@@ -1,0 +1,151 @@
+import { useEffect, useRef, useState } from 'react'
+import { ai } from '../ai/client'
+import { useModelStatus } from '../hooks/useModelStatus'
+import { useI18n } from '../i18n'
+import { ask, retrieve } from '../rag/ask'
+import type { ChatMessage } from '../types'
+
+function supportsWebGPU(): boolean {
+  return 'gpu' in navigator
+}
+
+export function ChatView() {
+  const { t } = useI18n()
+  const status = useModelStatus()
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [input, setInput] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [generatorWanted, setGeneratorWanted] = useState(false)
+  const bottomRef = useRef<HTMLDivElement>(null)
+
+  const canGenerate = supportsWebGPU()
+  const generatorReady = status.generator.status === 'ready'
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  const send = async () => {
+    const question = input.trim()
+    if (!question || busy) return
+    setInput('')
+    setBusy(true)
+    setMessages((m) => [...m, { role: 'user', content: question }])
+    try {
+      if (canGenerate && (generatorReady || generatorWanted)) {
+        setMessages((m) => [...m, { role: 'assistant', content: '' }])
+        const result = await ask(question, {
+          onToken: (token) =>
+            setMessages((m) => {
+              const next = [...m]
+              const last = next[next.length - 1]
+              next[next.length - 1] = { ...last, content: last.content + token }
+              return next
+            }),
+        })
+        setMessages((m) => {
+          const next = [...m]
+          next[next.length - 1] = {
+            role: 'assistant',
+            content: result.answer,
+            sources: result.sources,
+          }
+          return next
+        })
+      } else {
+        // Search-only mode: no WebGPU, or the user hasn't opted into the
+        // big generator download yet.
+        const sources = await retrieve(question)
+        setMessages((m) => [
+          ...m,
+          {
+            role: 'assistant',
+            content: sources.length > 0 ? '' : t('chatNoResults'),
+            sources,
+          },
+        ])
+      }
+    } catch {
+      setMessages((m) => [...m, { role: 'assistant', content: t('errorGeneric') }])
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="chat">
+      {!canGenerate && <div className="notice">{t('chatSearchOnlyNote')}</div>}
+      {canGenerate && !generatorReady && !generatorWanted && (
+        <div className="notice">
+          <button
+            className="primary"
+            onClick={() => {
+              setGeneratorWanted(true)
+              void ai.preload('generator').catch(() => {})
+            }}
+          >
+            {t('chatLoadModel')}
+          </button>
+          <p className="hint">{t('chatLoadModelHint')}</p>
+        </div>
+      )}
+      {generatorWanted && status.generator.status === 'loading' && (
+        <div className="notice">
+          <progress value={status.generator.progress} max={1} />
+          <p className="hint">
+            {Math.round(status.generator.progress * 100)}% — {status.generator.file ?? ''}
+          </p>
+        </div>
+      )}
+
+      <div className="messages">
+        {messages.length === 0 && (
+          <div className="empty">
+            <h2>{t('chatEmptyTitle')}</h2>
+            <p>{t('chatEmptyBody')}</p>
+          </div>
+        )}
+        {messages.map((msg, i) => (
+          <div key={i} className={`message ${msg.role}`}>
+            {msg.content && <div className="bubble">{msg.content}</div>}
+            {msg.sources && msg.sources.length > 0 && (
+              <details className="sources" open={!msg.content}>
+                <summary>
+                  {t('chatSources')} ({msg.sources.length})
+                </summary>
+                {msg.sources.map((s, j) => (
+                  <blockquote key={s.chunk_id}>
+                    <strong>
+                      [{j + 1}] {s.title}
+                    </strong>
+                    <p>{s.text}</p>
+                  </blockquote>
+                ))}
+              </details>
+            )}
+          </div>
+        ))}
+        {busy && <div className="message assistant thinking">{t('chatThinking')}</div>}
+        <div ref={bottomRef} />
+      </div>
+
+      <form
+        className="composer"
+        onSubmit={(e) => {
+          e.preventDefault()
+          void send()
+        }}
+      >
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder={t('chatPlaceholder')}
+          disabled={busy}
+        />
+        <button className="primary" type="submit" disabled={busy || !input.trim()}>
+          {t('chatSend')}
+        </button>
+      </form>
+    </div>
+  )
+}

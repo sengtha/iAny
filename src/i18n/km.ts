@@ -1,0 +1,75 @@
+import type { Translation } from './en'
+
+export const km: Translation = {
+  appTagline: 'បំប៉ន AI ពីអ្វីក៏បាន។ ដំណើរការ 100% ក្នុងឧបករណ៍របស់អ្នក។',
+  navChat: 'សន្ទនា',
+  navLibrary: 'បណ្ណាល័យ',
+  navPacks: 'កញ្ចប់ចំណេះ',
+  navSettings: 'ការកំណត់',
+
+  chatPlaceholder: 'សួរអ្វីក៏បានអំពីអ្វីដែលអ្នកបានបញ្ចូល…',
+  chatEmptyTitle: 'សួរមូលដ្ឋានចំណេះដឹងរបស់អ្នក',
+  chatEmptyBody:
+    'អ្វីៗទាំងអស់ដំណើរការក្រៅបណ្ដាញនៅក្នុងឧបករណ៍នេះ។ បញ្ចូលឯកសារនៅផ្ទាំងបណ្ណាល័យ រួចសួរសំណួរនៅទីនេះ — ជាភាសាខ្មែរ ឬអង់គ្លេស។',
+  chatSend: 'ផ្ញើ',
+  chatSources: 'ប្រភព',
+  chatSearchOnlyNote:
+    'ចម្លើយ AI ត្រូវការ WebGPU (Chrome/Edge លើកុំព្យូទ័រ)។ នៅលើឧបករណ៍នេះ iAny ដំណើរការជារបៀបស្វែងរក៖ អ្នកនឹងទទួលបានអត្ថបទពាក់ព័ន្ធបំផុត ជំនួសឲ្យចម្លើយបង្កើតដោយ AI។',
+  chatThinking: 'កំពុងគិត…',
+  chatLoadModel: 'ទាញយកម៉ូដែល AI',
+  chatLoadModelHint:
+    'ទាញយកតែម្ដង (~1.5 GB) បន្ទាប់មកដំណើរការក្រៅបណ្ដាញទាំងស្រុង។ សូមទុកផ្ទាំងនេះបើកចំហរហូតដល់បញ្ចប់។',
+  chatNoResults: 'មិនទាន់មានព័ត៌មានពាក់ព័ន្ធទេ។ សូមបញ្ចូលឯកសារបន្ថែមនៅបណ្ណាល័យ។',
+
+  libraryTitle: 'បំប៉ន iAny',
+  libraryBody: 'បញ្ចូលកាន់តែច្រើន វាកាន់តែឆ្លាត។ បិទភ្ជាប់អត្ថបទ ឬបន្ថែមឯកសារ — ខ្មែរ ឬអង់គ្លេស។',
+  libraryDocTitle: 'ចំណងជើង (មិនចាំបាច់)',
+  libraryDocText: 'បិទភ្ជាប់អត្ថបទណាមួយ…',
+  libraryAdd: 'បញ្ចូល',
+  libraryAddFile: 'បន្ថែមឯកសារ (.txt, .md)',
+  libraryEmpty: 'មិនទាន់មានឯកសារទេ។ បញ្ចូលអ្វីមួយឲ្យ iAny!',
+  libraryChunks: 'កំណាត់',
+  libraryDelete: 'លុប',
+  libraryIngesting: 'កំពុងរំលាយ…',
+  libraryEmbedding: 'កំពុងយល់ខ្លឹមសារ',
+  librarySaving: 'កំពុងរក្សាទុក',
+
+  packsTitle: 'កញ្ចប់ចំណេះដឹង',
+  packsBody:
+    'កញ្ចប់ គឺជាចំណេះដឹងរបស់អ្នកក្នុងឯកសារចល័តមួយ — ឯកសារ រួមទាំង embeddings AI។ នាំចេញជាការបម្រុងទុក ឬផ្លាស់ទីឧបករណ៍; នាំចូលកញ្ចប់ពីអ្នកដទៃ ហើយស្វែងរកបានភ្លាមៗ។',
+  packsExport: 'នាំចេញបណ្ណាល័យរបស់ខ្ញុំជាកញ្ចប់',
+  packsImport: 'នាំចូលកញ្ចប់',
+  packsEmpty: 'មិនទាន់មានកញ្ចប់នាំចូលទេ។',
+  packsDocuments: 'ឯកសារ',
+  packsDelete: 'ដកចេញ',
+  packsExportName: 'ឈ្មោះកញ្ចប់',
+  packsModelMismatch: 'កញ្ចប់នេះបង្កើតដោយម៉ូដែល embedding ផ្សេង មិនអាចនាំចូលបានទេ។',
+  packsInvalid: 'ឯកសារនេះមិនមែនជាកញ្ចប់ iAny ត្រឹមត្រូវទេ។',
+  packsImported: 'នាំចូលកញ្ចប់រួចរាល់ — ខ្លឹមសាររបស់វាអាចស្វែងរកបានហើយ។',
+  packsEmptyLibrary: 'បណ្ណាល័យរបស់អ្នកទទេ — គ្មានអ្វីនាំចេញទេ។',
+
+  settingsTitle: 'ការកំណត់',
+  settingsLanguage: 'Language / ភាសា',
+  settingsModels: 'ម៉ូដែល AI',
+  settingsEmbedder: 'ម៉ូដែលយល់ដឹង (EmbeddingGemma 300M)',
+  settingsGenerator: 'ម៉ូដែលឆ្លើយ (Gemma 4 E2B)',
+  settingsModelIdle: 'មិនទាន់ទាញយកទេ',
+  settingsModelLoading: 'កំពុងទាញយក…',
+  settingsModelReady: 'រួចរាល់ — ដំណើរការក្រៅបណ្ដាញ',
+  settingsModelError: 'ទាញយកបរាជ័យ',
+  settingsModelUnsupported: 'ត្រូវការ WebGPU (មិនមាននៅឧបករណ៍នេះ)',
+  settingsDownload: 'ទាញយក',
+  settingsStorage: 'ឃ្លាំងផ្ទុក',
+  settingsStoragePersisted: 'ការពាររួច — កម្មវិធីរុករកនឹងមិនលុបទិន្នន័យរបស់អ្នកទេ។',
+  settingsStorageNotPersisted:
+    'មិនទាន់ការពារ — កម្មវិធីរុករកអាចលុបទិន្នន័យរបស់អ្នក ពេលឃ្លាំងផ្ទុកជិតពេញ។',
+  settingsStorageRequest: 'ការពារទិន្នន័យរបស់ខ្ញុំ',
+  settingsStats: 'មូលដ្ឋានចំណេះដឹង',
+  settingsStatsDocs: 'ឯកសារ',
+  settingsStatsChunks: 'កំណាត់ចំណេះដឹង',
+  settingsDanger: 'តំបន់គ្រោះថ្នាក់',
+  settingsWipe: 'លុបទាំងអស់',
+  settingsWipeConfirm: 'លុបឯកសារ កញ្ចប់ និងកំណាត់ទាំងអស់? មិនអាចត្រឡប់វិញបានទេ។',
+
+  errorGeneric: 'មានបញ្ហាកើតឡើង។ សូមព្យាយាមម្ដងទៀត។',
+}

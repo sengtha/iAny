@@ -1,0 +1,75 @@
+export const en = {
+  appTagline: 'Feed AI from anything. 100% on your device.',
+  navChat: 'Chat',
+  navLibrary: 'Library',
+  navPacks: 'Packs',
+  navSettings: 'Settings',
+
+  chatPlaceholder: 'Ask anything about what you fed me…',
+  chatEmptyTitle: 'Ask your knowledge base',
+  chatEmptyBody:
+    'Everything runs offline on this device. Feed documents in the Library tab, then ask questions here — in English or Khmer.',
+  chatSend: 'Send',
+  chatSources: 'Sources',
+  chatSearchOnlyNote:
+    'AI answers need WebGPU (Chrome/Edge on desktop). On this device iAny runs in search mode: you get the most relevant passages instead of a generated answer.',
+  chatThinking: 'Thinking…',
+  chatLoadModel: 'Load the AI model',
+  chatLoadModelHint:
+    'One-time download (~1.5 GB), then it works fully offline. Keep the tab open until it finishes.',
+  chatNoResults: 'Nothing relevant found yet. Try feeding more material in the Library.',
+
+  libraryTitle: 'Feed iAny',
+  libraryBody: 'The more you feed it, the smarter it gets. Paste text or add files — Khmer or English.',
+  libraryDocTitle: 'Title (optional)',
+  libraryDocText: 'Paste any text…',
+  libraryAdd: 'Feed it',
+  libraryAddFile: 'Add files (.txt, .md)',
+  libraryEmpty: 'No documents yet. Feed iAny something!',
+  libraryChunks: 'chunks',
+  libraryDelete: 'Delete',
+  libraryIngesting: 'Digesting…',
+  libraryEmbedding: 'Understanding content',
+  librarySaving: 'Saving',
+
+  packsTitle: 'Knowledge packs',
+  packsBody:
+    'A pack is your knowledge in a portable file — documents plus AI embeddings. Export as a backup or to move devices; import packs from others and they are instantly searchable.',
+  packsExport: 'Export my library as a pack',
+  packsImport: 'Import a pack',
+  packsEmpty: 'No imported packs yet.',
+  packsDocuments: 'documents',
+  packsDelete: 'Remove',
+  packsExportName: 'Pack name',
+  packsModelMismatch: 'This pack was built with a different embedding model and cannot be imported.',
+  packsInvalid: 'This file is not a valid iAny pack.',
+  packsImported: 'Pack imported — its content is now searchable.',
+  packsEmptyLibrary: 'Your library is empty — nothing to export yet.',
+
+  settingsTitle: 'Settings',
+  settingsLanguage: 'Language / ភាសា',
+  settingsModels: 'AI models',
+  settingsEmbedder: 'Understanding model (EmbeddingGemma 300M)',
+  settingsGenerator: 'Answering model (Gemma 4 E2B)',
+  settingsModelIdle: 'Not downloaded yet',
+  settingsModelLoading: 'Downloading…',
+  settingsModelReady: 'Ready — works offline',
+  settingsModelError: 'Failed to load',
+  settingsModelUnsupported: 'Needs WebGPU (not available on this device)',
+  settingsDownload: 'Download',
+  settingsStorage: 'Storage',
+  settingsStoragePersisted: 'Protected — the browser will not evict your data.',
+  settingsStorageNotPersisted:
+    'Not protected — the browser could evict your data under storage pressure.',
+  settingsStorageRequest: 'Protect my data',
+  settingsStats: 'Knowledge base',
+  settingsStatsDocs: 'documents',
+  settingsStatsChunks: 'knowledge chunks',
+  settingsDanger: 'Danger zone',
+  settingsWipe: 'Erase everything',
+  settingsWipeConfirm: 'Erase all documents, packs and chunks? This cannot be undone.',
+
+  errorGeneric: 'Something went wrong. Please try again.',
+}
+
+export type Translation = typeof en
