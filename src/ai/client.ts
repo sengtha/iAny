@@ -23,6 +23,12 @@ class AIClient {
     if (!this.worker) {
       this.worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
       this.worker.onmessage = (e: MessageEvent<AIResponse>) => this.handle(e.data)
+      // Optional mirror/self-hosted model source for networks where
+      // huggingface.co is unreachable (set localStorage 'iany.modelHost').
+      const modelHost = localStorage.getItem('iany.modelHost')
+      if (modelHost) {
+        void this.request({ id: crypto.randomUUID(), type: 'configure', modelHost })
+      }
     }
     return this.worker
   }

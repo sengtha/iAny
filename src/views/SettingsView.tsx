@@ -3,6 +3,7 @@ import { ai } from '../ai/client'
 import { useModelStatus } from '../hooks/useModelStatus'
 import { useI18n } from '../i18n'
 import { getStats, wipeDatabase, type DbStats } from '../db/documents'
+import { runDiagnostics, type DiagnosticResult } from '../lib/diagnostics'
 import type { Language, ModelProgress } from '../types'
 
 function ModelCard({ label, model, onDownload }: {
@@ -33,6 +34,35 @@ function ModelCard({ label, model, onDownload }: {
         <button className="primary" onClick={onDownload}>
           {model.status === 'error' ? t('settingsRetry') : t('settingsDownload')}
         </button>
+      )}
+    </div>
+  )
+}
+
+function Diagnostics() {
+  const { t } = useI18n()
+  const [results, setResults] = useState<DiagnosticResult[] | null>(null)
+  const [running, setRunning] = useState(false)
+
+  const run = async () => {
+    setRunning(true)
+    setResults(await runDiagnostics())
+    setRunning(false)
+  }
+
+  return (
+    <div className="diagnostics">
+      <button disabled={running} onClick={() => void run()}>
+        {t('settingsDiagnose')}
+      </button>
+      {results && (
+        <ul className="diag-list">
+          {results.map((r) => (
+            <li key={r.name} className={r.ok ? 'ok' : 'fail'}>
+              {r.ok ? '✅' : '❌'} {r.name} — {r.detail}
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   )
@@ -83,6 +113,7 @@ export function SettingsView() {
           model={status.generator}
           onDownload={() => void ai.preload('generator').catch(() => {})}
         />
+        <Diagnostics />
       </section>
 
       <section className="card">

@@ -291,6 +291,27 @@ button:focus-visible {
   word-break: break-word;
 }
 
+.diagnostics {
+  margin-top: 8px;
+}
+
+.diag-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+}
+
+.diag-list li {
+  padding: 4px 0;
+  overflow-wrap: anywhere;
+}
+
+.diag-list li.fail {
+  color: var(--danger);
+}
+
 .empty {
   text-align: center;
   color: var(--fg-muted);

@@ -24,6 +24,9 @@ import type { AIRequest, AIResponse } from './protocol'
 if (env.backends.onnx?.wasm) {
   env.backends.onnx.wasm.wasmPaths = `${self.location.origin}/ort/`
 }
+// Never probe `${origin}/models/...` for weights: with an SPA fallback every
+// URL answers 200 with index.html, which poisons the local-model check.
+env.allowLocalModels = false
 
 const post = (msg: AIResponse) => self.postMessage(msg)
 
@@ -212,6 +215,14 @@ self.onmessage = async (e: MessageEvent<AIRequest>) => {
   const req = e.data
   try {
     switch (req.type) {
+      case 'configure': {
+        // Escape hatch for networks where huggingface.co is unreachable:
+        // point model downloads at a mirror or self-hosted bucket that
+        // exposes the same <host>/<model-id>/resolve/<revision>/<file> layout.
+        if (req.modelHost) env.remoteHost = req.modelHost
+        post({ id: req.id, type: 'result', data: null })
+        break
+      }
       case 'preload': {
         if (req.target === 'embedder') await getEmbedder()
         else await getGenerator()
