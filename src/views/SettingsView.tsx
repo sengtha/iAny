@@ -35,6 +35,7 @@ function ModelCard({ label, model, onDownload }: {
   const { t } = useI18n()
   const statusText = {
     idle: t('settingsModelIdle'),
+    cached: t('settingsModelCached'),
     loading: t('settingsModelLoading'),
     ready: t('settingsModelReady'),
     error: t('settingsModelError'),
@@ -103,6 +104,7 @@ function ModelShare() {
       const result = await importModelBundle(file)
       setMessage(`${t('modelShareImported')} (${result.model}, ${result.files})`)
       refresh()
+      void ai.refreshCachedStatus()
     } catch {
       setMessage(t('modelShareInvalid'))
     } finally {

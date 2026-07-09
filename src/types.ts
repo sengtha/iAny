@@ -82,7 +82,9 @@ export interface KnowledgePack {
   chunks: PackChunk[]
 }
 
-export type ModelStatus = 'idle' | 'loading' | 'ready' | 'error' | 'unsupported'
+/** 'cached': weights are downloaded (present in the Cache API) but not yet
+ *  loaded into memory — loading from disk is fast and happens on demand. */
+export type ModelStatus = 'idle' | 'cached' | 'loading' | 'ready' | 'error' | 'unsupported'
 
 export interface ModelProgress {
   target: 'embedder' | 'generator'

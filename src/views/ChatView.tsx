@@ -19,7 +19,9 @@ export function ChatView() {
   const bottomRef = useRef<HTMLDivElement>(null)
 
   const canGenerate = supportsWebGPU()
-  const generatorReady = status.generator.status === 'ready'
+  // 'cached' counts as available: weights are on disk and load on demand.
+  const generatorReady =
+    status.generator.status === 'ready' || status.generator.status === 'cached'
 
   useEffect(() => {
     const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -90,7 +92,7 @@ export function ChatView() {
           <p className="hint">{t('chatLoadModelHint')}</p>
         </div>
       )}
-      {generatorWanted && status.generator.status === 'loading' && (
+      {status.generator.status === 'loading' && (
         <div className="notice">
           <progress value={status.generator.progress} max={1} />
           <p className="hint">

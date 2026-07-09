@@ -1,4 +1,10 @@
-import type { ModelProgress, ModelStatus } from '../types'
+import { hasModelWeightsCached } from '../lib/modelShare'
+import {
+  EMBEDDING_MODEL_ID,
+  GENERATION_MODEL_ID,
+  type ModelProgress,
+  type ModelStatus,
+} from '../types'
 import type { AIRequest, AIResponse } from './protocol'
 
 type Pending = {
@@ -17,6 +23,28 @@ class AIClient {
   readonly status: Record<'embedder' | 'generator', ModelProgress> = {
     embedder: { target: 'embedder', status: 'idle', progress: 0 },
     generator: { target: 'generator', status: 'idle', progress: 0 },
+  }
+
+  constructor() {
+    void this.refreshCachedStatus()
+  }
+
+  /** Reflect what is already downloaded so the UI survives a refresh:
+   *  weights in the Cache API => 'cached' instead of 'idle'. */
+  async refreshCachedStatus(): Promise<void> {
+    const targets = [
+      { target: 'embedder', model: EMBEDDING_MODEL_ID },
+      { target: 'generator', model: GENERATION_MODEL_ID },
+    ] as const
+    for (const { target, model } of targets) {
+      try {
+        if (this.status[target].status === 'idle' && (await hasModelWeightsCached(model))) {
+          this.update(target, { status: 'cached', progress: 1 })
+        }
+      } catch {
+        // Cache API unavailable (e.g. private mode) — leave as idle.
+      }
+    }
   }
 
   private getWorker(): Worker {
@@ -82,14 +110,16 @@ class AIClient {
   }
 
   preload(target: 'embedder' | 'generator'): Promise<void> {
-    if (this.status[target].status === 'idle') {
+    if (this.status[target].status === 'idle' || this.status[target].status === 'cached') {
       this.update(target, { status: 'loading' })
     }
     return this.request({ id: crypto.randomUUID(), type: 'preload', target }).then(() => {})
   }
 
   async embed(texts: string[], kind: 'query' | 'document'): Promise<Float32Array[]> {
-    if (this.status.embedder.status === 'idle') this.update('embedder', { status: 'loading' })
+    if (this.status.embedder.status === 'idle' || this.status.embedder.status === 'cached') {
+      this.update('embedder', { status: 'loading' })
+    }
     return (await this.request({
       id: crypto.randomUUID(),
       type: 'embed',
@@ -102,7 +132,9 @@ class AIClient {
     messages: { role: string; content: string }[],
     opts: { maxNewTokens?: number; onToken?: (t: string) => void } = {},
   ): Promise<string> {
-    if (this.status.generator.status === 'idle') this.update('generator', { status: 'loading' })
+    if (this.status.generator.status === 'idle' || this.status.generator.status === 'cached') {
+      this.update('generator', { status: 'loading' })
+    }
     return (await this.request(
       {
         id: crypto.randomUUID(),

@@ -52,6 +52,7 @@ export const en = {
   settingsEmbedder: 'Understanding model (EmbeddingGemma 300M)',
   settingsGenerator: 'Answering model (Gemma 4 E2B)',
   settingsModelIdle: 'Not downloaded yet',
+  settingsModelCached: 'Downloaded — works offline, loads when needed',
   settingsModelLoading: 'Downloading…',
   settingsModelReady: 'Ready — works offline',
   settingsModelError: 'Failed to load',

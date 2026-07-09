@@ -54,6 +54,7 @@ export const km: Translation = {
   settingsEmbedder: 'ម៉ូដែលយល់ដឹង (EmbeddingGemma 300M)',
   settingsGenerator: 'ម៉ូដែលឆ្លើយ (Gemma 4 E2B)',
   settingsModelIdle: 'មិនទាន់ទាញយកទេ',
+  settingsModelCached: 'ទាញយករួច — ដំណើរការក្រៅបណ្ដាញ ផ្ទុកពេលត្រូវការ',
   settingsModelLoading: 'កំពុងទាញយក…',
   settingsModelReady: 'រួចរាល់ — ដំណើរការក្រៅបណ្ដាញ',
   settingsModelError: 'ទាញយកបរាជ័យ',

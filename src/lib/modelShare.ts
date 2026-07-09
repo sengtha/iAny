@@ -41,6 +41,13 @@ async function matchingRequests(modelId: string): Promise<Request[]> {
   return (await cache.keys()).filter((req) => req.url.includes(`${modelId}/`))
 }
 
+/** Cheap check: are the model's weights on disk? (Presence of an .onnx
+ *  entry — config/tokenizer alone doesn't count as downloaded.) */
+export async function hasModelWeightsCached(modelId: string): Promise<boolean> {
+  const reqs = await matchingRequests(modelId)
+  return reqs.some((r) => r.url.includes('.onnx'))
+}
+
 /** What is available to export for this model (null if nothing cached). */
 export async function getCachedModelInfo(modelId: string): Promise<ModelBundleInfo | null> {
   const reqs = await matchingRequests(modelId)
