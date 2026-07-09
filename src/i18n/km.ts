@@ -55,10 +55,12 @@ export const km: Translation = {
   settingsGenerator: 'ម៉ូដែលឆ្លើយ (Gemma 4 E2B)',
   settingsGeneratorCompact: 'ម៉ូដែលឆ្លើយ (Gemma 3 1B — ស្រាល)',
   settingsGeneratorTiny: 'ម៉ូដែលឆ្លើយ (Gemma 3 270M — តូចបំផុត)',
+  settingsGeneratorMax: 'ម៉ូដែលឆ្លើយ (Gemma 4 E4B — អតិបរមា)',
   settingsGenChoiceLabel: 'ទំហំម៉ូដែលឆ្លើយ (ការផ្លាស់ប្ដូរនឹងផ្ទុកកម្មវិធីឡើងវិញ)៖',
   settingsGenTiny: 'តូចបំផុត — ~0.25 GB ទូរស័ព្ទណាក៏បាន',
   settingsGenCompact: 'ស្រាល — ~0.7 GB សម្រាប់ទូរស័ព្ទ',
   settingsGenFull: 'ពេញ — ~1.5 GB សម្រាប់ឧបករណ៍ខ្លាំង',
+  settingsGenMax: 'អតិបរមា — ~3 GB កាតក្រាហ្វិកខ្លាំង (កុំព្យូទ័រ)',
   genCrashWarning:
     'ការផ្ទុកម៉ូដែលឆ្លើយ ហាក់ដូចជាបានធ្វើឲ្យកម្មវិធីរុករកគាំងលើកមុន — វាប្រហែលជាធំពេកសម្រាប់ឧបករណ៍នេះ។ សូមសាកល្បងម៉ូដែលតូចជាង។',
   genCrashUseSmaller: 'ប្រើម៉ូដែលតូចជាង',

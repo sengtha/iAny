@@ -23,11 +23,9 @@ import {
   type ModelBundleInfo,
 } from '../lib/modelShare'
 import {
-  COMPACT_GENERATION_MODEL_ID,
   EMBEDDING_MODEL_ID,
-  GENERATION_MODEL_ID,
+  GEN_MODELS,
   MODEL_MIN_COMPLETE_BYTES,
-  TINY_GENERATION_MODEL_ID,
   type Language,
   type ModelProgress,
 } from '../types'
@@ -70,9 +68,7 @@ function ModelShare() {
   const { t } = useI18n()
   const models = [
     { id: EMBEDDING_MODEL_ID, name: 'EmbeddingGemma' },
-    { id: GENERATION_MODEL_ID, name: 'Gemma 4 E2B' },
-    { id: COMPACT_GENERATION_MODEL_ID, name: 'Gemma 3 1B' },
-    { id: TINY_GENERATION_MODEL_ID, name: 'Gemma 3 270M' },
+    ...GEN_MODELS.map((m) => ({ id: m.id, name: m.name })),
   ]
   const [cached, setCached] = useState<Record<string, ModelBundleInfo | null>>({})
   const [busy, setBusy] = useState(false)
@@ -364,9 +360,10 @@ export function SettingsView() {
         <ModelCard
           label={
             {
-              full: t('settingsGenerator'),
-              compact: t('settingsGeneratorCompact'),
               tiny: t('settingsGeneratorTiny'),
+              compact: t('settingsGeneratorCompact'),
+              full: t('settingsGenerator'),
+              max: t('settingsGeneratorMax'),
             }[getGenModelChoice()]
           }
           model={status.generator}
@@ -374,25 +371,23 @@ export function SettingsView() {
         />
         {getCrashSuspect() !== null && <p className="error">{t('genCrashWarning')}</p>}
         <p className="hint">{t('settingsGenChoiceLabel')}</p>
-        <div className="row">
-          <button
-            className={getGenModelChoice() === 'tiny' ? 'primary' : ''}
-            onClick={() => getGenModelChoice() !== 'tiny' && setGenModelChoice('tiny')}
-          >
-            {t('settingsGenTiny')}
-          </button>
-          <button
-            className={getGenModelChoice() === 'compact' ? 'primary' : ''}
-            onClick={() => getGenModelChoice() !== 'compact' && setGenModelChoice('compact')}
-          >
-            {t('settingsGenCompact')}
-          </button>
-          <button
-            className={getGenModelChoice() === 'full' ? 'primary' : ''}
-            onClick={() => getGenModelChoice() !== 'full' && setGenModelChoice('full')}
-          >
-            {t('settingsGenFull')}
-          </button>
+        <div className="row gen-choices">
+          {GEN_MODELS.map((m) => (
+            <button
+              key={m.choice}
+              className={getGenModelChoice() === m.choice ? 'primary' : ''}
+              onClick={() => getGenModelChoice() !== m.choice && setGenModelChoice(m.choice)}
+            >
+              {
+                {
+                  tiny: t('settingsGenTiny'),
+                  compact: t('settingsGenCompact'),
+                  full: t('settingsGenFull'),
+                  max: t('settingsGenMax'),
+                }[m.choice]
+              }
+            </button>
+          ))}
         </div>
         <ModelShare />
         <Diagnostics />

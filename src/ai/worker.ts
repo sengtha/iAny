@@ -15,11 +15,10 @@ import {
   type TextGenerationPipeline,
 } from '@huggingface/transformers'
 import {
-  COMPACT_GENERATION_MODEL_ID,
   EMBEDDING_DIMS,
   EMBEDDING_MODEL_ID,
+  GEN_MODELS,
   GENERATION_MODEL_ID,
-  TINY_GENERATION_MODEL_ID,
 } from '../types'
 import type { AIRequest, AIResponse } from './protocol'
 import { createResumableFetch, purgeStalePartials } from './resumable'
@@ -101,9 +100,7 @@ function progressForwarder(target: 'embedder' | 'generator') {
 env.fetch = createResumableFetch(
   (url) =>
     url.includes(`${EMBEDDING_MODEL_ID}/`) ||
-    url.includes(`${GENERATION_MODEL_ID}/`) ||
-    url.includes(`${COMPACT_GENERATION_MODEL_ID}/`) ||
-    url.includes(`${TINY_GENERATION_MODEL_ID}/`),
+    GEN_MODELS.some((m) => url.includes(`${m.id}/`)),
   (url, loaded, total) => {
     const file = url.slice(url.lastIndexOf('/') + 1)
     reportFileProgress(currentTarget, file, loaded, total)
@@ -181,9 +178,11 @@ function getGenerator(): Promise<TextGenerationPipeline> {
     generatorPromise = (async () => {
       currentTarget = 'generator'
       const webgpu = !forceWasm && (await hasWebGPU())
-      // Gemma 4 E2B is too heavy for CPU inference; the Gemma 3 tiers run
-      // on WASM at usable speed, so they work even without (working) WebGPU.
-      if (!webgpu && generationModelId === GENERATION_MODEL_ID) {
+      const cpuOk = GEN_MODELS.find((m) => m.id === generationModelId)?.cpuOk ?? false
+      // Gemma 4 tiers are too heavy for CPU inference; the Gemma 3 tiers
+      // run on WASM at usable speed, so they work even without (working)
+      // WebGPU.
+      if (!webgpu && !cpuOk) {
         post({ type: 'status', target: 'generator', status: 'unsupported' })
         throw new Error('webgpu-unavailable')
       }
@@ -191,18 +190,17 @@ function getGenerator(): Promise<TextGenerationPipeline> {
       // Gemma 3 q4f16 builds overflow on WebGPU). q4 block quantization
       // needs GatherBlockQuantized, which the WASM CPU engine lacks — CPU
       // must use q8.
-      const attempts: LoadAttempt[] =
-        generationModelId === GENERATION_MODEL_ID
+      const attempts: LoadAttempt[] = !cpuOk
+        ? [
+            { device: 'webgpu', dtype: 'q4f16' },
+            { device: 'webgpu', dtype: 'q4' },
+          ]
+        : webgpu
           ? [
-              { device: 'webgpu', dtype: 'q4f16' },
               { device: 'webgpu', dtype: 'q4' },
+              { device: 'wasm', dtype: 'q8' },
             ]
-          : webgpu
-            ? [
-                { device: 'webgpu', dtype: 'q4' },
-                { device: 'wasm', dtype: 'q8' },
-              ]
-            : [{ device: 'wasm', dtype: 'q8' }]
+          : [{ device: 'wasm', dtype: 'q8' }]
       const generator = await loadWithFallback(attempts, async ({ device, dtype }) => {
         const p = await pipeline('text-generation', generationModelId, {
           dtype: dtype as 'q4f16',
@@ -297,7 +295,7 @@ async function generate(
     // retry once — except for Gemma 4 E2B, which is too heavy for WASM.
     const retryable =
       generatorDevice === 'webgpu' &&
-      generationModelId !== GENERATION_MODEL_ID &&
+      (GEN_MODELS.find((m) => m.id === generationModelId)?.cpuOk ?? false) &&
       GPU_RUNTIME_ERROR.test(message)
     if (!retryable) throw e
     console.warn('[iAny] WebGPU inference failed, retrying on CPU:', message)

@@ -11,7 +11,7 @@ import {
 import { useModelStatus } from '../hooks/useModelStatus'
 import { useI18n } from '../i18n'
 import { ask, retrieve } from '../rag/ask'
-import type { ChatMessage } from '../types'
+import { nextSmallerChoice, type ChatMessage } from '../types'
 
 function supportsWebGPU(): boolean {
   return 'gpu' in navigator
@@ -112,12 +112,10 @@ export function ChatView() {
         <div className="notice">
           <p className="error">{t('genCrashWarning')}</p>
           <div className="row">
-            {getGenModelChoice() !== 'tiny' && (
+            {nextSmallerChoice(getGenModelChoice()) && (
               <button
                 className="primary"
-                onClick={() =>
-                  setGenModelChoice(getGenModelChoice() === 'full' ? 'compact' : 'tiny')
-                }
+                onClick={() => setGenModelChoice(nextSmallerChoice(getGenModelChoice())!)}
               >
                 {t('genCrashUseSmaller')}
               </button>

@@ -1,9 +1,9 @@
 import { hasModelWeightsCached } from '../lib/modelShare'
 import {
-  COMPACT_GENERATION_MODEL_ID,
   EMBEDDING_MODEL_ID,
-  GENERATION_MODEL_ID,
-  TINY_GENERATION_MODEL_ID,
+  GEN_MODELS,
+  genModelSpec,
+  nextSmallerChoice,
   type GenModelChoice,
   type ModelProgress,
   type ModelStatus,
@@ -35,17 +35,15 @@ export function getLastGenDevice(): 'webgpu' | 'wasm' | null {
  *  crashes phone browsers, so low-memory/mobile devices default compact. */
 export function getGenModelChoice(): GenModelChoice {
   const saved = localStorage.getItem(GEN_MODEL_KEY)
-  if (saved === 'full' || saved === 'compact' || saved === 'tiny') return saved
+  if (saved && GEN_MODELS.some((m) => m.choice === saved)) return saved as GenModelChoice
+  // 'max' is opt-in only — the default tops out at 'full'.
   const deviceMemory = (navigator as { deviceMemory?: number }).deviceMemory
   if (deviceMemory !== undefined) return deviceMemory >= 8 ? 'full' : 'compact'
   return navigator.maxTouchPoints > 1 ? 'compact' : 'full'
 }
 
 export function getGenModelId(): string {
-  const choice = getGenModelChoice()
-  if (choice === 'tiny') return TINY_GENERATION_MODEL_ID
-  if (choice === 'compact') return COMPACT_GENERATION_MODEL_ID
-  return GENERATION_MODEL_ID
+  return genModelSpec(getGenModelChoice()).id
 }
 
 /** Persists the choice and reloads so the AI worker starts clean. */
@@ -66,9 +64,8 @@ export const crashRecovery: { downgradedTo: GenModelChoice | null; stuckAtTiny: 
   (() => {
     try {
       if (getCrashSuspect() !== getGenModelId()) return { downgradedTo: null, stuckAtTiny: false }
-      const choice = getGenModelChoice()
-      if (choice === 'tiny') return { downgradedTo: null, stuckAtTiny: true }
-      const next: GenModelChoice = choice === 'full' ? 'compact' : 'tiny'
+      const next = nextSmallerChoice(getGenModelChoice())
+      if (!next) return { downgradedTo: null, stuckAtTiny: true }
       localStorage.setItem(GEN_MODEL_KEY, next)
       clearCrashGuard()
       return { downgradedTo: next, stuckAtTiny: false }

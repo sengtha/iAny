@@ -53,10 +53,12 @@ export const en = {
   settingsGenerator: 'Answering model (Gemma 4 E2B)',
   settingsGeneratorCompact: 'Answering model (Gemma 3 1B — light)',
   settingsGeneratorTiny: 'Answering model (Gemma 3 270M — tiny)',
+  settingsGeneratorMax: 'Answering model (Gemma 4 E4B — max)',
   settingsGenChoiceLabel: 'Answering model size (changing reloads the app):',
   settingsGenTiny: 'Tiny — ~0.25 GB, any phone',
   settingsGenCompact: 'Light — ~0.7 GB, for phones',
   settingsGenFull: 'Full — ~1.5 GB, powerful devices',
+  settingsGenMax: 'Max — ~3 GB, high-end GPU (desktop)',
   genCrashWarning:
     'Loading the answering model seems to have crashed the browser last time — it is probably too big for this device. Try a smaller model size.',
   genCrashUseSmaller: 'Use a smaller model',
