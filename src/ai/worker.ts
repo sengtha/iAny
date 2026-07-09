@@ -14,7 +14,12 @@ import {
   type FeatureExtractionPipeline,
   type TextGenerationPipeline,
 } from '@huggingface/transformers'
-import { EMBEDDING_DIMS, EMBEDDING_MODEL_ID, GENERATION_MODEL_ID } from '../types'
+import {
+  COMPACT_GENERATION_MODEL_ID,
+  EMBEDDING_DIMS,
+  EMBEDDING_MODEL_ID,
+  GENERATION_MODEL_ID,
+} from '../types'
 import type { AIRequest, AIResponse } from './protocol'
 import { createResumableFetch } from './resumable'
 
@@ -86,7 +91,10 @@ function progressForwarder(target: 'embedder' | 'generator') {
 // Transformers.js routes every download through env.fetch (NOT the global
 // fetch), so the wrapper must be installed there.
 env.fetch = createResumableFetch(
-  (url) => url.includes(`${EMBEDDING_MODEL_ID}/`) || url.includes(`${GENERATION_MODEL_ID}/`),
+  (url) =>
+    url.includes(`${EMBEDDING_MODEL_ID}/`) ||
+    url.includes(`${GENERATION_MODEL_ID}/`) ||
+    url.includes(`${COMPACT_GENERATION_MODEL_ID}/`),
   (url, loaded, total) => {
     const file = url.slice(url.lastIndexOf('/') + 1)
     reportFileProgress(currentTarget, file, loaded, total)
@@ -152,6 +160,7 @@ function getEmbedder(): Promise<FeatureExtractionPipeline> {
   return embedderPromise
 }
 
+let generationModelId = GENERATION_MODEL_ID
 let generatorPromise: Promise<TextGenerationPipeline> | null = null
 function getGenerator(): Promise<TextGenerationPipeline> {
   if (!generatorPromise) {
@@ -161,18 +170,21 @@ function getGenerator(): Promise<TextGenerationPipeline> {
         post({ type: 'status', target: 'generator', status: 'unsupported' })
         throw new Error('webgpu-unavailable')
       }
-      // q4f16 needs shader-f16 support; q4 covers GPUs without it.
-      const generator = await loadWithFallback(
-        [
-          { device: 'webgpu', dtype: 'q4f16' },
-          { device: 'webgpu', dtype: 'q4' },
-        ],
-        ({ device, dtype }) =>
-          pipeline('text-generation', GENERATION_MODEL_ID, {
-            dtype: dtype as 'q4f16',
-            device,
-            progress_callback: progressForwarder('generator'),
-          }),
+      // q4f16 needs shader-f16 support; q4 covers GPUs without it. The
+      // compact Gemma 3 build is q4-only (q4f16 overflows on WebGPU).
+      const attempts: LoadAttempt[] =
+        generationModelId === COMPACT_GENERATION_MODEL_ID
+          ? [{ device: 'webgpu', dtype: 'q4' }]
+          : [
+              { device: 'webgpu', dtype: 'q4f16' },
+              { device: 'webgpu', dtype: 'q4' },
+            ]
+      const generator = await loadWithFallback(attempts, ({ device, dtype }) =>
+        pipeline('text-generation', generationModelId, {
+          dtype: dtype as 'q4f16',
+          device,
+          progress_callback: progressForwarder('generator'),
+        }),
       )
       post({ type: 'status', target: 'generator', status: 'ready' })
       return generator
@@ -251,6 +263,7 @@ self.onmessage = async (e: MessageEvent<AIRequest>) => {
         // point model downloads at a mirror or self-hosted bucket that
         // exposes the same <host>/<model-id>/resolve/<revision>/<file> layout.
         if (req.modelHost) env.remoteHost = req.modelHost
+        if (req.generationModel) generationModelId = req.generationModel
         post({ id: req.id, type: 'result', data: null })
         break
       }

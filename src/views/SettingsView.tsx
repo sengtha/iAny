@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ai } from '../ai/client'
+import { ai, getGenModelChoice, setGenModelChoice } from '../ai/client'
 import { useModelStatus } from '../hooks/useModelStatus'
 import { useI18n } from '../i18n'
 import { getStats, wipeDatabase, type DbStats } from '../db/documents'
@@ -21,6 +21,7 @@ import {
   type ModelBundleInfo,
 } from '../lib/modelShare'
 import {
+  COMPACT_GENERATION_MODEL_ID,
   EMBEDDING_MODEL_ID,
   GENERATION_MODEL_ID,
   MODEL_MIN_COMPLETE_BYTES,
@@ -67,6 +68,7 @@ function ModelShare() {
   const models = [
     { id: EMBEDDING_MODEL_ID, name: 'EmbeddingGemma' },
     { id: GENERATION_MODEL_ID, name: 'Gemma 4 E2B' },
+    { id: COMPACT_GENERATION_MODEL_ID, name: 'Gemma 3 1B' },
   ]
   const [cached, setCached] = useState<Record<string, ModelBundleInfo | null>>({})
   const [busy, setBusy] = useState(false)
@@ -332,10 +334,29 @@ export function SettingsView() {
           onDownload={() => void ai.preload('embedder').catch(() => {})}
         />
         <ModelCard
-          label={t('settingsGenerator')}
+          label={
+            getGenModelChoice() === 'compact'
+              ? t('settingsGeneratorCompact')
+              : t('settingsGenerator')
+          }
           model={status.generator}
           onDownload={() => void ai.preload('generator').catch(() => {})}
         />
+        <p className="hint">{t('settingsGenChoiceLabel')}</p>
+        <div className="row">
+          <button
+            className={getGenModelChoice() === 'compact' ? 'primary' : ''}
+            onClick={() => getGenModelChoice() !== 'compact' && setGenModelChoice('compact')}
+          >
+            {t('settingsGenCompact')}
+          </button>
+          <button
+            className={getGenModelChoice() === 'full' ? 'primary' : ''}
+            onClick={() => getGenModelChoice() !== 'full' && setGenModelChoice('full')}
+          >
+            {t('settingsGenFull')}
+          </button>
+        </div>
         <ModelShare />
         <Diagnostics />
       </section>

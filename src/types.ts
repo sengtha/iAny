@@ -7,6 +7,12 @@ export const EMBEDDING_MODEL_ID = 'onnx-community/embeddinggemma-300m-ONNX'
  *  renormalize. 3x smaller storage and faster HNSW with minimal quality loss. */
 export const EMBEDDING_DIMS = 256
 export const GENERATION_MODEL_ID = 'onnx-community/gemma-4-E2B-it-ONNX'
+/** Compact answering model for memory-constrained devices (phones): loading
+ *  Gemma 4 E2B needs ~3 GB of tab memory, which crashes most mobile
+ *  browsers. Gemma 3 1B (GQA build, optimized for WebGPU) is ~700 MB and
+ *  still strongly multilingual. */
+export const COMPACT_GENERATION_MODEL_ID = 'onnx-community/gemma-3-1b-it-ONNX-GQA'
+export type GenModelChoice = 'full' | 'compact'
 
 /** A model counts as fully downloaded only above these sizes — config and
  *  tokenizer files alone (or an interrupted weight download) must not show
@@ -15,6 +21,7 @@ export const GENERATION_MODEL_ID = 'onnx-community/gemma-4-E2B-it-ONNX'
 export const MODEL_MIN_COMPLETE_BYTES: Record<string, number> = {
   [EMBEDDING_MODEL_ID]: 100 * 1e6,
   [GENERATION_MODEL_ID]: 800 * 1e6,
+  [COMPACT_GENERATION_MODEL_ID]: 300 * 1e6,
 }
 
 export const CHUNK_MAX_CHARS = 1200

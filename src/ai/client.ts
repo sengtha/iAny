@@ -1,11 +1,35 @@
 import { hasModelWeightsCached } from '../lib/modelShare'
 import {
+  COMPACT_GENERATION_MODEL_ID,
   EMBEDDING_MODEL_ID,
   GENERATION_MODEL_ID,
+  type GenModelChoice,
   type ModelProgress,
   type ModelStatus,
 } from '../types'
 import type { AIRequest, AIResponse } from './protocol'
+
+const GEN_MODEL_KEY = 'iany.genModel'
+
+/** Device-aware default: Gemma 4 E2B needs ~3 GB of tab memory, which
+ *  crashes phone browsers, so low-memory/mobile devices default compact. */
+export function getGenModelChoice(): GenModelChoice {
+  const saved = localStorage.getItem(GEN_MODEL_KEY)
+  if (saved === 'full' || saved === 'compact') return saved
+  const deviceMemory = (navigator as { deviceMemory?: number }).deviceMemory
+  if (deviceMemory !== undefined) return deviceMemory >= 8 ? 'full' : 'compact'
+  return navigator.maxTouchPoints > 1 ? 'compact' : 'full'
+}
+
+export function getGenModelId(): string {
+  return getGenModelChoice() === 'compact' ? COMPACT_GENERATION_MODEL_ID : GENERATION_MODEL_ID
+}
+
+/** Persists the choice and reloads so the AI worker starts clean. */
+export function setGenModelChoice(choice: GenModelChoice): void {
+  localStorage.setItem(GEN_MODEL_KEY, choice)
+  location.reload()
+}
 
 type Pending = {
   resolve: (data: unknown) => void
@@ -34,7 +58,7 @@ class AIClient {
   async refreshCachedStatus(): Promise<void> {
     const targets = [
       { target: 'embedder', model: EMBEDDING_MODEL_ID },
-      { target: 'generator', model: GENERATION_MODEL_ID },
+      { target: 'generator', model: getGenModelId() },
     ] as const
     for (const { target, model } of targets) {
       try {
@@ -58,7 +82,12 @@ class AIClient {
       // direct during local development).
       const modelHost =
         localStorage.getItem('iany.modelHost') ?? `${location.origin}/models`
-      void this.request({ id: crypto.randomUUID(), type: 'configure', modelHost })
+      void this.request({
+        id: crypto.randomUUID(),
+        type: 'configure',
+        modelHost,
+        generationModel: getGenModelId(),
+      })
     }
     return this.worker
   }

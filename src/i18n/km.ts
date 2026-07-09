@@ -18,7 +18,7 @@ export const km: Translation = {
   chatThinking: 'កំពុងគិត…',
   chatLoadModel: 'ទាញយកម៉ូដែល AI',
   chatLoadModelHint:
-    'ទាញយកតែម្ដង (~1.5 GB) បន្ទាប់មកដំណើរការក្រៅបណ្ដាញទាំងស្រុង។ សូមទុកផ្ទាំងនេះបើកចំហរហូតដល់បញ្ចប់។',
+    'ទាញយកតែម្ដង (0.7–1.5 GB អាស្រ័យលើម៉ូដែលដែលជ្រើសក្នុងការកំណត់) បន្ទាប់មកដំណើរការក្រៅបណ្ដាញទាំងស្រុង។ ការទាញយកដែលផ្អាក នឹងបន្តពីកន្លែងចាស់។',
   chatNoResults: 'មិនទាន់មានព័ត៌មានពាក់ព័ន្ធទេ។ សូមបញ្ចូលឯកសារបន្ថែមនៅបណ្ណាល័យ។',
 
   libraryTitle: 'បំប៉ន iAny',
@@ -53,6 +53,10 @@ export const km: Translation = {
   settingsModels: 'ម៉ូដែល AI',
   settingsEmbedder: 'ម៉ូដែលយល់ដឹង (EmbeddingGemma 300M)',
   settingsGenerator: 'ម៉ូដែលឆ្លើយ (Gemma 4 E2B)',
+  settingsGeneratorCompact: 'ម៉ូដែលឆ្លើយ (Gemma 3 1B — ស្រាល)',
+  settingsGenChoiceLabel: 'ទំហំម៉ូដែលឆ្លើយ (ការផ្លាស់ប្ដូរនឹងផ្ទុកកម្មវិធីឡើងវិញ)៖',
+  settingsGenCompact: 'ស្រាល — ~0.7 GB សម្រាប់ទូរស័ព្ទ',
+  settingsGenFull: 'ពេញ — ~1.5 GB សម្រាប់ឧបករណ៍ខ្លាំង',
   settingsModelIdle: 'មិនទាន់ទាញយកទេ',
   settingsModelCached: 'ទាញយករួច — ដំណើរការក្រៅបណ្ដាញ ផ្ទុកពេលត្រូវការ',
   settingsModelLoading: 'កំពុងទាញយក…',

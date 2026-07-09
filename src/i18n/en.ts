@@ -16,7 +16,7 @@ export const en = {
   chatThinking: 'Thinking…',
   chatLoadModel: 'Load the AI model',
   chatLoadModelHint:
-    'One-time download (~1.5 GB), then it works fully offline. Keep the tab open until it finishes.',
+    'One-time download (0.7–1.5 GB depending on the model chosen in Settings), then it works fully offline. Interrupted downloads continue where they stopped.',
   chatNoResults: 'Nothing relevant found yet. Try feeding more material in the Library.',
 
   libraryTitle: 'Feed iAny',
@@ -51,6 +51,10 @@ export const en = {
   settingsModels: 'AI models',
   settingsEmbedder: 'Understanding model (EmbeddingGemma 300M)',
   settingsGenerator: 'Answering model (Gemma 4 E2B)',
+  settingsGeneratorCompact: 'Answering model (Gemma 3 1B — light)',
+  settingsGenChoiceLabel: 'Answering model size (changing reloads the app):',
+  settingsGenCompact: 'Light — ~0.7 GB, for phones',
+  settingsGenFull: 'Full — ~1.5 GB, powerful devices',
   settingsModelIdle: 'Not downloaded yet',
   settingsModelCached: 'Downloaded — works offline, loads when needed',
   settingsModelLoading: 'Downloading…',
