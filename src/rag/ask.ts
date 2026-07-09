@@ -44,13 +44,21 @@ export async function ask(
   question: string,
   opts: { onToken?: (t: string, reset?: boolean) => void; limit?: number } = {},
 ): Promise<AskResult> {
-  // Fewer sources and shorter answers on the tiny tier: it runs on weak
-  // devices where every token of context and KV cache costs memory.
+  // The tiny tier runs on weak devices, and prompt length is the real
+  // memory killer there: Gemma's 262k vocabulary means the prefill logits
+  // tensor costs ~1 MB per prompt token, so a 1000-token RAG prompt spikes
+  // ~1 GB regardless of model size. Keep the prompt drastically short.
   const tiny = getGenModelChoice() === 'tiny'
-  const sources = await retrieve(question, opts.limit ?? (tiny ? 4 : 6))
+  const sources = await retrieve(question, opts.limit ?? (tiny ? 2 : 6))
+  const promptSources = tiny
+    ? sources.map((s) => ({
+        ...s,
+        text: s.text.length > 300 ? `${s.text.slice(0, 300)}…` : s.text,
+      }))
+    : sources
   const answer = await ai.generate(
-    [{ role: 'user', content: buildPrompt(question, sources) }],
-    { maxNewTokens: tiny ? 512 : 1024, onToken: opts.onToken },
+    [{ role: 'user', content: buildPrompt(question, promptSources) }],
+    { maxNewTokens: tiny ? 192 : 1024, onToken: opts.onToken },
   )
   return { answer, sources }
 }
