@@ -40,7 +40,7 @@ function ModelCard({ label, model, onDownload }: {
   const statusText = {
     idle: t('settingsModelIdle'),
     cached: t('settingsModelCached'),
-    loading: t('settingsModelLoading'),
+    loading: model.network ? t('settingsModelLoading') : t('modelPreparing'),
     ready: t('settingsModelReady'),
     error: t('settingsModelError'),
     unsupported: t('settingsModelUnsupported'),

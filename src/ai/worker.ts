@@ -57,6 +57,10 @@ const progressFiles: Record<'embedder' | 'generator', Map<string, { loaded: numb
   generator: new Map(),
 }
 
+/** Files that actually hit the network this session — everything else in
+ *  the progress stream is a disk read of an already-downloaded model. */
+const networkFiles = new Set<string>()
+
 function reportFileProgress(
   target: 'embedder' | 'generator',
   file: string,
@@ -67,15 +71,18 @@ function reportFileProgress(
   files.set(file, { loaded, total })
   let sumLoaded = 0
   let sumTotal = 0
-  for (const f of files.values()) {
+  let network = false
+  for (const [name, f] of files.entries()) {
     sumLoaded += f.loaded
     sumTotal += f.total
+    if (networkFiles.has(name)) network = true
   }
   post({
     type: 'progress',
     target,
     progress: sumTotal > 0 ? sumLoaded / sumTotal : 0,
     file,
+    network,
   })
 }
 
@@ -101,6 +108,7 @@ env.fetch = createResumableFetch(
     const file = url.slice(url.lastIndexOf('/') + 1)
     reportFileProgress(currentTarget, file, loaded, total)
   },
+  (url) => networkFiles.add(url.slice(url.lastIndexOf('/') + 1)),
 )
 
 interface LoadAttempt {

@@ -141,7 +141,12 @@ class AIClient {
       if (msg.target === 'generator' && msg.progress >= 0.999) {
         localStorage.setItem(CRASH_GUARD_KEY, getGenModelId())
       }
-      this.update(msg.target, { status: 'loading', progress: msg.progress, file: msg.file })
+      this.update(msg.target, {
+        status: 'loading',
+        progress: msg.progress,
+        file: msg.file,
+        network: msg.network,
+      })
       return
     }
     if (msg.type === 'status') {

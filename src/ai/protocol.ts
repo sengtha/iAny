@@ -15,7 +15,14 @@ export type AIResponse =
   | { id: string; type: 'result'; data: unknown }
   | { id: string; type: 'error'; message: string }
   | { id: string; type: 'token'; token: string; reset?: boolean }
-  | { type: 'progress'; target: 'embedder' | 'generator'; progress: number; file?: string }
+  | {
+      type: 'progress'
+      target: 'embedder' | 'generator'
+      progress: number
+      file?: string
+      /** true when bytes are crossing the network; false = disk read */
+      network?: boolean
+    }
   | {
       type: 'status'
       target: 'embedder' | 'generator'

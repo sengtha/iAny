@@ -67,6 +67,7 @@ export const km: Translation = {
   settingsModelIdle: 'មិនទាន់ទាញយកទេ',
   settingsModelCached: 'ទាញយករួច — ដំណើរការក្រៅបណ្ដាញ ផ្ទុកពេលត្រូវការ',
   settingsModelLoading: 'កំពុងទាញយក…',
+  modelPreparing: 'កំពុងរៀបចំ — ផ្ទុកពីឃ្លាំង មិនមែនទាញយកទេ…',
   settingsModelReady: 'រួចរាល់ — ដំណើរការក្រៅបណ្ដាញ',
   settingsModelError: 'ទាញយកបរាជ័យ',
   settingsModelUnsupported:

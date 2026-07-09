@@ -113,4 +113,7 @@ export interface ModelProgress {
   progress: number
   file?: string
   error?: string
+  /** while loading: true = downloading over the network, false = reading
+   *  an already-downloaded model from storage */
+  network?: boolean
 }

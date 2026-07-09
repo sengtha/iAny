@@ -152,7 +152,9 @@ export function ChatView() {
         <div className="notice">
           <progress value={status.generator.progress} max={1} />
           <p className="hint">
-            {Math.round(status.generator.progress * 100)}% — {status.generator.file ?? ''}
+            {status.generator.network
+              ? `${Math.round(status.generator.progress * 100)}% — ${status.generator.file ?? ''}`
+              : t('modelPreparing')}
           </p>
         </div>
       )}

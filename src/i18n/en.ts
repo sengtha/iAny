@@ -65,6 +65,7 @@ export const en = {
   settingsModelIdle: 'Not downloaded yet',
   settingsModelCached: 'Downloaded — works offline, loads when needed',
   settingsModelLoading: 'Downloading…',
+  modelPreparing: 'Preparing — loading from storage, no download…',
   settingsModelReady: 'Ready — works offline',
   settingsModelError: 'Failed to load',
   settingsModelUnsupported:

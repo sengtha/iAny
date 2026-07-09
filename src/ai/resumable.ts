@@ -120,6 +120,7 @@ export async function purgeStalePartials(keepModelIds: string[]): Promise<void> 
 export function createResumableFetch(
   shouldIntercept: (url: string) => boolean,
   report: ProgressReport,
+  onNetwork?: (url: string) => void,
 ): typeof fetch {
   const origFetch = self.fetch.bind(self)
   return (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -128,8 +129,12 @@ export function createResumableFetch(
     const headers = new Headers(
       init?.headers ?? (input instanceof Request ? input.headers : undefined),
     )
-    if (method === 'GET' && !headers.has('range') && shouldIntercept(url)) {
-      return resumableFetch(url, origFetch, report)
+    if (method === 'GET' && shouldIntercept(url)) {
+      // Transformers.js only reaches env.fetch on a cache miss, so any call
+      // here means real network activity for this file (vs. progress events
+      // that come from reading an already-cached model off disk).
+      onNetwork?.(url)
+      if (!headers.has('range')) return resumableFetch(url, origFetch, report)
     }
     return origFetch(input as RequestInfo, init)
   }) as typeof fetch
