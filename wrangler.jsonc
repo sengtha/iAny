@@ -9,9 +9,9 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    // Model mirror requests must reach the worker; everything else is
-    // served directly as static assets.
-    "run_worker_first": ["/models/*"]
+    // Model mirror and API requests must reach the worker; everything
+    // else is served directly as static assets.
+    "run_worker_first": ["/models/*", "/api/*"]
   },
   "r2_buckets": [
     {

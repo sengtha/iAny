@@ -312,6 +312,36 @@ button:focus-visible {
   color: var(--danger);
 }
 
+.model-share {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--bg-softer);
+}
+
+.recovery-code {
+  background: var(--bg);
+  border: 1px solid var(--bg-softer);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  font-size: 0.9rem;
+  letter-spacing: 0.05em;
+  user-select: all;
+  overflow-wrap: anywhere;
+}
+
+.restore {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--bg-softer);
+}
+
+.restore-input {
+  flex: 1;
+  min-width: 200px;
+  margin: 0;
+  text-transform: uppercase;
+}
+
 .empty {
   text-align: center;
   color: var(--fg-muted);

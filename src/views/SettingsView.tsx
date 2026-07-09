@@ -3,8 +3,29 @@ import { ai } from '../ai/client'
 import { useModelStatus } from '../hooks/useModelStatus'
 import { useI18n } from '../i18n'
 import { getStats, wipeDatabase, type DbStats } from '../db/documents'
+import {
+  backupNow,
+  generateRecoveryCode,
+  getBackupInfo,
+  getStoredCode,
+  normalizeCode,
+  restoreBackup,
+  storeCode,
+} from '../lib/backup'
 import { runDiagnostics, type DiagnosticResult } from '../lib/diagnostics'
-import type { Language, ModelProgress } from '../types'
+import {
+  exportModelBundle,
+  formatBytes,
+  getCachedModelInfo,
+  importModelBundle,
+  type ModelBundleInfo,
+} from '../lib/modelShare'
+import {
+  EMBEDDING_MODEL_ID,
+  GENERATION_MODEL_ID,
+  type Language,
+  type ModelProgress,
+} from '../types'
 
 function ModelCard({ label, model, onDownload }: {
   label: string
@@ -36,6 +57,202 @@ function ModelCard({ label, model, onDownload }: {
         </button>
       )}
     </div>
+  )
+}
+
+function ModelShare() {
+  const { t } = useI18n()
+  const models = [
+    { id: EMBEDDING_MODEL_ID, name: 'EmbeddingGemma' },
+    { id: GENERATION_MODEL_ID, name: 'Gemma 4 E2B' },
+  ]
+  const [cached, setCached] = useState<Record<string, ModelBundleInfo | null>>({})
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState('')
+
+  const refresh = () => {
+    for (const m of models) {
+      void getCachedModelInfo(m.id).then((info) => setCached((c) => ({ ...c, [m.id]: info })))
+    }
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(refresh, [])
+
+  const doExport = async (id: string, name: string) => {
+    setBusy(true)
+    setMessage('')
+    try {
+      const blob = await exportModelBundle(id)
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = `${name.replace(/\s+/g, '-')}.iany-model`
+      a.click()
+      URL.revokeObjectURL(a.href)
+    } catch {
+      setMessage(t('errorGeneric'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const doImport = async (file: File | null) => {
+    if (!file) return
+    setBusy(true)
+    setMessage('')
+    try {
+      const result = await importModelBundle(file)
+      setMessage(`${t('modelShareImported')} (${result.model}, ${result.files})`)
+      refresh()
+    } catch {
+      setMessage(t('modelShareInvalid'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="model-share">
+      <p className="hint">{t('modelShareHint')}</p>
+      <div className="row">
+        {models.map(
+          (m) =>
+            cached[m.id] && (
+              <button key={m.id} disabled={busy} onClick={() => void doExport(m.id, m.name)}>
+                {t('modelShareExport')} {m.name} ({formatBytes(cached[m.id]!.bytes)})
+              </button>
+            ),
+        )}
+        <label className="filepick">
+          {t('modelShareImport')}
+          <input
+            type="file"
+            accept=".iany-model"
+            hidden
+            disabled={busy}
+            onChange={(e) => {
+              void doImport(e.target.files?.[0] ?? null)
+              e.target.value = ''
+            }}
+          />
+        </label>
+      </div>
+      {message && <p className="hint">{message}</p>}
+    </div>
+  )
+}
+
+function CloudBackup() {
+  const { t } = useI18n()
+  const [code, setCode] = useState<string | null>(getStoredCode)
+  const [revealed, setRevealed] = useState(false)
+  const [restoreInput, setRestoreInput] = useState('')
+  const [lastBackup, setLastBackup] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState('')
+
+  useEffect(() => {
+    if (code) {
+      void getBackupInfo(code)
+        .then((info) => setLastBackup(info.uploadedAt ?? null))
+        .catch(() => {})
+    }
+  }, [code])
+
+  const enable = () => {
+    const fresh = generateRecoveryCode()
+    storeCode(fresh)
+    setCode(fresh)
+    setRevealed(true)
+  }
+
+  const doBackup = async () => {
+    if (!code) return
+    setBusy(true)
+    setMessage('')
+    try {
+      await backupNow(code)
+      setLastBackup(new Date().toISOString())
+      setMessage(t('backupDone'))
+    } catch (e) {
+      setMessage(
+        e instanceof Error && e.message === 'empty-library' ? t('packsEmptyLibrary') : t('errorGeneric'),
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const doRestore = async () => {
+    const entered = normalizeCode(restoreInput)
+    if (!entered) return
+    setBusy(true)
+    setMessage('')
+    try {
+      await restoreBackup(entered)
+      storeCode(entered)
+      setCode(entered)
+      setRestoreInput('')
+      setMessage(t('backupRestored'))
+    } catch (e) {
+      const err = e instanceof Error ? e.message : ''
+      setMessage(
+        err === 'backup-not-found'
+          ? t('backupNotFound')
+          : err === 'backup-decrypt-failed'
+            ? t('backupNotFound')
+            : t('errorGeneric'),
+      )
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className="card">
+      <h2>{t('backupTitle')}</h2>
+      <p>{t('backupBody')}</p>
+      {!code && (
+        <button className="primary" onClick={enable}>
+          {t('backupEnable')}
+        </button>
+      )}
+      {code && (
+        <>
+          <p className="hint">{t('backupCodeLabel')}</p>
+          <div className="row">
+            <code className="recovery-code">{revealed ? code : '••••-••••-••••-••••-••••'}</code>
+            <button onClick={() => setRevealed((r) => !r)}>{revealed ? '🙈' : '👁️'}</button>
+            <button onClick={() => void navigator.clipboard?.writeText(code)}>📋</button>
+          </div>
+          <p className="hint error">{t('backupCodeWarning')}</p>
+          <div className="row">
+            <button className="primary" disabled={busy} onClick={() => void doBackup()}>
+              {t('backupNow')}
+            </button>
+            {lastBackup && (
+              <span className="hint">
+                {t('backupLast')} {new Date(lastBackup).toLocaleString()}
+              </span>
+            )}
+          </div>
+        </>
+      )}
+      <div className="restore">
+        <p className="hint">{t('backupRestoreHint')}</p>
+        <div className="row">
+          <input
+            value={restoreInput}
+            onChange={(e) => setRestoreInput(e.target.value)}
+            placeholder="XXXX-XXXX-XXXX-XXXX-XXXX"
+            className="restore-input"
+          />
+          <button disabled={busy || !restoreInput.trim()} onClick={() => void doRestore()}>
+            {t('backupRestore')}
+          </button>
+        </div>
+      </div>
+      {message && <p className="hint">{message}</p>}
+    </section>
   )
 }
 
@@ -113,8 +330,11 @@ export function SettingsView() {
           model={status.generator}
           onDownload={() => void ai.preload('generator').catch(() => {})}
         />
+        <ModelShare />
         <Diagnostics />
       </section>
+
+      <CloudBackup />
 
       <section className="card">
         <h2>{t('settingsStorage')}</h2>

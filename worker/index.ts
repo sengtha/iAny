@@ -26,6 +26,13 @@ const ALLOWED_PREFIXES = [
 // FixedLengthStream-based R2 puts.
 const BUFFER_LIMIT = 10 * 1024 * 1024
 
+// Encrypted client-side backups (see src/lib/backup.ts). The id is derived
+// from the user's recovery code; the payload is AES-GCM ciphertext the
+// server cannot read. Free during beta — the future credits system gates
+// this endpoint.
+const BACKUP_MAX_BYTES = 50 * 1024 * 1024
+const BACKUP_ID_RE = /^[0-9a-f]{64}$/
+
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url)
@@ -35,8 +42,46 @@ export default {
       }
       return serveModel(url, request, env, ctx)
     }
+    if (url.pathname.startsWith('/api/backup/')) {
+      return serveBackup(url, request, env)
+    }
     return env.ASSETS.fetch(request)
   },
+}
+
+async function serveBackup(url: URL, request: Request, env: Env): Promise<Response> {
+  const id = url.pathname.slice('/api/backup/'.length)
+  if (!BACKUP_ID_RE.test(id)) return new Response('Bad id', { status: 400 })
+  const key = `backups/${id}.bin`
+
+  if (request.method === 'PUT') {
+    const length = Number(request.headers.get('content-length') ?? 0)
+    if (!length || length > BACKUP_MAX_BYTES) {
+      return new Response('Payload too large', { status: 413 })
+    }
+    const body = await request.arrayBuffer()
+    if (body.byteLength > BACKUP_MAX_BYTES) {
+      return new Response('Payload too large', { status: 413 })
+    }
+    await env.MODELS.put(key, body, {
+      customMetadata: { uploaded: new Date().toISOString() },
+    })
+    return new Response(null, { status: 204 })
+  }
+
+  if (request.method === 'GET' || request.method === 'HEAD') {
+    const obj = await env.MODELS.get(key)
+    if (!obj) return new Response('Not found', { status: 404 })
+    const headers = new Headers({
+      'content-type': 'application/octet-stream',
+      'content-length': String(obj.size),
+      'cache-control': 'no-store',
+      'x-backup-uploaded': obj.customMetadata?.uploaded ?? '',
+    })
+    return new Response(request.method === 'HEAD' ? null : obj.body, { headers })
+  }
+
+  return new Response('Method not allowed', { status: 405 })
 }
 
 function fileHeaders(contentType: string | undefined, size?: number): Headers {

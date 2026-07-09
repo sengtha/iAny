@@ -59,6 +59,28 @@ export const en = {
   settingsDownload: 'Download',
   settingsRetry: 'Retry',
   settingsDiagnose: 'Test model download connections',
+
+  modelShareHint:
+    'Move downloaded AI models to another device without internet: export to a file, send it with Quick Share / USB / SD card, then import on the other device.',
+  modelShareExport: 'Export',
+  modelShareImport: 'Import model file',
+  modelShareImported: 'Model imported — it is ready to use offline.',
+  modelShareInvalid: 'This file is not a valid iAny model bundle.',
+
+  backupTitle: 'Cloud backup',
+  backupBody:
+    'Back up your knowledge base encrypted to the cloud and restore it on any device. Only your recovery code can unlock it — iAny’s servers cannot read your data. Free during beta.',
+  backupEnable: 'Enable cloud backup',
+  backupCodeLabel: 'Your recovery code',
+  backupCodeWarning:
+    'Write this code down somewhere safe. Without it your backup can never be recovered — not even by us.',
+  backupNow: 'Back up now',
+  backupLast: 'Last backup:',
+  backupDone: 'Backup uploaded.',
+  backupRestoreHint: 'Restore on a new device: enter its recovery code.',
+  backupRestore: 'Restore',
+  backupRestored: 'Backup restored — your knowledge is back.',
+  backupNotFound: 'No backup found for this code (check for typos).',
   settingsStorage: 'Storage',
   settingsStoragePersisted: 'Protected — the browser will not evict your data.',
   settingsStorageNotPersisted:

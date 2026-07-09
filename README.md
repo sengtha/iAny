@@ -112,8 +112,27 @@ When the v2 API lands, add `"main": "worker/index.ts"` plus R2/D1 bindings
 to `wrangler.jsonc`; Worker routes automatically take precedence over
 static assets.
 
+## Sharing models between devices (no internet)
+
+Settings → AI models → **Export**: bundles a downloaded model's cached
+weights into a single `.iany-model` file you can move via Quick Share,
+USB or SD card, then **Import** on the receiving device — the model is
+ready with zero download. One person downloads once and can seed many
+offline devices.
+
+## Cloud backup (v2, beta)
+
+Settings → **Cloud backup** encrypts your knowledge base on-device
+(AES-GCM; key derived from a recovery code that never leaves the device)
+and stores the ciphertext via `/api/backup/*` in R2. Restoring on a new
+device just needs the recovery code. The server cannot read backups —
+losing the code means losing the backup. Free during beta; the future
+credits system will gate this endpoint.
+
 ## Roadmap
 
-1. **v1 (this)** — offline feed/ask, hybrid Khmer/English retrieval, packs.
-2. **v2** — cloud backup & multi-device sync via ElectricSQL (paid credits).
+1. **v1 (done)** — offline feed/ask, hybrid Khmer/English retrieval,
+   knowledge packs, model mirror, device-to-device model sharing.
+2. **v2 (in progress)** — encrypted cloud backup/restore (done, beta);
+   next: credits & payments, live multi-device sync via ElectricSQL.
 3. **v3** — knowledge pack marketplace (buy/sell packs, platform fee).
