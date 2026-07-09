@@ -22,7 +22,8 @@ export function ChatView() {
   const generatorReady = status.generator.status === 'ready'
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches
+    bottomRef.current?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth' })
   }, [messages])
 
   const send = async () => {
