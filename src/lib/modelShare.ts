@@ -13,6 +13,8 @@
  * neither export nor import loads whole models into memory.
  */
 
+import { MODEL_MIN_COMPLETE_BYTES } from '../types'
+
 const CACHE_NAME = 'transformers-cache'
 const MAGIC = 'IANYMDL1'
 
@@ -41,11 +43,13 @@ async function matchingRequests(modelId: string): Promise<Request[]> {
   return (await cache.keys()).filter((req) => req.url.includes(`${modelId}/`))
 }
 
-/** Cheap check: are the model's weights on disk? (Presence of an .onnx
- *  entry — config/tokenizer alone doesn't count as downloaded.) */
+/** Are the model's weights actually on disk? Requires the cached bytes to
+ *  clear the per-model completeness threshold — config/tokenizer files or
+ *  an interrupted weight download must not count as 'Downloaded'. */
 export async function hasModelWeightsCached(modelId: string): Promise<boolean> {
-  const reqs = await matchingRequests(modelId)
-  return reqs.some((r) => r.url.includes('.onnx'))
+  const info = await getCachedModelInfo(modelId)
+  if (!info) return false
+  return info.bytes >= (MODEL_MIN_COMPLETE_BYTES[modelId] ?? 50 * 1e6)
 }
 
 /** What is available to export for this model (null if nothing cached). */

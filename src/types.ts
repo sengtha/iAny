@@ -8,6 +8,15 @@ export const EMBEDDING_MODEL_ID = 'onnx-community/embeddinggemma-300m-ONNX'
 export const EMBEDDING_DIMS = 256
 export const GENERATION_MODEL_ID = 'onnx-community/gemma-4-E2B-it-ONNX'
 
+/** A model counts as fully downloaded only above these sizes — config and
+ *  tokenizer files alone (or an interrupted weight download) must not show
+ *  as 'Downloaded'. Actual sizes: embedder q4 ~200 MB, generator q4f16
+ *  ~1.4 GB. */
+export const MODEL_MIN_COMPLETE_BYTES: Record<string, number> = {
+  [EMBEDDING_MODEL_ID]: 100 * 1e6,
+  [GENERATION_MODEL_ID]: 800 * 1e6,
+}
+
 export const CHUNK_MAX_CHARS = 1200
 export const CHUNK_OVERLAP_SENTENCES = 1
 

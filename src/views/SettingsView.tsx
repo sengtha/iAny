@@ -23,6 +23,7 @@ import {
 import {
   EMBEDDING_MODEL_ID,
   GENERATION_MODEL_ID,
+  MODEL_MIN_COMPLETE_BYTES,
   type Language,
   type ModelProgress,
 } from '../types'
@@ -118,7 +119,10 @@ function ModelShare() {
       <div className="row">
         {models.map(
           (m) =>
-            cached[m.id] && (
+            cached[m.id] &&
+            // Don't offer exporting an incomplete download — the bundle
+            // would be missing weights and useless on the other device.
+            cached[m.id]!.bytes >= (MODEL_MIN_COMPLETE_BYTES[m.id] ?? 0) && (
               <button key={m.id} disabled={busy} onClick={() => void doExport(m.id, m.name)}>
                 {t('modelShareExport')} {m.name} ({formatBytes(cached[m.id]!.bytes)})
               </button>
