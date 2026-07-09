@@ -81,6 +81,27 @@ npm run preview      # serve the production build
 node scripts/generate-icons.mjs   # regenerate PWA icons from public/icon.svg
 ```
 
+## Deployment (Cloudflare Workers)
+
+iAny deploys as static assets on Cloudflare Workers (`wrangler.jsonc`) —
+free unlimited bandwidth, which matters because the offline app shell is
+~37 MB of precached WASM.
+
+```bash
+npx wrangler login    # once
+npm run deploy        # build + wrangler deploy
+```
+
+Or connect the repo with Workers Builds for deploy-on-push: build command
+`npm run build`, deploy command `npx wrangler deploy`, and set the build
+environment variable `ONNXRUNTIME_NODE_INSTALL_CUDA=skip` (the
+onnxruntime-node postinstall otherwise tries to download CUDA binaries and
+can fail CI).
+
+When the v2 API lands, add `"main": "worker/index.ts"` plus R2/D1 bindings
+to `wrangler.jsonc`; Worker routes automatically take precedence over
+static assets.
+
 ## Roadmap
 
 1. **v1 (this)** — offline feed/ask, hybrid Khmer/English retrieval, packs.

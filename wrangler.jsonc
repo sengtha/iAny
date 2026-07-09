@@ -1,0 +1,11 @@
+// Cloudflare Workers config — v1 is static assets only.
+// When the v2 API arrives, add:  "main": "worker/index.ts"
+// plus R2/D1/Queues bindings; routes then take precedence over assets.
+{
+  "name": "iany",
+  "compatibility_date": "2026-07-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}
