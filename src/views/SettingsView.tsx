@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { ai, getCrashSuspect, getGenModelChoice, setGenModelChoice } from '../ai/client'
 import { useModelStatus } from '../hooks/useModelStatus'
 import { useI18n } from '../i18n'
+import { resetDatabase } from '../db/client'
 import { getStats, wipeDatabase, type DbStats } from '../db/documents'
 import {
   backupNow,
@@ -317,11 +318,14 @@ export function SettingsView() {
   const { t, lang, setLang } = useI18n()
   const status = useModelStatus()
   const [stats, setStats] = useState<DbStats | null>(null)
+  const [dbError, setDbError] = useState<string | null>(null)
   const [persisted, setPersisted] = useState<boolean | null>(null)
   const [usage, setUsage] = useState<{ used: number; quota: number } | null>(null)
 
   useEffect(() => {
-    void getStats().then(setStats)
+    getStats()
+      .then(setStats)
+      .catch((e) => setDbError(e instanceof Error ? e.message : String(e)))
     void navigator.storage?.persisted?.().then(setPersisted)
     void navigator.storage
       ?.estimate?.()
@@ -416,11 +420,27 @@ export function SettingsView() {
 
       <section className="card">
         <h2>{t('settingsStats')}</h2>
-        <p className="hint">
-          {stats
-            ? `${stats.documents} ${t('settingsStatsDocs')} · ${stats.chunks} ${t('settingsStatsChunks')}`
-            : '…'}
-        </p>
+        {!dbError && (
+          <p className="hint">
+            {stats
+              ? `${stats.documents} ${t('settingsStatsDocs')} · ${stats.chunks} ${t('settingsStatsChunks')}`
+              : '…'}
+          </p>
+        )}
+        {dbError && (
+          <>
+            <p className="error">{t('settingsDbBroken')}</p>
+            <p className="hint error-detail">{dbError.slice(0, 200)}</p>
+            <button
+              className="danger"
+              onClick={() => {
+                if (confirm(t('settingsDbResetConfirm'))) void resetDatabase()
+              }}
+            >
+              {t('settingsDbReset')}
+            </button>
+          </>
+        )}
       </section>
 
       <p className="hint build-id">iAny · build {__BUILD_ID__}</p>

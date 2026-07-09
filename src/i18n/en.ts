@@ -108,6 +108,11 @@ export const en = {
   settingsDanger: 'Danger zone',
   settingsWipe: 'Erase everything',
   settingsWipeConfirm: 'Erase all documents, packs and chunks? This cannot be undone.',
+  settingsDbBroken:
+    'The knowledge base failed to open — its storage may have been damaged by an earlier crash.',
+  settingsDbReset: 'Reset knowledge base',
+  settingsDbResetConfirm:
+    'Delete the local knowledge base storage and restart? Local documents are lost (AI models and cloud backups are not affected).',
 
   errorGeneric: 'Something went wrong. Please try again.',
 }
