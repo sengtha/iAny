@@ -163,12 +163,19 @@ function getEmbedder(): Promise<FeatureExtractionPipeline> {
 }
 
 let generationModelId = GENERATION_MODEL_ID
+let generatorDevice: 'webgpu' | 'wasm' = 'webgpu'
+/** Set when WebGPU *inference* failed (device loaded but OrtRun crashed —
+ *  common on old mobile GPUs); forces CPU from then on. */
+let forceWasm = false
 let generatorPromise: Promise<TextGenerationPipeline> | null = null
 function getGenerator(): Promise<TextGenerationPipeline> {
   if (!generatorPromise) {
     generatorPromise = (async () => {
       currentTarget = 'generator'
-      if (!(await hasWebGPU())) {
+      const webgpu = !forceWasm && (await hasWebGPU())
+      // Gemma 4 E2B is too heavy for CPU inference; the Gemma 3 tiers run
+      // on WASM at usable speed, so they work even without (working) WebGPU.
+      if (!webgpu && generationModelId === GENERATION_MODEL_ID) {
         post({ type: 'status', target: 'generator', status: 'unsupported' })
         throw new Error('webgpu-unavailable')
       }
@@ -180,14 +187,21 @@ function getGenerator(): Promise<TextGenerationPipeline> {
               { device: 'webgpu', dtype: 'q4f16' },
               { device: 'webgpu', dtype: 'q4' },
             ]
-          : [{ device: 'webgpu', dtype: 'q4' }]
-      const generator = await loadWithFallback(attempts, ({ device, dtype }) =>
-        pipeline('text-generation', generationModelId, {
+          : webgpu
+            ? [
+                { device: 'webgpu', dtype: 'q4' },
+                { device: 'wasm', dtype: 'q4' },
+              ]
+            : [{ device: 'wasm', dtype: 'q4' }]
+      const generator = await loadWithFallback(attempts, async ({ device, dtype }) => {
+        const p = await pipeline('text-generation', generationModelId, {
           dtype: dtype as 'q4f16',
           device,
           progress_callback: progressForwarder('generator'),
-        }),
-      )
+        })
+        generatorDevice = device
+        return p
+      })
       post({ type: 'status', target: 'generator', status: 'ready' })
       return generator
     })()
@@ -234,12 +248,12 @@ async function embed(texts: string[], kind: 'query' | 'document'): Promise<Float
   return rows
 }
 
-async function generate(
+async function runGeneration(
   id: string,
+  generator: TextGenerationPipeline,
   messages: { role: string; content: string }[],
   maxNewTokens: number,
 ): Promise<string> {
-  const generator = await getGenerator()
   const streamer = new TextStreamer(generator.tokenizer, {
     skip_prompt: true,
     skip_special_tokens: true,
@@ -254,6 +268,41 @@ async function generate(
     output as { generated_text: { role: string; content: string }[] }[]
   )[0].generated_text.at(-1)
   return last?.content ?? ''
+}
+
+const GPU_RUNTIME_ERROR = /OrtRun|webgpu|wgpu|MapAsync|device.*lost|GPU/i
+
+async function generate(
+  id: string,
+  messages: { role: string; content: string }[],
+  maxNewTokens: number,
+): Promise<string> {
+  const generator = await getGenerator()
+  try {
+    return await runGeneration(id, generator, messages, maxNewTokens)
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e)
+    // Old mobile GPUs can load the model and still fail during inference
+    // (e.g. OrtRun/MapAsync errors on 2019-era drivers). Rebuild on CPU and
+    // retry once — except for Gemma 4 E2B, which is too heavy for WASM.
+    const retryable =
+      generatorDevice === 'webgpu' &&
+      generationModelId !== GENERATION_MODEL_ID &&
+      GPU_RUNTIME_ERROR.test(message)
+    if (!retryable) throw e
+    console.warn('[iAny] WebGPU inference failed, retrying on CPU:', message)
+    forceWasm = true
+    try {
+      await generator.dispose?.()
+    } catch {
+      // GPU state may already be unusable; disposal failure is expected.
+    }
+    generatorPromise = null
+    const cpuGenerator = await getGenerator()
+    // Tell the UI to discard any tokens streamed before the GPU failure.
+    post({ id, type: 'token', token: '', reset: true })
+    return runGeneration(id, cpuGenerator, messages, maxNewTokens)
+  }
 }
 
 self.onmessage = async (e: MessageEvent<AIRequest>) => {

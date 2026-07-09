@@ -12,7 +12,7 @@ export const en = {
   chatSend: 'Send',
   chatSources: 'Sources',
   chatSearchOnlyNote:
-    'AI answers need WebGPU (Chrome/Edge on desktop). On this device iAny runs in search mode: you get the most relevant passages instead of a generated answer.',
+    'The Full answering model needs WebGPU, which this browser does not have. Pick a smaller answering model in Settings to get AI answers here, or use search mode.',
   chatThinking: 'Thinking…',
   chatLoadModel: 'Load the AI model',
   chatLoadModelHint:

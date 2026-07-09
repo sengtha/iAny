@@ -31,7 +31,11 @@ export function ChatView() {
   const [crashSuspect, setCrashSuspect] = useState<string | null>(() => getCrashSuspect())
   const crashBlocked = crashSuspect === getGenModelId() && status.generator.status !== 'ready'
 
-  const canGenerate = supportsWebGPU() && !crashBlocked
+  // The Gemma 3 tiers run on CPU (WASM) when WebGPU is missing or broken;
+  // only the full Gemma 4 E2B strictly needs a working GPU.
+  const webgpuMissing = !supportsWebGPU()
+  const fullSelected = getGenModelChoice() === 'full'
+  const canGenerate = !(webgpuMissing && fullSelected) && !crashBlocked
   // 'cached' counts as available: weights are on disk and load on demand.
   const generatorReady =
     status.generator.status === 'ready' || status.generator.status === 'cached'
@@ -51,11 +55,14 @@ export function ChatView() {
       if (canGenerate && (generatorReady || generatorWanted)) {
         setMessages((m) => [...m, { role: 'assistant', content: '' }])
         const result = await ask(question, {
-          onToken: (token) =>
+          onToken: (token, reset) =>
             setMessages((m) => {
               const next = [...m]
               const last = next[next.length - 1]
-              next[next.length - 1] = { ...last, content: last.content + token }
+              next[next.length - 1] = {
+                ...last,
+                content: reset ? token : last.content + token,
+              }
               return next
             }),
         })
@@ -126,7 +133,7 @@ export function ChatView() {
           </div>
         </div>
       )}
-      {!supportsWebGPU() && <div className="notice">{t('chatSearchOnlyNote')}</div>}
+      {webgpuMissing && fullSelected && <div className="notice">{t('chatSearchOnlyNote')}</div>}
       {canGenerate && !generatorReady && !generatorWanted && (
         <div className="notice">
           <button

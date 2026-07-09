@@ -74,7 +74,7 @@ export const crashRecovery: { downgradedTo: GenModelChoice | null; stuckAtTiny: 
 type Pending = {
   resolve: (data: unknown) => void
   reject: (err: Error) => void
-  onToken?: (token: string) => void
+  onToken?: (token: string, reset?: boolean) => void
 }
 
 export type ProgressListener = (p: ModelProgress) => void
@@ -158,7 +158,7 @@ class AIClient {
     const p = this.pending.get(msg.id)
     if (!p) return
     if (msg.type === 'token') {
-      p.onToken?.(msg.token)
+      p.onToken?.(msg.token, msg.reset)
     } else if (msg.type === 'result') {
       this.pending.delete(msg.id)
       p.resolve(msg.data)
@@ -213,7 +213,7 @@ class AIClient {
 
   async generate(
     messages: { role: string; content: string }[],
-    opts: { maxNewTokens?: number; onToken?: (t: string) => void } = {},
+    opts: { maxNewTokens?: number; onToken?: (t: string, reset?: boolean) => void } = {},
   ): Promise<string> {
     if (this.status.generator.status === 'cached') {
       localStorage.setItem(CRASH_GUARD_KEY, getGenModelId())

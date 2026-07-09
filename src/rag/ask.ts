@@ -42,7 +42,7 @@ function buildPrompt(question: string, sources: ChunkHit[]): string {
 
 export async function ask(
   question: string,
-  opts: { onToken?: (t: string) => void; limit?: number } = {},
+  opts: { onToken?: (t: string, reset?: boolean) => void; limit?: number } = {},
 ): Promise<AskResult> {
   const sources = await retrieve(question, opts.limit ?? 6)
   const answer = await ai.generate(

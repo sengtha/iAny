@@ -14,7 +14,7 @@ export type AIRequest =
 export type AIResponse =
   | { id: string; type: 'result'; data: unknown }
   | { id: string; type: 'error'; message: string }
-  | { id: string; type: 'token'; token: string }
+  | { id: string; type: 'token'; token: string; reset?: boolean }
   | { type: 'progress'; target: 'embedder' | 'generator'; progress: number; file?: string }
   | {
       type: 'status'
