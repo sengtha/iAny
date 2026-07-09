@@ -31,6 +31,8 @@ export const km: Translation = {
   libraryOcrPreparing: 'កំពុងរៀបចំកម្មវិធីអានអក្សរ (លើកដំបូងទាញយក ~5 MB)…',
   libraryOcrReading: 'កំពុងអានអក្សរពីរូបថត…',
   libraryOcrEmpty: 'រកអក្សរក្នុងរូបថតមិនឃើញទេ។ សូមថតឲ្យច្បាស់ និងមានពន្លឺគ្រប់គ្រាន់។',
+  libraryOcrLang: 'ភាសាស្កេន៖',
+  libraryOcrLangBoth: 'លាយគ្នា',
   libraryEmpty: 'មិនទាន់មានឯកសារទេ។ បញ្ចូលអ្វីមួយឲ្យ iAny!',
   libraryChunks: 'កំណាត់',
   libraryDelete: 'លុប',

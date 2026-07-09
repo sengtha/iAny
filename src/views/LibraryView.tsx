@@ -2,17 +2,20 @@ import { useEffect, useState } from 'react'
 import { useModelStatus } from '../hooks/useModelStatus'
 import { useI18n } from '../i18n'
 import { deleteDocument, listDocuments, type DocumentSummary } from '../db/documents'
-import { ocrImage } from '../lib/ocr'
+import { ocrImage, type OcrLang } from '../lib/ocr'
 import { ingestDocument, type IngestProgress } from '../rag/ingest'
 
 export function LibraryView() {
-  const { t } = useI18n()
+  const { t, lang } = useI18n()
   const status = useModelStatus()
   const [docs, setDocs] = useState<DocumentSummary[]>([])
   const [title, setTitle] = useState('')
   const [text, setText] = useState('')
   const [progress, setProgress] = useState<IngestProgress | null>(null)
   const [ocr, setOcr] = useState<{ progress: number; stage: string } | null>(null)
+  // Khmer scans must run without English: the Latin recognizer misreads
+  // Khmer glyphs and pollutes the output. Default follows the UI language.
+  const [ocrLang, setOcrLang] = useState<OcrLang>(lang === 'km' ? 'khm' : 'eng')
   const [error, setError] = useState('')
 
   const refresh = () => {
@@ -53,7 +56,7 @@ export function LibraryView() {
     setError('')
     setOcr({ progress: 0, stage: 'loading' })
     try {
-      const text = await ocrImage(file, (p, stage) => setOcr({ progress: p, stage }))
+      const text = await ocrImage(file, ocrLang, (p, stage) => setOcr({ progress: p, stage }))
       if (!text) {
         setError(t('libraryOcrEmpty'))
       } else {
@@ -127,6 +130,25 @@ export function LibraryView() {
               }}
             />
           </label>
+        </div>
+        <div className="row ocr-langs">
+          <span className="hint">{t('libraryOcrLang')}</span>
+          {(
+            [
+              { value: 'khm', label: 'ខ្មែរ' },
+              { value: 'eng', label: 'English' },
+              { value: 'khm+eng', label: t('libraryOcrLangBoth') },
+            ] as const
+          ).map((o) => (
+            <button
+              key={o.value}
+              className={ocrLang === o.value ? 'primary chip' : 'chip'}
+              disabled={busy}
+              onClick={() => setOcrLang(o.value)}
+            >
+              {o.label}
+            </button>
+          ))}
         </div>
         {ocr && (
           <div className="notice">

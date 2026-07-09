@@ -29,6 +29,8 @@ export const en = {
   libraryOcrPreparing: 'Preparing text reader (first time downloads ~5 MB)…',
   libraryOcrReading: 'Reading text from the photo…',
   libraryOcrEmpty: 'No text found in the photo. Try a clearer, well-lit shot.',
+  libraryOcrLang: 'Scan language:',
+  libraryOcrLangBoth: 'Mixed',
   libraryEmpty: 'No documents yet. Feed iAny something!',
   libraryChunks: 'chunks',
   libraryDelete: 'Delete',

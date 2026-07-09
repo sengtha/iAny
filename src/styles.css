@@ -357,6 +357,16 @@ button:focus-visible {
   margin: 4px 0 12px;
 }
 
+.ocr-langs {
+  margin-top: 8px;
+}
+
+button.chip {
+  min-height: 36px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+}
+
 .empty {
   text-align: center;
   color: var(--fg-muted);

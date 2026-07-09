@@ -15,7 +15,8 @@ interface Env {
 }
 
 const HF = 'https://huggingface.co'
-const TESSDATA = 'https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/main'
+const TESSDATA_BEST = 'https://raw.githubusercontent.com/tesseract-ocr/tessdata_best/main'
+const TESSDATA_FAST = 'https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/main'
 // Only mirror the models iAny actually uses — this endpoint must not be an
 // open proxy.
 const ALLOWED_PREFIXES = [
@@ -26,15 +27,19 @@ const ALLOWED_PREFIXES = [
   'onnx-community/gemma-4-E4B-it-ONNX/',
   'onnx-community/Qwen3-0.6B-ONNX/',
 ]
-// OCR language data (Khmer + English), served through the same mirror.
-const TESSDATA_RE = /^tessdata\/(khm|eng)\.traineddata$/
+// OCR language data, served through the same mirror. Khmer uses the
+// high-accuracy models; English's fast model is accurate enough.
+const TESSDATA_RE = /^tessdata2\/(khm|eng)\.traineddata$/
 
 function isAllowedKey(key: string): boolean {
   return ALLOWED_PREFIXES.some((p) => key.startsWith(p)) || TESSDATA_RE.test(key)
 }
 
 function upstreamUrl(key: string, hfPath: string): string {
-  if (key.startsWith('tessdata/')) return `${TESSDATA}/${key.slice('tessdata/'.length)}`
+  if (key.startsWith('tessdata2/')) {
+    const file = key.slice('tessdata2/'.length)
+    return `${file.startsWith('khm') ? TESSDATA_BEST : TESSDATA_FAST}/${file}`
+  }
   return `${HF}/${hfPath}`
 }
 // Below this size, buffer instead of streaming: small JSON/tokenizer files
