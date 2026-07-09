@@ -49,6 +49,28 @@ export function setGenModelChoice(choice: GenModelChoice): void {
   location.reload()
 }
 
+/**
+ * Automatic crash recovery, evaluated once per app start BEFORE the AI
+ * worker exists: if the previous generator load crashed the tab, step down
+ * to the next smaller model so the user isn't asked to diagnose anything.
+ * At the tiny tier there is nowhere left to go — chat stays in search mode
+ * behind an explicit warning instead.
+ */
+export const crashRecovery: { downgradedTo: GenModelChoice | null; stuckAtTiny: boolean } =
+  (() => {
+    try {
+      if (getCrashSuspect() !== getGenModelId()) return { downgradedTo: null, stuckAtTiny: false }
+      const choice = getGenModelChoice()
+      if (choice === 'tiny') return { downgradedTo: null, stuckAtTiny: true }
+      const next: GenModelChoice = choice === 'full' ? 'compact' : 'tiny'
+      localStorage.setItem(GEN_MODEL_KEY, next)
+      clearCrashGuard()
+      return { downgradedTo: next, stuckAtTiny: false }
+    } catch {
+      return { downgradedTo: null, stuckAtTiny: false }
+    }
+  })()
+
 type Pending = {
   resolve: (data: unknown) => void
   reject: (err: Error) => void
@@ -112,6 +134,13 @@ class AIClient {
 
   private handle(msg: AIResponse) {
     if (msg.type === 'progress') {
+      // Arm the crash guard only when the dangerous phase begins: download
+      // finished, weights about to be loaded into memory. Arming earlier
+      // would misread a tab closed mid-download (normal — downloads are
+      // resumable) as a crash.
+      if (msg.target === 'generator' && msg.progress >= 0.999) {
+        localStorage.setItem(CRASH_GUARD_KEY, getGenModelId())
+      }
       this.update(msg.target, { status: 'loading', progress: msg.progress, file: msg.file })
       return
     }
@@ -163,7 +192,8 @@ class AIClient {
     if (this.status[target].status === 'idle' || this.status[target].status === 'cached') {
       this.update(target, { status: 'loading' })
     }
-    if (target === 'generator' && this.status.generator.status !== 'ready') {
+    // Weights already on disk mean instantiation starts immediately.
+    if (target === 'generator' && this.status.generator.status === 'cached') {
       localStorage.setItem(CRASH_GUARD_KEY, getGenModelId())
     }
     return this.request({ id: crypto.randomUUID(), type: 'preload', target }).then(() => {})
@@ -185,11 +215,11 @@ class AIClient {
     messages: { role: string; content: string }[],
     opts: { maxNewTokens?: number; onToken?: (t: string) => void } = {},
   ): Promise<string> {
+    if (this.status.generator.status === 'cached') {
+      localStorage.setItem(CRASH_GUARD_KEY, getGenModelId())
+    }
     if (this.status.generator.status === 'idle' || this.status.generator.status === 'cached') {
       this.update('generator', { status: 'loading' })
-    }
-    if (this.status.generator.status !== 'ready') {
-      localStorage.setItem(CRASH_GUARD_KEY, getGenModelId())
     }
     return (await this.request(
       {

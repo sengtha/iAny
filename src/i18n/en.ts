@@ -60,6 +60,8 @@ export const en = {
   genCrashWarning:
     'Loading the answering model seems to have crashed the browser last time — it is probably too big for this device. Try a smaller model size.',
   genCrashUseSmaller: 'Use a smaller model',
+  genAutoDowngraded:
+    'The answering model was too big for this device, so iAny switched to a smaller one. Just ask your question again.',
   settingsModelIdle: 'Not downloaded yet',
   settingsModelCached: 'Downloaded — works offline, loads when needed',
   settingsModelLoading: 'Downloading…',

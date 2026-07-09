@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   ai,
   clearCrashGuard,
+  crashRecovery,
   getCrashSuspect,
   getGenModelChoice,
   getGenModelId,
@@ -89,6 +90,9 @@ export function ChatView() {
 
   return (
     <div className="chat">
+      {crashRecovery.downgradedTo && (
+        <div className="notice">{t('genAutoDowngraded')}</div>
+      )}
       {crashBlocked && (
         <div className="notice">
           <p className="error">{t('genCrashWarning')}</p>
