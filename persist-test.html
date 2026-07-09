@@ -1,0 +1,24 @@
+<!doctype html>
+<!-- Dev-only persistence regression check (not part of the build).
+     Serve with `npm run dev`, open /persist-test.html?insert=1, reload
+     repeatedly: the count must increase by exactly 1 per load and never
+     reset. Guards against reintroducing relaxedDurability-style data loss
+     (see src/db/worker.ts). -->
+<html>
+  <body>
+    <div id="out">loading</div>
+    <script type="module">
+      import { getDB } from '/src/db/client.ts'
+      const db = await getDB()
+      const params = new URLSearchParams(location.search)
+      if (params.get('insert')) {
+        await db.query(
+          `INSERT INTO documents (id, title, lang, content) VALUES ($1, 'persist-test', 'en', 'hello')`,
+          [crypto.randomUUID()],
+        )
+      }
+      const res = await db.query('SELECT count(*)::int AS n FROM documents')
+      document.getElementById('out').textContent = `count=${res.rows[0].n}`
+    </script>
+  </body>
+</html>
