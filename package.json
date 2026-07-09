@@ -5,7 +5,9 @@
   "description": "iAny — offline-first RAG. Feed it anything; it gets smarter. Runs 100% on your device.",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/copy-ort.mjs",
     "dev": "vite",
+    "prebuild": "node scripts/copy-ort.mjs",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",

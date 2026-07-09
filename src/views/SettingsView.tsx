@@ -25,10 +25,13 @@ function ModelCard({ label, model, onDownload }: {
         <strong>{label}</strong>
         <p className="hint">{statusText}</p>
         {model.status === 'loading' && <progress value={model.progress} max={1} />}
+        {model.status === 'error' && model.error && (
+          <p className="hint error-detail">{model.error.slice(0, 400)}</p>
+        )}
       </div>
-      {model.status === 'idle' && (
+      {(model.status === 'idle' || model.status === 'error') && (
         <button className="primary" onClick={onDownload}>
-          {t('settingsDownload')}
+          {model.status === 'error' ? t('settingsRetry') : t('settingsDownload')}
         </button>
       )}
     </div>

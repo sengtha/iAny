@@ -57,6 +57,7 @@ export const en = {
   settingsModelError: 'Failed to load',
   settingsModelUnsupported: 'Needs WebGPU (not available on this device)',
   settingsDownload: 'Download',
+  settingsRetry: 'Retry',
   settingsStorage: 'Storage',
   settingsStoragePersisted: 'Protected — the browser will not evict your data.',
   settingsStorageNotPersisted:

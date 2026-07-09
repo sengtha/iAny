@@ -40,9 +40,24 @@ export default defineConfig({
         // itself (browser Cache API) and the database lives in IndexedDB,
         // so the service worker must not try to handle those.
         globPatterns: ['**/*.{js,css,html,svg,png,woff2,wasm,data,gz}'],
+        // The ONNX runtime variants live in /ort/ and are cached at runtime
+        // instead: each device only ever needs the one matching its
+        // capabilities (WebGPU vs CPU), so precaching all of them would
+        // waste ~75 MB per install. Same for the Vite-bundled copy.
+        globIgnores: ['ort/**', '**/ort-wasm*'],
         maximumFileSizeToCacheInBytes: 30 * 1024 * 1024,
         navigateFallback: 'index.html',
-        runtimeCaching: [],
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.startsWith('/ort/'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'ort-runtime',
+              expiration: { maxEntries: 8 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+        ],
       },
     }),
   ],

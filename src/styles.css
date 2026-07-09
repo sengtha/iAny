@@ -285,6 +285,12 @@ button:focus-visible {
   font-size: 0.85rem;
 }
 
+.error-detail {
+  color: var(--danger);
+  font-size: 0.72rem;
+  word-break: break-word;
+}
+
 .empty {
   text-align: center;
   color: var(--fg-muted);

@@ -8,6 +8,7 @@
  * models download once per device and then work fully offline.
  */
 import {
+  env,
   pipeline,
   TextStreamer,
   type FeatureExtractionPipeline,
@@ -15,6 +16,14 @@ import {
 } from '@huggingface/transformers'
 import { EMBEDDING_DIMS, EMBEDDING_MODEL_ID, GENERATION_MODEL_ID } from '../types'
 import type { AIRequest, AIResponse } from './protocol'
+
+// ONNX Runtime picks a WASM variant at runtime by device capability
+// (jsep/jspi for WebGPU, asyncify/plain for CPU). Bundlers only discover one
+// variant statically, so all of them are served from /ort/ (see
+// scripts/copy-ort.mjs) and cached offline by the service worker.
+if (env.backends.onnx?.wasm) {
+  env.backends.onnx.wasm.wasmPaths = `${self.location.origin}/ort/`
+}
 
 const post = (msg: AIResponse) => self.postMessage(msg)
 
@@ -52,23 +61,59 @@ function progressForwarder(target: 'embedder' | 'generator') {
   }
 }
 
+interface LoadAttempt {
+  device: 'webgpu' | 'wasm'
+  dtype: string
+}
+
+/** Try configurations in order, so one bad device/dtype combination on a
+ *  given phone or GPU doesn't take the whole feature down. */
+async function loadWithFallback<T>(
+  attempts: LoadAttempt[],
+  load: (attempt: LoadAttempt) => Promise<T>,
+): Promise<T> {
+  const failures: string[] = []
+  for (const attempt of attempts) {
+    try {
+      return await load(attempt)
+    } catch (e) {
+      const detail = `${attempt.device}/${attempt.dtype}: ${e instanceof Error ? e.message : String(e)}`
+      console.error('[iAny] model load failed', detail, e)
+      failures.push(detail)
+    }
+  }
+  throw new Error(failures.join(' | '))
+}
+
 let embedderPromise: Promise<FeatureExtractionPipeline> | null = null
 function getEmbedder(): Promise<FeatureExtractionPipeline> {
   if (!embedderPromise) {
     embedderPromise = (async () => {
-      const device = (await hasWebGPU()) ? 'webgpu' : 'wasm'
+      const webgpu = await hasWebGPU()
       // EmbeddingGemma activations do not support fp16 — q4/q8/fp32 only.
-      const embedder = await pipeline('feature-extraction', EMBEDDING_MODEL_ID, {
-        dtype: 'q4',
-        device,
-        progress_callback: progressForwarder('embedder'),
-      })
+      const attempts: LoadAttempt[] = [
+        ...(webgpu ? [{ device: 'webgpu', dtype: 'q4' } as LoadAttempt] : []),
+        { device: 'wasm', dtype: 'q4' },
+        { device: 'wasm', dtype: 'q8' },
+      ]
+      const embedder = await loadWithFallback(attempts, ({ device, dtype }) =>
+        pipeline('feature-extraction', EMBEDDING_MODEL_ID, {
+          dtype: dtype as 'q4',
+          device,
+          progress_callback: progressForwarder('embedder'),
+        }),
+      )
       post({ type: 'status', target: 'embedder', status: 'ready' })
       return embedder
     })()
     embedderPromise.catch((e) => {
       embedderPromise = null
-      post({ type: 'status', target: 'embedder', status: 'error', error: String(e) })
+      post({
+        type: 'status',
+        target: 'embedder',
+        status: 'error',
+        error: e instanceof Error ? e.message : String(e),
+      })
     })
   }
   return embedderPromise
@@ -82,18 +127,27 @@ function getGenerator(): Promise<TextGenerationPipeline> {
         post({ type: 'status', target: 'generator', status: 'unsupported' })
         throw new Error('webgpu-unavailable')
       }
-      const generator = await pipeline('text-generation', GENERATION_MODEL_ID, {
-        dtype: 'q4f16',
-        device: 'webgpu',
-        progress_callback: progressForwarder('generator'),
-      })
+      // q4f16 needs shader-f16 support; q4 covers GPUs without it.
+      const generator = await loadWithFallback(
+        [
+          { device: 'webgpu', dtype: 'q4f16' },
+          { device: 'webgpu', dtype: 'q4' },
+        ],
+        ({ device, dtype }) =>
+          pipeline('text-generation', GENERATION_MODEL_ID, {
+            dtype: dtype as 'q4f16',
+            device,
+            progress_callback: progressForwarder('generator'),
+          }),
+      )
       post({ type: 'status', target: 'generator', status: 'ready' })
       return generator
     })()
     generatorPromise.catch((e) => {
       generatorPromise = null
-      if (String(e) !== 'Error: webgpu-unavailable') {
-        post({ type: 'status', target: 'generator', status: 'error', error: String(e) })
+      const message = e instanceof Error ? e.message : String(e)
+      if (message !== 'webgpu-unavailable') {
+        post({ type: 'status', target: 'generator', status: 'error', error: message })
       }
     })
   }
