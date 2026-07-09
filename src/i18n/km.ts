@@ -57,7 +57,8 @@ export const km: Translation = {
   settingsModelLoading: 'កំពុងទាញយក…',
   settingsModelReady: 'រួចរាល់ — ដំណើរការក្រៅបណ្ដាញ',
   settingsModelError: 'ទាញយកបរាជ័យ',
-  settingsModelUnsupported: 'ត្រូវការ WebGPU (មិនមាននៅឧបករណ៍នេះ)',
+  settingsModelUnsupported:
+    'ត្រូវការ WebGPU — មិនមាននៅកម្មវិធីរុករកនេះទេ។ នៅ Android សូមបើក iAny ក្នុង Chrome (Samsung Internet មិនទាន់គាំទ្រ WebGPU ទេ)។ ការស្វែងរកនៅតែដំណើរការពេញលេញ។',
   settingsDownload: 'ទាញយក',
   settingsRetry: 'ព្យាយាមម្ដងទៀត',
   settingsDiagnose: 'សាកល្បងការតភ្ជាប់ទាញយកម៉ូដែល',

@@ -55,7 +55,8 @@ export const en = {
   settingsModelLoading: 'Downloading…',
   settingsModelReady: 'Ready — works offline',
   settingsModelError: 'Failed to load',
-  settingsModelUnsupported: 'Needs WebGPU (not available on this device)',
+  settingsModelUnsupported:
+    'Needs WebGPU — not available in this browser. On Android, open iAny in Chrome (Samsung Internet does not support WebGPU yet). Search works fully in the meantime.',
   settingsDownload: 'Download',
   settingsRetry: 'Retry',
   settingsDiagnose: 'Test model download connections',
