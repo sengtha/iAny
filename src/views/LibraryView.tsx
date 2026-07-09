@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useModelStatus } from '../hooks/useModelStatus'
 import { useI18n } from '../i18n'
 import { deleteDocument, listDocuments, type DocumentSummary } from '../db/documents'
+import { ocrImage } from '../lib/ocr'
 import { ingestDocument, type IngestProgress } from '../rag/ingest'
 
 export function LibraryView() {
@@ -11,6 +12,7 @@ export function LibraryView() {
   const [title, setTitle] = useState('')
   const [text, setText] = useState('')
   const [progress, setProgress] = useState<IngestProgress | null>(null)
+  const [ocr, setOcr] = useState<{ progress: number; stage: string } | null>(null)
   const [error, setError] = useState('')
 
   const refresh = () => {
@@ -46,7 +48,29 @@ export function LibraryView() {
     void feed(inputs)
   }
 
-  const busy = progress !== null
+  const onPhoto = async (file: File | null) => {
+    if (!file) return
+    setError('')
+    setOcr({ progress: 0, stage: 'loading' })
+    try {
+      const text = await ocrImage(file, (p, stage) => setOcr({ progress: p, stage }))
+      if (!text) {
+        setError(t('libraryOcrEmpty'))
+      } else {
+        // Into the compose box for review — OCR output needs a human glance
+        // before it becomes knowledge.
+        setText((prev) => (prev.trim() ? `${prev}\n\n${text}` : text))
+        if (!title) setTitle(file.name.replace(/\.[a-z0-9]+$/i, ''))
+      }
+    } catch (e) {
+      console.error('[iAny] ocr failed', e)
+      setError(t('errorGeneric'))
+    } finally {
+      setOcr(null)
+    }
+  }
+
+  const busy = progress !== null || ocr !== null
   const embedderLoading = status.embedder.status === 'loading'
 
   return (
@@ -89,8 +113,30 @@ export function LibraryView() {
               }}
             />
           </label>
+          <label className="filepick">
+            📷 {t('libraryAddPhoto')}
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              hidden
+              disabled={busy}
+              onChange={(e) => {
+                void onPhoto(e.target.files?.[0] ?? null)
+                e.target.value = ''
+              }}
+            />
+          </label>
         </div>
-        {busy && (
+        {ocr && (
+          <div className="notice">
+            <progress value={ocr.progress} max={1} />
+            <p className="hint">
+              {ocr.stage === 'recognizing' ? t('libraryOcrReading') : t('libraryOcrPreparing')}
+            </p>
+          </div>
+        )}
+        {progress && (
           <div className="notice">
             <p className="hint">
               {t('libraryIngesting')}{' '}

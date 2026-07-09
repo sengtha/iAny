@@ -15,8 +15,9 @@ interface Env {
 }
 
 const HF = 'https://huggingface.co'
+const TESSDATA = 'https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/main'
 // Only mirror the models iAny actually uses — this endpoint must not be an
-// open proxy into Hugging Face.
+// open proxy.
 const ALLOWED_PREFIXES = [
   'onnx-community/embeddinggemma-300m-ONNX/',
   'onnx-community/gemma-4-E2B-it-ONNX/',
@@ -24,6 +25,17 @@ const ALLOWED_PREFIXES = [
   'onnx-community/gemma-3-270m-it-ONNX/',
   'onnx-community/gemma-4-E4B-it-ONNX/',
 ]
+// OCR language data (Khmer + English), served through the same mirror.
+const TESSDATA_RE = /^tessdata\/(khm|eng)\.traineddata$/
+
+function isAllowedKey(key: string): boolean {
+  return ALLOWED_PREFIXES.some((p) => key.startsWith(p)) || TESSDATA_RE.test(key)
+}
+
+function upstreamUrl(key: string, hfPath: string): string {
+  if (key.startsWith('tessdata/')) return `${TESSDATA}/${key.slice('tessdata/'.length)}`
+  return `${HF}/${hfPath}`
+}
 // Below this size, buffer instead of streaming: small JSON/tokenizer files
 // may arrive compressed (content-length != stream length), which breaks
 // FixedLengthStream-based R2 puts.
@@ -108,7 +120,7 @@ function parseRange(header: string | null): { start: number; end: number | null 
  *  object is fully stored). Returns false when the file can't be cached
  *  (e.g. unknown length), in which case callers should proxy directly. */
 async function primeFromUpstream(key: string, hfPath: string, env: Env): Promise<boolean> {
-  const upstream = await fetch(`${HF}/${hfPath}`)
+  const upstream = await fetch(upstreamUrl(key, hfPath))
   if (!upstream.ok || !upstream.body) return false
   const contentType = upstream.headers.get('content-type') ?? 'application/octet-stream'
   const length = Number(upstream.headers.get('content-length') ?? 0)
@@ -133,7 +145,7 @@ async function serveModel(
   // R2 keys drop the resolve segment: {model-id}/{file}
   const hfPath = url.pathname.slice('/models/'.length)
   const key = hfPath.replace(/\/resolve\/[^/]+\//, '/')
-  if (!ALLOWED_PREFIXES.some((p) => key.startsWith(p))) {
+  if (!isAllowedKey(key)) {
     return new Response('Forbidden', { status: 403 })
   }
 
@@ -144,7 +156,7 @@ async function serveModel(
     if (head) {
       return new Response(null, { headers: fileHeaders(head.httpMetadata?.contentType, head.size) })
     }
-    const upstream = await fetch(`${HF}/${hfPath}`, { method: 'HEAD' })
+    const upstream = await fetch(upstreamUrl(key, hfPath), { method: 'HEAD' })
     if (!upstream.ok) return new Response(`Upstream ${upstream.status}`, { status: 502 })
     const len = Number(upstream.headers.get('content-length') ?? 0)
     return new Response(null, {
@@ -163,7 +175,7 @@ async function serveModel(
     if (!head) {
       if (!(await primeFromUpstream(key, hfPath, env))) {
         // Can't cache (unknown length): proxy the range straight to HF.
-        return fetch(`${HF}/${hfPath}`, { headers: { range: request.headers.get('range')! } })
+        return fetch(upstreamUrl(key, hfPath), { headers: { range: request.headers.get('range')! } })
       }
       head = await env.MODELS.head(key)
       if (!head) return new Response('Prime failed', { status: 502 })
@@ -183,7 +195,7 @@ async function serveModel(
     return new Response(cached.body, { headers: fileHeaders(cached.httpMetadata?.contentType, cached.size) })
   }
 
-  const upstream = await fetch(`${HF}/${hfPath}`)
+  const upstream = await fetch(upstreamUrl(key, hfPath))
   if (!upstream.ok || !upstream.body) {
     return new Response(`Upstream ${upstream.status}`, { status: 502 })
   }

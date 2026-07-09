@@ -50,16 +50,17 @@ export default defineConfig({
         // instead: each device only ever needs the one matching its
         // capabilities (WebGPU vs CPU), so precaching all of them would
         // waste ~75 MB per install. Same for the Vite-bundled copy.
-        globIgnores: ['ort/**', '**/ort-wasm*'],
+        globIgnores: ['ort/**', '**/ort-wasm*', 'tess/**'],
         maximumFileSizeToCacheInBytes: 30 * 1024 * 1024,
         navigateFallback: 'index.html',
         runtimeCaching: [
           {
-            urlPattern: ({ url }) => url.pathname.startsWith('/ort/'),
+            urlPattern: ({ url }) =>
+              url.pathname.startsWith('/ort/') || url.pathname.startsWith('/tess/'),
             handler: 'CacheFirst',
             options: {
-              cacheName: 'ort-runtime',
-              expiration: { maxEntries: 8 },
+              cacheName: 'runtime-engines',
+              expiration: { maxEntries: 24 },
               cacheableResponse: { statuses: [0, 200] },
             },
           },

@@ -1,19 +1,26 @@
-// Copies the onnxruntime-web runtime (all WASM variants + their .mjs
-// loaders) into public/ort/. ONNX Runtime picks a variant at runtime by
-// device capability (jsep/jspi for WebGPU, asyncify/plain for CPU), and
-// Vite's static analysis only discovers one of them — so we serve the whole
-// set from a stable path and point Transformers.js at it (see src/ai/worker.ts).
-// public/ort/ is gitignored; this runs automatically before dev and build.
+// Copies runtime assets that must be served from stable same-origin paths
+// (bundlers can't statically discover them; client networks often can't
+// reach CDNs):
+// - onnxruntime-web WASM variants -> public/ort/   (see src/ai/worker.ts)
+// - tesseract.js worker + core    -> public/tess/  (see src/lib/ocr.ts)
+// Both directories are gitignored; this runs automatically before dev/build.
 import { copyFileSync, mkdirSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 
-const src = 'node_modules/onnxruntime-web/dist'
-const dest = 'public/ort'
-mkdirSync(dest, { recursive: true })
-
-for (const file of readdirSync(src)) {
-  if (/^ort-wasm-simd-threaded.*\.(wasm|mjs)$/.test(file)) {
-    copyFileSync(join(src, file), join(dest, file))
-    console.log(`${dest}/${file}`)
+function copyMatching(src, dest, pattern) {
+  mkdirSync(dest, { recursive: true })
+  for (const file of readdirSync(src)) {
+    if (pattern.test(file)) {
+      copyFileSync(join(src, file), join(dest, file))
+      console.log(`${dest}/${file}`)
+    }
   }
 }
+
+copyMatching(
+  'node_modules/onnxruntime-web/dist',
+  'public/ort',
+  /^ort-wasm-simd-threaded.*\.(wasm|mjs)$/,
+)
+copyMatching('node_modules/tesseract.js/dist', 'public/tess', /^worker\.min\.js$/)
+copyMatching('node_modules/tesseract.js-core', 'public/tess', /^tesseract-core.*\.(js|wasm)$/)
