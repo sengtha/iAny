@@ -1,4 +1,4 @@
-import { ai } from '../ai/client'
+import { ai, getGenModelChoice } from '../ai/client'
 import { detectLang, tokenizeForSearch } from '../ai/chunker'
 import { hybridSearch } from '../db/search'
 import type { ChunkHit } from '../types'
@@ -44,10 +44,13 @@ export async function ask(
   question: string,
   opts: { onToken?: (t: string, reset?: boolean) => void; limit?: number } = {},
 ): Promise<AskResult> {
-  const sources = await retrieve(question, opts.limit ?? 6)
+  // Fewer sources and shorter answers on the tiny tier: it runs on weak
+  // devices where every token of context and KV cache costs memory.
+  const tiny = getGenModelChoice() === 'tiny'
+  const sources = await retrieve(question, opts.limit ?? (tiny ? 4 : 6))
   const answer = await ai.generate(
     [{ role: 'user', content: buildPrompt(question, sources) }],
-    { maxNewTokens: 1024, onToken: opts.onToken },
+    { maxNewTokens: tiny ? 512 : 1024, onToken: opts.onToken },
   )
   return { answer, sources }
 }

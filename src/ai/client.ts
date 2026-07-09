@@ -71,17 +71,31 @@ export const crashRecovery: { downgradedTo: GenModelChoice | null; stuckAtTiny: 
     }
   })()
 
+type Role = 'embedder' | 'generator'
+
 type Pending = {
+  role: Role
   resolve: (data: unknown) => void
   reject: (err: Error) => void
   onToken?: (token: string, reset?: boolean) => void
 }
 
+/** On weak devices both models don't fit in memory together (embedder
+ *  ~0.5 GB + generator ~0.8 GB exceeds a mobile tab's budget), so each
+ *  lives in its own worker and only one stays resident at a time. 'tiny'
+ *  is itself a signal of a weak device (auto-downgrade lands there). */
+function isLowMemoryDevice(): boolean {
+  const deviceMemory = (navigator as { deviceMemory?: number }).deviceMemory
+  return (deviceMemory !== undefined && deviceMemory <= 4) || getGenModelChoice() === 'tiny'
+}
+
 export type ProgressListener = (p: ModelProgress) => void
 
-/** Promise-based RPC over the AI worker, with model progress events. */
+/** Promise-based RPC over the AI workers, with model progress events.
+ *  The embedder and generator run in separate workers so either can be
+ *  released (terminated) independently to reclaim memory. */
 class AIClient {
-  private worker: Worker | null = null
+  private workers: Record<Role, Worker | null> = { embedder: null, generator: null }
   private pending = new Map<string, Pending>()
   private listeners = new Set<ProgressListener>()
   readonly status: Record<'embedder' | 'generator', ModelProgress> = {
@@ -111,10 +125,11 @@ class AIClient {
     }
   }
 
-  private getWorker(): Worker {
-    if (!this.worker) {
-      this.worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
-      this.worker.onmessage = (e: MessageEvent<AIResponse>) => this.handle(e.data)
+  private getWorker(role: Role): Worker {
+    if (!this.workers[role]) {
+      const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
+      worker.onmessage = (e: MessageEvent<AIResponse>) => this.handle(e.data)
+      this.workers[role] = worker
       // Models are downloaded through this origin's pull-through mirror
       // (see worker/index.ts): client devices frequently cannot reach
       // huggingface.co, while Cloudflare's network can. localStorage
@@ -122,14 +137,43 @@ class AIClient {
       // direct during local development).
       const modelHost =
         localStorage.getItem('iany.modelHost') ?? `${location.origin}/models`
-      void this.request({
-        id: crypto.randomUUID(),
-        type: 'configure',
-        modelHost,
-        generationModel: getGenModelId(),
-      })
+      void this.request(
+        {
+          id: crypto.randomUUID(),
+          type: 'configure',
+          modelHost,
+          generationModel: getGenModelId(),
+        },
+        role,
+      )
     }
-    return this.worker
+    return this.workers[role]!
+  }
+
+  /** Terminate a worker to reclaim its memory. The model stays on disk
+   *  ('cached') and reloads on next use. */
+  private release(role: Role): void {
+    const worker = this.workers[role]
+    if (!worker) return
+    worker.terminate()
+    this.workers[role] = null
+    for (const [id, p] of [...this.pending]) {
+      if (p.role === role) {
+        this.pending.delete(id)
+        p.reject(new Error('released'))
+      }
+    }
+    // An intentional terminate during load must not read as a tab crash.
+    if (role === 'generator') clearCrashGuard()
+    if (this.status[role].status === 'ready' || this.status[role].status === 'loading') {
+      this.update(role, { status: 'cached', progress: 1 })
+    }
+  }
+
+  /** Before heavy work in one worker, free the other on weak devices. */
+  private makeRoomFor(role: Role): void {
+    if (!isLowMemoryDevice()) return
+    this.release(role === 'embedder' ? 'generator' : 'embedder')
   }
 
   private handle(msg: AIResponse) {
@@ -186,14 +230,19 @@ class AIClient {
     return () => this.listeners.delete(listener)
   }
 
-  private request(req: AIRequest, onToken?: (t: string) => void): Promise<unknown> {
+  private request(
+    req: AIRequest,
+    role: Role,
+    onToken?: (t: string, reset?: boolean) => void,
+  ): Promise<unknown> {
     return new Promise((resolve, reject) => {
-      this.pending.set(req.id, { resolve, reject, onToken })
-      this.getWorker().postMessage(req)
+      this.pending.set(req.id, { role, resolve, reject, onToken })
+      this.getWorker(role).postMessage(req)
     })
   }
 
-  preload(target: 'embedder' | 'generator'): Promise<void> {
+  preload(target: Role): Promise<void> {
+    this.makeRoomFor(target)
     if (this.status[target].status === 'idle' || this.status[target].status === 'cached') {
       this.update(target, { status: 'loading' })
     }
@@ -201,25 +250,27 @@ class AIClient {
     if (target === 'generator' && this.status.generator.status === 'cached') {
       localStorage.setItem(CRASH_GUARD_KEY, getGenModelId())
     }
-    return this.request({ id: crypto.randomUUID(), type: 'preload', target }).then(() => {})
+    return this.request({ id: crypto.randomUUID(), type: 'preload', target }, target).then(
+      () => {},
+    )
   }
 
   async embed(texts: string[], kind: 'query' | 'document'): Promise<Float32Array[]> {
+    this.makeRoomFor('embedder')
     if (this.status.embedder.status === 'idle' || this.status.embedder.status === 'cached') {
       this.update('embedder', { status: 'loading' })
     }
-    return (await this.request({
-      id: crypto.randomUUID(),
-      type: 'embed',
-      texts,
-      kind,
-    })) as Float32Array[]
+    return (await this.request(
+      { id: crypto.randomUUID(), type: 'embed', texts, kind },
+      'embedder',
+    )) as Float32Array[]
   }
 
   async generate(
     messages: { role: string; content: string }[],
     opts: { maxNewTokens?: number; onToken?: (t: string, reset?: boolean) => void } = {},
   ): Promise<string> {
+    this.makeRoomFor('generator')
     if (this.status.generator.status === 'cached') {
       localStorage.setItem(CRASH_GUARD_KEY, getGenModelId())
     }
@@ -233,6 +284,7 @@ class AIClient {
         messages,
         maxNewTokens: opts.maxNewTokens ?? 1024,
       },
+      'generator',
       opts.onToken,
     )) as string
   }
