@@ -352,6 +352,11 @@ button:focus-visible {
   text-transform: uppercase;
 }
 
+.build-id {
+  text-align: center;
+  margin: 4px 0 12px;
+}
+
 .empty {
   text-align: center;
   color: var(--fg-muted);

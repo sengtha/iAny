@@ -423,6 +423,8 @@ export function SettingsView() {
         </p>
       </section>
 
+      <p className="hint build-id">iAny · build {__BUILD_ID__}</p>
+
       <section className="card">
         <h2>{t('settingsDanger')}</h2>
         <button
