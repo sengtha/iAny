@@ -128,6 +128,18 @@ export async function importModelBundle(file: File): Promise<{ model: string; fi
   return { model: header.model, files: header.files.length }
 }
 
+/** Remove a model's downloaded files (weights cache + any partials) to
+ *  free storage quota — e.g. an abandoned bigger model hogging the space
+ *  the browser needs to persist the model actually in use. */
+export async function deleteModelCache(modelId: string): Promise<void> {
+  for (const cacheName of [CACHE_NAME, 'iany-partials']) {
+    const cache = await caches.open(cacheName)
+    for (const req of await cache.keys()) {
+      if (req.url.includes(`${modelId}/`)) await cache.delete(req)
+    }
+  }
+}
+
 export function formatBytes(bytes: number): string {
   if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`
   if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(0)} MB`

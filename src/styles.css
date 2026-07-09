@@ -318,6 +318,16 @@ button:focus-visible {
   border-top: 1px solid var(--bg-softer);
 }
 
+.model-row {
+  margin-bottom: 8px;
+  justify-content: space-between;
+}
+
+.model-row .hint {
+  flex: 1;
+  min-width: 140px;
+}
+
 .recovery-code {
   background: var(--bg);
   border: 1px solid var(--bg-softer);

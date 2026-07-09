@@ -96,6 +96,23 @@ export async function resumableFetch(
   })
 }
 
+/** Delete leftover partial chunks that don't belong to any of the given
+ *  models (e.g. an abandoned download of a model the user switched away
+ *  from). Stale partials silently eat the storage quota and can prevent
+ *  the browser from persisting newly downloaded models. */
+export async function purgeStalePartials(keepModelIds: string[]): Promise<void> {
+  try {
+    const cache = await caches.open(PARTIAL_CACHE)
+    for (const req of await cache.keys()) {
+      if (!keepModelIds.some((id) => req.url.includes(`${id}/`))) {
+        await cache.delete(req)
+      }
+    }
+  } catch {
+    // Cache API unavailable — nothing to purge.
+  }
+}
+
 /** Build a fetch that makes matching GET requests resumable. Install it as
  *  Transformers.js `env.fetch` — the library routes ALL model downloads
  *  through that hook and never touches the global fetch. Requests that

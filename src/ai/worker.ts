@@ -22,7 +22,7 @@ import {
   TINY_GENERATION_MODEL_ID,
 } from '../types'
 import type { AIRequest, AIResponse } from './protocol'
-import { createResumableFetch } from './resumable'
+import { createResumableFetch, purgeStalePartials } from './resumable'
 
 // ONNX Runtime picks a WASM variant at runtime by device capability
 // (jsep/jspi for WebGPU, asyncify/plain for CPU). Bundlers only discover one
@@ -315,6 +315,7 @@ self.onmessage = async (e: MessageEvent<AIRequest>) => {
         // exposes the same <host>/<model-id>/resolve/<revision>/<file> layout.
         if (req.modelHost) env.remoteHost = req.modelHost
         if (req.generationModel) generationModelId = req.generationModel
+        void purgeStalePartials([EMBEDDING_MODEL_ID, generationModelId])
         post({ id: req.id, type: 'result', data: null })
         break
       }

@@ -14,6 +14,7 @@ import {
 } from '../lib/backup'
 import { runDiagnostics, type DiagnosticResult } from '../lib/diagnostics'
 import {
+  deleteModelCache,
   exportModelBundle,
   formatBytes,
   getCachedModelInfo,
@@ -120,18 +121,35 @@ function ModelShare() {
   return (
     <div className="model-share">
       <p className="hint">{t('modelShareHint')}</p>
-      <div className="row">
-        {models.map(
-          (m) =>
-            cached[m.id] &&
-            // Don't offer exporting an incomplete download — the bundle
-            // would be missing weights and useless on the other device.
-            cached[m.id]!.bytes >= (MODEL_MIN_COMPLETE_BYTES[m.id] ?? 0) && (
-              <button key={m.id} disabled={busy} onClick={() => void doExport(m.id, m.name)}>
-                {t('modelShareExport')} {m.name} ({formatBytes(cached[m.id]!.bytes)})
+      {models.map((m) => {
+        const info = cached[m.id]
+        if (!info) return null
+        const complete = info.bytes >= (MODEL_MIN_COMPLETE_BYTES[m.id] ?? 0)
+        return (
+          <div key={m.id} className="row model-row">
+            <span className="hint">
+              {m.name} — {formatBytes(info.bytes)}
+            </span>
+            {/* Don't offer exporting an incomplete download — the bundle
+                would be missing weights and useless on the other device. */}
+            {complete && (
+              <button disabled={busy} onClick={() => void doExport(m.id, m.name)}>
+                {t('modelShareExport')}
               </button>
-            ),
-        )}
+            )}
+            <button
+              className="danger"
+              disabled={busy}
+              onClick={() => {
+                void deleteModelCache(m.id).then(refresh)
+              }}
+            >
+              {t('modelShareDelete')}
+            </button>
+          </div>
+        )
+      })}
+      <div className="row">
         <label className="filepick">
           {t('modelShareImport')}
           <input
@@ -300,10 +318,14 @@ export function SettingsView() {
   const status = useModelStatus()
   const [stats, setStats] = useState<DbStats | null>(null)
   const [persisted, setPersisted] = useState<boolean | null>(null)
+  const [usage, setUsage] = useState<{ used: number; quota: number } | null>(null)
 
   useEffect(() => {
     void getStats().then(setStats)
     void navigator.storage?.persisted?.().then(setPersisted)
+    void navigator.storage
+      ?.estimate?.()
+      .then((e) => setUsage({ used: e.usage ?? 0, quota: e.quota ?? 0 }))
   }, [])
 
   const requestPersist = async () => {
@@ -376,6 +398,14 @@ export function SettingsView() {
 
       <section className="card">
         <h2>{t('settingsStorage')}</h2>
+        {usage && usage.quota > 0 && (
+          <>
+            <p className="hint">
+              {t('settingsStorageUsed')}: {formatBytes(usage.used)} / {formatBytes(usage.quota)}
+            </p>
+            <progress value={usage.used} max={usage.quota} />
+          </>
+        )}
         <p className="hint">
           {persisted ? t('settingsStoragePersisted') : t('settingsStorageNotPersisted')}
         </p>

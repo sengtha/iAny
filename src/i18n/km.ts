@@ -80,6 +80,7 @@ export const km: Translation = {
   modelShareExport: 'នាំចេញ',
   modelShareImport: 'នាំចូលឯកសារម៉ូដែល',
   modelShareImported: 'នាំចូលម៉ូដែលរួចរាល់ — អាចប្រើក្រៅបណ្ដាញបានហើយ។',
+  modelShareDelete: 'លុប',
   modelShareInvalid: 'ឯកសារនេះមិនមែនជាកញ្ចប់ម៉ូដែល iAny ត្រឹមត្រូវទេ។',
 
   backupTitle: 'បម្រុងទុកលើក្លោដ',
@@ -97,6 +98,7 @@ export const km: Translation = {
   backupRestored: 'បានស្ដារការបម្រុងទុក — ចំណេះដឹងរបស់អ្នកត្រឡប់មកវិញហើយ។',
   backupNotFound: 'រកមិនឃើញការបម្រុងទុកសម្រាប់កូដនេះទេ (សូមពិនិត្យអក្សរ)។',
   settingsStorage: 'ឃ្លាំងផ្ទុក',
+  settingsStorageUsed: 'បានប្រើ',
   settingsStoragePersisted: 'ការពាររួច — កម្មវិធីរុករកនឹងមិនលុបទិន្នន័យរបស់អ្នកទេ។',
   settingsStorageNotPersisted:
     'មិនទាន់ការពារ — កម្មវិធីរុករកអាចលុបទិន្នន័យរបស់អ្នក ពេលឃ្លាំងផ្ទុកជិតពេញ។',

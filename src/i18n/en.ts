@@ -78,6 +78,7 @@ export const en = {
   modelShareExport: 'Export',
   modelShareImport: 'Import model file',
   modelShareImported: 'Model imported — it is ready to use offline.',
+  modelShareDelete: 'Delete',
   modelShareInvalid: 'This file is not a valid iAny model bundle.',
 
   backupTitle: 'Cloud backup',
@@ -95,6 +96,7 @@ export const en = {
   backupRestored: 'Backup restored — your knowledge is back.',
   backupNotFound: 'No backup found for this code (check for typos).',
   settingsStorage: 'Storage',
+  settingsStorageUsed: 'Used',
   settingsStoragePersisted: 'Protected — the browser will not evict your data.',
   settingsStorageNotPersisted:
     'Not protected — the browser could evict your data under storage pressure.',
