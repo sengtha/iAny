@@ -1,11 +1,22 @@
-// Cloudflare Workers config — v1 is static assets only.
-// When the v2 API arrives, add:  "main": "worker/index.ts"
-// plus R2/D1/Queues bindings; routes then take precedence over assets.
+// Cloudflare Workers config.
+// One-time setup before the first deploy:
+//   npx wrangler r2 bucket create iany-models
 {
   "name": "iany",
+  "main": "worker/index.ts",
   "compatibility_date": "2026-07-01",
   "assets": {
     "directory": "./dist",
-    "not_found_handling": "single-page-application"
-  }
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    // Model mirror requests must reach the worker; everything else is
+    // served directly as static assets.
+    "run_worker_first": ["/models/*"]
+  },
+  "r2_buckets": [
+    {
+      "binding": "MODELS",
+      "bucket_name": "iany-models"
+    }
+  ]
 }

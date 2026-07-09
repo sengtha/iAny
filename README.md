@@ -83,14 +83,24 @@ node scripts/generate-icons.mjs   # regenerate PWA icons from public/icon.svg
 
 ## Deployment (Cloudflare Workers)
 
-iAny deploys as static assets on Cloudflare Workers (`wrangler.jsonc`) —
-free unlimited bandwidth, which matters because the offline app shell is
-~37 MB of precached WASM.
+iAny deploys on Cloudflare Workers (`wrangler.jsonc`): static assets plus
+a small edge worker (`worker/index.ts`) that acts as a **pull-through
+model mirror**. The app downloads models from `/models/*` on its own
+origin; on a cache miss the worker fetches the file from Hugging Face
+through Cloudflare's network, streams it to the client and stores it in
+R2 in the same pass. This matters because many client networks (mobile
+carriers, filtered Wi-Fi) cannot reach huggingface.co directly — after
+the first download, models are served entirely from R2 with free egress.
 
 ```bash
-npx wrangler login    # once
-npm run deploy        # build + wrangler deploy
+npx wrangler login                         # once
+npx wrangler r2 bucket create iany-models  # once
+npm run deploy                             # build + wrangler deploy
 ```
+
+Set localStorage `iany.modelHost` to override the model source (e.g.
+`https://huggingface.co` to bypass the mirror during local development).
+Settings → "Test model download connections" probes each hop on-device.
 
 Or connect the repo with Workers Builds for deploy-on-push: build command
 `npm run build`, deploy command `npx wrangler deploy`, and set the build

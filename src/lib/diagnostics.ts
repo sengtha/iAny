@@ -31,12 +31,12 @@ export async function runDiagnostics(): Promise<DiagnosticResult[]> {
   return Promise.all([
     probe('App origin (/ort/)', `/ort/ort-wasm-simd-threaded.mjs`),
     probe(
-      'huggingface.co',
-      `https://huggingface.co/${EMBEDDING_MODEL_ID}/resolve/main/config.json`,
+      'Model mirror (/models/)',
+      `/models/${EMBEDDING_MODEL_ID}/resolve/main/config.json`,
     ),
     probe(
-      'HF CDN (weights)',
-      `https://cdn-lb.huggingface.co/robots.txt`,
+      'huggingface.co (direct)',
+      `https://huggingface.co/${EMBEDDING_MODEL_ID}/resolve/main/config.json`,
     ),
   ])
 }

@@ -23,12 +23,14 @@ class AIClient {
     if (!this.worker) {
       this.worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' })
       this.worker.onmessage = (e: MessageEvent<AIResponse>) => this.handle(e.data)
-      // Optional mirror/self-hosted model source for networks where
-      // huggingface.co is unreachable (set localStorage 'iany.modelHost').
-      const modelHost = localStorage.getItem('iany.modelHost')
-      if (modelHost) {
-        void this.request({ id: crypto.randomUUID(), type: 'configure', modelHost })
-      }
+      // Models are downloaded through this origin's pull-through mirror
+      // (see worker/index.ts): client devices frequently cannot reach
+      // huggingface.co, while Cloudflare's network can. localStorage
+      // 'iany.modelHost' overrides (e.g. 'https://huggingface.co' to go
+      // direct during local development).
+      const modelHost =
+        localStorage.getItem('iany.modelHost') ?? `${location.origin}/models`
+      void this.request({ id: crypto.randomUUID(), type: 'configure', modelHost })
     }
     return this.worker
   }
