@@ -19,6 +19,7 @@ import {
   EMBEDDING_DIMS,
   EMBEDDING_MODEL_ID,
   GENERATION_MODEL_ID,
+  TINY_GENERATION_MODEL_ID,
 } from '../types'
 import type { AIRequest, AIResponse } from './protocol'
 import { createResumableFetch } from './resumable'
@@ -94,7 +95,8 @@ env.fetch = createResumableFetch(
   (url) =>
     url.includes(`${EMBEDDING_MODEL_ID}/`) ||
     url.includes(`${GENERATION_MODEL_ID}/`) ||
-    url.includes(`${COMPACT_GENERATION_MODEL_ID}/`),
+    url.includes(`${COMPACT_GENERATION_MODEL_ID}/`) ||
+    url.includes(`${TINY_GENERATION_MODEL_ID}/`),
   (url, loaded, total) => {
     const file = url.slice(url.lastIndexOf('/') + 1)
     reportFileProgress(currentTarget, file, loaded, total)
@@ -171,14 +173,14 @@ function getGenerator(): Promise<TextGenerationPipeline> {
         throw new Error('webgpu-unavailable')
       }
       // q4f16 needs shader-f16 support; q4 covers GPUs without it. The
-      // compact Gemma 3 build is q4-only (q4f16 overflows on WebGPU).
+      // Gemma 3 builds are q4-only (q4f16 overflows on WebGPU).
       const attempts: LoadAttempt[] =
-        generationModelId === COMPACT_GENERATION_MODEL_ID
-          ? [{ device: 'webgpu', dtype: 'q4' }]
-          : [
+        generationModelId === GENERATION_MODEL_ID
+          ? [
               { device: 'webgpu', dtype: 'q4f16' },
               { device: 'webgpu', dtype: 'q4' },
             ]
+          : [{ device: 'webgpu', dtype: 'q4' }]
       const generator = await loadWithFallback(attempts, ({ device, dtype }) =>
         pipeline('text-generation', generationModelId, {
           dtype: dtype as 'q4f16',

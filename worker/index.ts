@@ -21,6 +21,7 @@ const ALLOWED_PREFIXES = [
   'onnx-community/embeddinggemma-300m-ONNX/',
   'onnx-community/gemma-4-E2B-it-ONNX/',
   'onnx-community/gemma-3-1b-it-ONNX-GQA/',
+  'onnx-community/gemma-3-270m-it-ONNX/',
 ]
 // Below this size, buffer instead of streaming: small JSON/tokenizer files
 // may arrive compressed (content-length != stream length), which breaks

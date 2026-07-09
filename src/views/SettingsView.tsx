@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ai, getGenModelChoice, setGenModelChoice } from '../ai/client'
+import { ai, getCrashSuspect, getGenModelChoice, setGenModelChoice } from '../ai/client'
 import { useModelStatus } from '../hooks/useModelStatus'
 import { useI18n } from '../i18n'
 import { getStats, wipeDatabase, type DbStats } from '../db/documents'
@@ -25,6 +25,7 @@ import {
   EMBEDDING_MODEL_ID,
   GENERATION_MODEL_ID,
   MODEL_MIN_COMPLETE_BYTES,
+  TINY_GENERATION_MODEL_ID,
   type Language,
   type ModelProgress,
 } from '../types'
@@ -69,6 +70,7 @@ function ModelShare() {
     { id: EMBEDDING_MODEL_ID, name: 'EmbeddingGemma' },
     { id: GENERATION_MODEL_ID, name: 'Gemma 4 E2B' },
     { id: COMPACT_GENERATION_MODEL_ID, name: 'Gemma 3 1B' },
+    { id: TINY_GENERATION_MODEL_ID, name: 'Gemma 3 270M' },
   ]
   const [cached, setCached] = useState<Record<string, ModelBundleInfo | null>>({})
   const [busy, setBusy] = useState(false)
@@ -335,15 +337,24 @@ export function SettingsView() {
         />
         <ModelCard
           label={
-            getGenModelChoice() === 'compact'
-              ? t('settingsGeneratorCompact')
-              : t('settingsGenerator')
+            {
+              full: t('settingsGenerator'),
+              compact: t('settingsGeneratorCompact'),
+              tiny: t('settingsGeneratorTiny'),
+            }[getGenModelChoice()]
           }
           model={status.generator}
           onDownload={() => void ai.preload('generator').catch(() => {})}
         />
+        {getCrashSuspect() !== null && <p className="error">{t('genCrashWarning')}</p>}
         <p className="hint">{t('settingsGenChoiceLabel')}</p>
         <div className="row">
+          <button
+            className={getGenModelChoice() === 'tiny' ? 'primary' : ''}
+            onClick={() => getGenModelChoice() !== 'tiny' && setGenModelChoice('tiny')}
+          >
+            {t('settingsGenTiny')}
+          </button>
           <button
             className={getGenModelChoice() === 'compact' ? 'primary' : ''}
             onClick={() => getGenModelChoice() !== 'compact' && setGenModelChoice('compact')}

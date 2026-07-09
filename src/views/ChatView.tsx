@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { ai } from '../ai/client'
+import {
+  ai,
+  clearCrashGuard,
+  getCrashSuspect,
+  getGenModelChoice,
+  getGenModelId,
+  setGenModelChoice,
+} from '../ai/client'
 import { useModelStatus } from '../hooks/useModelStatus'
 import { useI18n } from '../i18n'
 import { ask, retrieve } from '../rag/ask'
@@ -18,7 +25,12 @@ export function ChatView() {
   const [generatorWanted, setGeneratorWanted] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  const canGenerate = supportsWebGPU()
+  // If the previous generator load crashed the tab, hold off on loading it
+  // again until the user explicitly retries or picks a smaller model.
+  const [crashSuspect, setCrashSuspect] = useState<string | null>(() => getCrashSuspect())
+  const crashBlocked = crashSuspect === getGenModelId() && status.generator.status !== 'ready'
+
+  const canGenerate = supportsWebGPU() && !crashBlocked
   // 'cached' counts as available: weights are on disk and load on demand.
   const generatorReady =
     status.generator.status === 'ready' || status.generator.status === 'cached'
@@ -77,7 +89,32 @@ export function ChatView() {
 
   return (
     <div className="chat">
-      {!canGenerate && <div className="notice">{t('chatSearchOnlyNote')}</div>}
+      {crashBlocked && (
+        <div className="notice">
+          <p className="error">{t('genCrashWarning')}</p>
+          <div className="row">
+            {getGenModelChoice() !== 'tiny' && (
+              <button
+                className="primary"
+                onClick={() =>
+                  setGenModelChoice(getGenModelChoice() === 'full' ? 'compact' : 'tiny')
+                }
+              >
+                {t('genCrashUseSmaller')}
+              </button>
+            )}
+            <button
+              onClick={() => {
+                clearCrashGuard()
+                setCrashSuspect(null)
+              }}
+            >
+              {t('settingsRetry')}
+            </button>
+          </div>
+        </div>
+      )}
+      {!supportsWebGPU() && <div className="notice">{t('chatSearchOnlyNote')}</div>}
       {canGenerate && !generatorReady && !generatorWanted && (
         <div className="notice">
           <button

@@ -3,6 +3,7 @@ import {
   COMPACT_GENERATION_MODEL_ID,
   EMBEDDING_MODEL_ID,
   GENERATION_MODEL_ID,
+  TINY_GENERATION_MODEL_ID,
   type GenModelChoice,
   type ModelProgress,
   type ModelStatus,
@@ -10,24 +11,41 @@ import {
 import type { AIRequest, AIResponse } from './protocol'
 
 const GEN_MODEL_KEY = 'iany.genModel'
+const CRASH_GUARD_KEY = 'iany.genCrashGuard'
+
+/** Crash detection: the guard is set when a generator load starts and
+ *  cleared when it succeeds or fails cleanly. If it is still present on the
+ *  next app start, the previous load killed the tab (OOM crash) — warn
+ *  instead of walking into the same wall automatically. */
+export function getCrashSuspect(): string | null {
+  return localStorage.getItem(CRASH_GUARD_KEY)
+}
+
+export function clearCrashGuard(): void {
+  localStorage.removeItem(CRASH_GUARD_KEY)
+}
 
 /** Device-aware default: Gemma 4 E2B needs ~3 GB of tab memory, which
  *  crashes phone browsers, so low-memory/mobile devices default compact. */
 export function getGenModelChoice(): GenModelChoice {
   const saved = localStorage.getItem(GEN_MODEL_KEY)
-  if (saved === 'full' || saved === 'compact') return saved
+  if (saved === 'full' || saved === 'compact' || saved === 'tiny') return saved
   const deviceMemory = (navigator as { deviceMemory?: number }).deviceMemory
   if (deviceMemory !== undefined) return deviceMemory >= 8 ? 'full' : 'compact'
   return navigator.maxTouchPoints > 1 ? 'compact' : 'full'
 }
 
 export function getGenModelId(): string {
-  return getGenModelChoice() === 'compact' ? COMPACT_GENERATION_MODEL_ID : GENERATION_MODEL_ID
+  const choice = getGenModelChoice()
+  if (choice === 'tiny') return TINY_GENERATION_MODEL_ID
+  if (choice === 'compact') return COMPACT_GENERATION_MODEL_ID
+  return GENERATION_MODEL_ID
 }
 
 /** Persists the choice and reloads so the AI worker starts clean. */
 export function setGenModelChoice(choice: GenModelChoice): void {
   localStorage.setItem(GEN_MODEL_KEY, choice)
+  clearCrashGuard()
   location.reload()
 }
 
@@ -98,6 +116,9 @@ class AIClient {
       return
     }
     if (msg.type === 'status') {
+      // Any terminal status means the worker survived the load attempt —
+      // it wasn't a tab crash.
+      if (msg.target === 'generator' && msg.status !== 'loading') clearCrashGuard()
       this.update(msg.target, {
         status: msg.status,
         progress: msg.status === 'ready' ? 1 : this.status[msg.target].progress,
@@ -142,6 +163,9 @@ class AIClient {
     if (this.status[target].status === 'idle' || this.status[target].status === 'cached') {
       this.update(target, { status: 'loading' })
     }
+    if (target === 'generator' && this.status.generator.status !== 'ready') {
+      localStorage.setItem(CRASH_GUARD_KEY, getGenModelId())
+    }
     return this.request({ id: crypto.randomUUID(), type: 'preload', target }).then(() => {})
   }
 
@@ -163,6 +187,9 @@ class AIClient {
   ): Promise<string> {
     if (this.status.generator.status === 'idle' || this.status.generator.status === 'cached') {
       this.update('generator', { status: 'loading' })
+    }
+    if (this.status.generator.status !== 'ready') {
+      localStorage.setItem(CRASH_GUARD_KEY, getGenModelId())
     }
     return (await this.request(
       {

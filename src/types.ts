@@ -12,7 +12,10 @@ export const GENERATION_MODEL_ID = 'onnx-community/gemma-4-E2B-it-ONNX'
  *  browsers. Gemma 3 1B (GQA build, optimized for WebGPU) is ~700 MB and
  *  still strongly multilingual. */
 export const COMPACT_GENERATION_MODEL_ID = 'onnx-community/gemma-3-1b-it-ONNX-GQA'
-export type GenModelChoice = 'full' | 'compact'
+/** Last-resort tier (~0.25 GB): for phones where even the 1B model crashes
+ *  the tab at load time. Noticeably weaker answers, but it runs. */
+export const TINY_GENERATION_MODEL_ID = 'onnx-community/gemma-3-270m-it-ONNX'
+export type GenModelChoice = 'full' | 'compact' | 'tiny'
 
 /** A model counts as fully downloaded only above these sizes — config and
  *  tokenizer files alone (or an interrupted weight download) must not show
@@ -22,6 +25,7 @@ export const MODEL_MIN_COMPLETE_BYTES: Record<string, number> = {
   [EMBEDDING_MODEL_ID]: 100 * 1e6,
   [GENERATION_MODEL_ID]: 800 * 1e6,
   [COMPACT_GENERATION_MODEL_ID]: 300 * 1e6,
+  [TINY_GENERATION_MODEL_ID]: 80 * 1e6,
 }
 
 export const CHUNK_MAX_CHARS = 1200
