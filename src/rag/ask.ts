@@ -1,7 +1,7 @@
 import { ai, getGenModelChoice, getLastGenDevice } from '../ai/client'
 import { detectLang, tokenizeForSearch } from '../ai/chunker'
 import { hybridSearch } from '../db/search'
-import type { ChunkHit } from '../types'
+import { genModelSpec, type ChunkHit } from '../types'
 
 export interface AskResult {
   answer: string
@@ -65,8 +65,10 @@ export async function ask(
           ...s,
           text: s.text.length > profile.chars ? `${s.text.slice(0, profile.chars)}…` : s.text,
         }))
+  // Qwen3 thinks out loud unless told not to ('/no_think' soft switch).
+  const noThink = genModelSpec(getGenModelChoice()).noThink ? '\n/no_think' : ''
   const answer = await ai.generate(
-    [{ role: 'user', content: buildPrompt(question, promptSources) }],
+    [{ role: 'user', content: buildPrompt(question, promptSources) + noThink }],
     { maxNewTokens: profile.maxNewTokens, onToken: opts.onToken },
   )
   return { answer, sources }

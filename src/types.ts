@@ -6,17 +6,20 @@ export const EMBEDDING_MODEL_ID = 'onnx-community/embeddinggemma-300m-ONNX'
 /** EmbeddingGemma is a Matryoshka model: we truncate 768 -> 256 dims and
  *  renormalize. 3x smaller storage and faster HNSW with minimal quality loss. */
 export const EMBEDDING_DIMS = 256
-export type GenModelChoice = 'tiny' | 'compact' | 'full' | 'max'
+export type GenModelChoice = 'tiny' | 'small' | 'compact' | 'full' | 'max'
 
 export interface GenModelSpec {
   choice: GenModelChoice
   id: string
   /** Short display name (shown in the models list) */
   name: string
-  /** Gemma 3 tiers run on CPU (WASM q8); Gemma 4 needs a working WebGPU. */
+  /** Small tiers run on CPU (WASM q8); Gemma 4 needs a working WebGPU. */
   cpuOk: boolean
   /** Below this many cached bytes the download isn't complete. */
   minBytes: number
+  /** Qwen3: disable thinking mode per turn (its <think> blocks would
+   *  otherwise stream into the chat). */
+  noThink?: boolean
 }
 
 /** Answering model tiers, smallest first (crash recovery steps down this
@@ -29,6 +32,14 @@ export const GEN_MODELS: GenModelSpec[] = [
     name: 'Gemma 3 270M',
     cpuOk: true,
     minBytes: 80 * 1e6,
+  },
+  {
+    choice: 'small',
+    id: 'onnx-community/Qwen3-0.6B-ONNX',
+    name: 'Qwen3 0.6B',
+    cpuOk: true,
+    minBytes: 250 * 1e6,
+    noThink: true,
   },
   {
     choice: 'compact',

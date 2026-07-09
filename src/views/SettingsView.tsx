@@ -361,6 +361,7 @@ export function SettingsView() {
           label={
             {
               tiny: t('settingsGeneratorTiny'),
+              small: t('settingsGeneratorSmall'),
               compact: t('settingsGeneratorCompact'),
               full: t('settingsGenerator'),
               max: t('settingsGeneratorMax'),
@@ -381,6 +382,7 @@ export function SettingsView() {
               {
                 {
                   tiny: t('settingsGenTiny'),
+                  small: t('settingsGenSmall'),
                   compact: t('settingsGenCompact'),
                   full: t('settingsGenFull'),
                   max: t('settingsGenMax'),

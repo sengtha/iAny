@@ -89,7 +89,13 @@ type Pending = {
  *  is itself a signal of a weak device (auto-downgrade lands there). */
 function isLowMemoryDevice(): boolean {
   const deviceMemory = (navigator as { deviceMemory?: number }).deviceMemory
-  return (deviceMemory !== undefined && deviceMemory <= 4) || getGenModelChoice() === 'tiny'
+  return (
+    (deviceMemory !== undefined && deviceMemory <= 4) ||
+    getGenModelChoice() === 'tiny' ||
+    // CPU generation means the whole model lives in tab memory — never
+    // keep both models resident there regardless of tier.
+    getLastGenDevice() === 'wasm'
+  )
 }
 
 export type ProgressListener = (p: ModelProgress) => void

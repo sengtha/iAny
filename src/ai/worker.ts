@@ -256,16 +256,32 @@ async function embed(texts: string[], kind: 'query' | 'document'): Promise<Float
   return rows
 }
 
+/** Remove reasoning-model scaffolding (Qwen3 <think> blocks) — harmless
+ *  no-op for models that never emit it. */
+function stripThink(text: string): string {
+  return text.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/^\s+/, '')
+}
+
 async function runGeneration(
   id: string,
   generator: TextGenerationPipeline,
   messages: { role: string; content: string }[],
   maxNewTokens: number,
 ): Promise<string> {
+  let leadingWhitespace = true
   const streamer = new TextStreamer(generator.tokenizer, {
     skip_prompt: true,
     skip_special_tokens: true,
-    callback_function: (token: string) => post({ id, type: 'token', token }),
+    callback_function: (token: string) => {
+      // Suppress think markers and the blank lines an empty think block
+      // leaves behind at the start of the stream.
+      let t = token.replace(/<\/?think>/g, '')
+      if (leadingWhitespace) {
+        t = t.replace(/^\s+/, '')
+        if (t.length > 0) leadingWhitespace = false
+      }
+      if (t) post({ id, type: 'token', token: t })
+    },
   })
   const output = await generator(messages, {
     max_new_tokens: maxNewTokens,
@@ -275,7 +291,7 @@ async function runGeneration(
   const last = (
     output as { generated_text: { role: string; content: string }[] }[]
   )[0].generated_text.at(-1)
-  return last?.content ?? ''
+  return stripThink(last?.content ?? '')
 }
 
 const GPU_RUNTIME_ERROR = /OrtRun|webgpu|wgpu|MapAsync|device.*lost|GPU/i

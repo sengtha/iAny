@@ -24,6 +24,7 @@ const ALLOWED_PREFIXES = [
   'onnx-community/gemma-3-1b-it-ONNX-GQA/',
   'onnx-community/gemma-3-270m-it-ONNX/',
   'onnx-community/gemma-4-E4B-it-ONNX/',
+  'onnx-community/Qwen3-0.6B-ONNX/',
 ]
 // OCR language data (Khmer + English), served through the same mirror.
 const TESSDATA_RE = /^tessdata\/(khm|eng)\.traineddata$/
