@@ -1,4 +1,4 @@
-import { ai, getGenModelChoice } from '../ai/client'
+import { ai, getGenModelChoice, getLastGenDevice } from '../ai/client'
 import { detectLang, tokenizeForSearch } from '../ai/chunker'
 import { hybridSearch } from '../db/search'
 import type { ChunkHit } from '../types'
@@ -49,16 +49,25 @@ export async function ask(
   // tensor costs ~1 MB per prompt token, so a 1000-token RAG prompt spikes
   // ~1 GB regardless of model size. Keep the prompt drastically short.
   const tiny = getGenModelChoice() === 'tiny'
-  const sources = await retrieve(question, opts.limit ?? (tiny ? 2 : 6))
-  const promptSources = tiny
-    ? sources.map((s) => ({
-        ...s,
-        text: s.text.length > 300 ? `${s.text.slice(0, 300)}…` : s.text,
-      }))
-    : sources
+  // CPU (wasm) generation gets the same protection on any model size —
+  // the logits spike scales with prompt length, not weights.
+  const cpu = getLastGenDevice() === 'wasm'
+  const profile = tiny
+    ? { limit: 2, chars: 300, maxNewTokens: 192 }
+    : cpu
+      ? { limit: 3, chars: 400, maxNewTokens: 256 }
+      : { limit: 6, chars: Infinity, maxNewTokens: 1024 }
+  const sources = await retrieve(question, opts.limit ?? profile.limit)
+  const promptSources =
+    profile.chars === Infinity
+      ? sources
+      : sources.map((s) => ({
+          ...s,
+          text: s.text.length > profile.chars ? `${s.text.slice(0, profile.chars)}…` : s.text,
+        }))
   const answer = await ai.generate(
     [{ role: 'user', content: buildPrompt(question, promptSources) }],
-    { maxNewTokens: tiny ? 192 : 1024, onToken: opts.onToken },
+    { maxNewTokens: profile.maxNewTokens, onToken: opts.onToken },
   )
   return { answer, sources }
 }

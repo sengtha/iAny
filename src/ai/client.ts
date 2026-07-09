@@ -25,6 +25,12 @@ export function clearCrashGuard(): void {
   localStorage.removeItem(CRASH_GUARD_KEY)
 }
 
+/** The engine generation last ran on ('wasm' = CPU), if known. */
+export function getLastGenDevice(): 'webgpu' | 'wasm' | null {
+  const v = localStorage.getItem('iany.genDevice')
+  return v === 'webgpu' || v === 'wasm' ? v : null
+}
+
 /** Device-aware default: Gemma 4 E2B needs ~3 GB of tab memory, which
  *  crashes phone browsers, so low-memory/mobile devices default compact. */
 export function getGenModelChoice(): GenModelChoice {
@@ -197,6 +203,11 @@ class AIClient {
       // Any terminal status means the worker survived the load attempt —
       // it wasn't a tab crash.
       if (msg.target === 'generator' && msg.status !== 'loading') clearCrashGuard()
+      // Remember which engine generation actually runs on: CPU (wasm)
+      // devices need tight prompt caps (see rag/ask.ts).
+      if (msg.target === 'generator' && msg.status === 'ready' && msg.device) {
+        localStorage.setItem('iany.genDevice', msg.device)
+      }
       this.update(msg.target, {
         status: msg.status,
         progress: msg.status === 'ready' ? 1 : this.status[msg.target].progress,

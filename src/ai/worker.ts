@@ -212,7 +212,7 @@ function getGenerator(): Promise<TextGenerationPipeline> {
         generatorDevice = device
         return p
       })
-      post({ type: 'status', target: 'generator', status: 'ready' })
+      post({ type: 'status', target: 'generator', status: 'ready', device: generatorDevice })
       return generator
     })()
     generatorPromise.catch((e) => {

@@ -28,4 +28,5 @@ export type AIResponse =
       target: 'embedder' | 'generator'
       status: ModelStatus
       error?: string
+      device?: 'webgpu' | 'wasm'
     }
