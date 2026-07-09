@@ -16,7 +16,7 @@ import {
 } from '@huggingface/transformers'
 import { EMBEDDING_DIMS, EMBEDDING_MODEL_ID, GENERATION_MODEL_ID } from '../types'
 import type { AIRequest, AIResponse } from './protocol'
-import { installResumableFetch } from './resumable'
+import { createResumableFetch } from './resumable'
 
 // ONNX Runtime picks a WASM variant at runtime by device capability
 // (jsep/jspi for WebGPU, asyncify/plain for CPU). Bundlers only discover one
@@ -83,7 +83,9 @@ function progressForwarder(target: 'embedder' | 'generator') {
 
 // Large model files download in durable 8 MB chunks: an interrupted
 // download resumes from the last saved chunk instead of restarting.
-installResumableFetch(
+// Transformers.js routes every download through env.fetch (NOT the global
+// fetch), so the wrapper must be installed there.
+env.fetch = createResumableFetch(
   (url) => url.includes(`${EMBEDDING_MODEL_ID}/`) || url.includes(`${GENERATION_MODEL_ID}/`),
   (url, loaded, total) => {
     const file = url.slice(url.lastIndexOf('/') + 1)

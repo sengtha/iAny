@@ -96,16 +96,22 @@ export async function resumableFetch(
   })
 }
 
-/** Wrap the global fetch so matching GET requests become resumable. */
-export function installResumableFetch(
+/** Build a fetch that makes matching GET requests resumable. Install it as
+ *  Transformers.js `env.fetch` — the library routes ALL model downloads
+ *  through that hook and never touches the global fetch. Requests that
+ *  already carry a Range header (metadata probes) pass through untouched. */
+export function createResumableFetch(
   shouldIntercept: (url: string) => boolean,
   report: ProgressReport,
-): void {
+): typeof fetch {
   const origFetch = self.fetch.bind(self)
-  self.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+  return (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = input instanceof Request ? input.url : String(input)
     const method = init?.method ?? (input instanceof Request ? input.method : 'GET')
-    if (method === 'GET' && shouldIntercept(url)) {
+    const headers = new Headers(
+      init?.headers ?? (input instanceof Request ? input.headers : undefined),
+    )
+    if (method === 'GET' && !headers.has('range') && shouldIntercept(url)) {
       return resumableFetch(url, origFetch, report)
     }
     return origFetch(input as RequestInfo, init)
