@@ -89,9 +89,35 @@ function fileHeaders(contentType: string | undefined, size?: number): Headers {
     'content-type': contentType ?? 'application/octet-stream',
     'cache-control': 'public, max-age=31536000, immutable',
     'access-control-allow-origin': '*',
+    'accept-ranges': 'bytes',
   })
   if (size !== undefined) headers.set('content-length', String(size))
   return headers
+}
+
+function parseRange(header: string | null): { start: number; end: number | null } | null {
+  const m = /^bytes=(\d+)-(\d*)$/.exec(header ?? '')
+  if (!m) return null
+  return { start: Number(m[1]), end: m[2] ? Number(m[2]) : null }
+}
+
+/** Fetch a file from Hugging Face into R2 (synchronous — resolves once the
+ *  object is fully stored). Returns false when the file can't be cached
+ *  (e.g. unknown length), in which case callers should proxy directly. */
+async function primeFromUpstream(key: string, hfPath: string, env: Env): Promise<boolean> {
+  const upstream = await fetch(`${HF}/${hfPath}`)
+  if (!upstream.ok || !upstream.body) return false
+  const contentType = upstream.headers.get('content-type') ?? 'application/octet-stream'
+  const length = Number(upstream.headers.get('content-length') ?? 0)
+  if (!length) return false
+  if (length <= BUFFER_LIMIT) {
+    await env.MODELS.put(key, await upstream.arrayBuffer(), { httpMetadata: { contentType } })
+  } else {
+    await env.MODELS.put(key, upstream.body.pipeThrough(new FixedLengthStream(length)), {
+      httpMetadata: { contentType },
+    })
+  }
+  return true
 }
 
 async function serveModel(
@@ -108,11 +134,49 @@ async function serveModel(
     return new Response('Forbidden', { status: 403 })
   }
 
+  // HEAD: report size/type without pulling anything. Serves the resumable
+  // downloader's probe cheaply whether or not the file is in R2 yet.
+  if (request.method === 'HEAD') {
+    const head = await env.MODELS.head(key)
+    if (head) {
+      return new Response(null, { headers: fileHeaders(head.httpMetadata?.contentType, head.size) })
+    }
+    const upstream = await fetch(`${HF}/${hfPath}`, { method: 'HEAD' })
+    if (!upstream.ok) return new Response(`Upstream ${upstream.status}`, { status: 502 })
+    const len = Number(upstream.headers.get('content-length') ?? 0)
+    return new Response(null, {
+      headers: fileHeaders(
+        upstream.headers.get('content-type') ?? undefined,
+        len > 0 ? len : undefined,
+      ),
+    })
+  }
+
+  // Range: resumable chunk download. Ensure the object is in R2 first
+  // (one synchronous pull), then serve every range from R2.
+  const range = parseRange(request.headers.get('range'))
+  if (range) {
+    let head = await env.MODELS.head(key)
+    if (!head) {
+      if (!(await primeFromUpstream(key, hfPath, env))) {
+        // Can't cache (unknown length): proxy the range straight to HF.
+        return fetch(`${HF}/${hfPath}`, { headers: { range: request.headers.get('range')! } })
+      }
+      head = await env.MODELS.head(key)
+      if (!head) return new Response('Prime failed', { status: 502 })
+    }
+    const end = Math.min(range.end ?? head.size - 1, head.size - 1)
+    if (range.start > end) return new Response('Range not satisfiable', { status: 416 })
+    const length = end - range.start + 1
+    const obj = await env.MODELS.get(key, { range: { offset: range.start, length } })
+    if (!obj) return new Response('Not found', { status: 404 })
+    const headers = fileHeaders(obj.httpMetadata?.contentType, length)
+    headers.set('content-range', `bytes ${range.start}-${end}/${head.size}`)
+    return new Response(obj.body, { status: 206, headers })
+  }
+
   const cached = await env.MODELS.get(key)
   if (cached) {
-    if (request.method === 'HEAD') {
-      return new Response(null, { headers: fileHeaders(cached.httpMetadata?.contentType, cached.size) })
-    }
     return new Response(cached.body, { headers: fileHeaders(cached.httpMetadata?.contentType, cached.size) })
   }
 
@@ -126,9 +190,7 @@ async function serveModel(
   if (length > 0 && length <= BUFFER_LIMIT) {
     const buf = await upstream.arrayBuffer()
     ctx.waitUntil(env.MODELS.put(key, buf, { httpMetadata: { contentType } }))
-    return new Response(request.method === 'HEAD' ? null : buf, {
-      headers: fileHeaders(contentType, buf.byteLength),
-    })
+    return new Response(buf, { headers: fileHeaders(contentType, buf.byteLength) })
   }
 
   if (length > 0) {
@@ -139,13 +201,9 @@ async function serveModel(
         httpMetadata: { contentType },
       }),
     )
-    return new Response(request.method === 'HEAD' ? null : toClient, {
-      headers: fileHeaders(contentType, length),
-    })
+    return new Response(toClient, { headers: fileHeaders(contentType, length) })
   }
 
   // Unknown length: pass through without caching.
-  return new Response(request.method === 'HEAD' ? null : upstream.body, {
-    headers: fileHeaders(contentType),
-  })
+  return new Response(upstream.body, { headers: fileHeaders(contentType) })
 }

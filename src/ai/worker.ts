@@ -16,6 +16,7 @@ import {
 } from '@huggingface/transformers'
 import { EMBEDDING_DIMS, EMBEDDING_MODEL_ID, GENERATION_MODEL_ID } from '../types'
 import type { AIRequest, AIResponse } from './protocol'
+import { installResumableFetch } from './resumable'
 
 // ONNX Runtime picks a WASM variant at runtime by device capability
 // (jsep/jspi for WebGPU, asyncify/plain for CPU). Bundlers only discover one
@@ -40,29 +41,55 @@ async function hasWebGPU(): Promise<boolean> {
   }
 }
 
+// Both Transformers.js progress callbacks and the resumable downloader
+// report into the same per-target file map, so the UI sees one coherent
+// progress bar. currentTarget tracks which model is being loaded (loads are
+// user-triggered and sequential).
+let currentTarget: 'embedder' | 'generator' = 'embedder'
+const progressFiles: Record<'embedder' | 'generator', Map<string, { loaded: number; total: number }>> = {
+  embedder: new Map(),
+  generator: new Map(),
+}
+
+function reportFileProgress(
+  target: 'embedder' | 'generator',
+  file: string,
+  loaded: number,
+  total: number,
+) {
+  const files = progressFiles[target]
+  files.set(file, { loaded, total })
+  let sumLoaded = 0
+  let sumTotal = 0
+  for (const f of files.values()) {
+    sumLoaded += f.loaded
+    sumTotal += f.total
+  }
+  post({
+    type: 'progress',
+    target,
+    progress: sumTotal > 0 ? sumLoaded / sumTotal : 0,
+    file,
+  })
+}
+
 function progressForwarder(target: 'embedder' | 'generator') {
-  const files = new Map<string, { loaded: number; total: number }>()
   return (p: Record<string, unknown>) => {
     if (p.status === 'progress' && typeof p.file === 'string') {
-      files.set(p.file, {
-        loaded: (p.loaded as number) ?? 0,
-        total: (p.total as number) ?? 0,
-      })
-      let loaded = 0
-      let total = 0
-      for (const f of files.values()) {
-        loaded += f.loaded
-        total += f.total
-      }
-      post({
-        type: 'progress',
-        target,
-        progress: total > 0 ? loaded / total : 0,
-        file: p.file,
-      })
+      reportFileProgress(target, p.file, (p.loaded as number) ?? 0, (p.total as number) ?? 0)
     }
   }
 }
+
+// Large model files download in durable 8 MB chunks: an interrupted
+// download resumes from the last saved chunk instead of restarting.
+installResumableFetch(
+  (url) => url.includes(`${EMBEDDING_MODEL_ID}/`) || url.includes(`${GENERATION_MODEL_ID}/`),
+  (url, loaded, total) => {
+    const file = url.slice(url.lastIndexOf('/') + 1)
+    reportFileProgress(currentTarget, file, loaded, total)
+  },
+)
 
 interface LoadAttempt {
   device: 'webgpu' | 'wasm'
@@ -92,6 +119,7 @@ let embedderPromise: Promise<FeatureExtractionPipeline> | null = null
 function getEmbedder(): Promise<FeatureExtractionPipeline> {
   if (!embedderPromise) {
     embedderPromise = (async () => {
+      currentTarget = 'embedder'
       const webgpu = await hasWebGPU()
       // EmbeddingGemma activations do not support fp16 — q4/q8/fp32 only.
       const attempts: LoadAttempt[] = [
@@ -126,6 +154,7 @@ let generatorPromise: Promise<TextGenerationPipeline> | null = null
 function getGenerator(): Promise<TextGenerationPipeline> {
   if (!generatorPromise) {
     generatorPromise = (async () => {
+      currentTarget = 'generator'
       if (!(await hasWebGPU())) {
         post({ type: 'status', target: 'generator', status: 'unsupported' })
         throw new Error('webgpu-unavailable')
