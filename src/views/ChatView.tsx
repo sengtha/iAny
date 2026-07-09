@@ -81,8 +81,16 @@ export function ChatView() {
           },
         ])
       }
-    } catch {
-      setMessages((m) => [...m, { role: 'assistant', content: t('errorGeneric') }])
+    } catch (e) {
+      console.error('[iAny] ask failed', e)
+      const detail = e instanceof Error ? e.message : String(e)
+      setMessages((m) => [
+        ...m,
+        // Surface the underlying error: "something went wrong" alone makes
+        // remote diagnosis impossible (a phone screenshot is often the only
+        // signal we get).
+        { role: 'assistant', content: `${t('errorGeneric')}\n\n⚠️ ${detail.slice(0, 300)}` },
+      ])
     } finally {
       setBusy(false)
     }
