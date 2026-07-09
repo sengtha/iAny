@@ -5,12 +5,12 @@
       <stop offset="1" stop-color="#6366f1"/>
     </linearGradient>
   </defs>
-  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
-  <g fill="#ffffff">
-    <!-- dot of the "i": AI sparkle -->
+  <!-- Full-bleed background: maskable icons are cropped to arbitrary
+       shapes, so the glyph sits inside the 80% safe zone. -->
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <g fill="#ffffff" transform="translate(56.3 56.3) scale(0.78)">
     <path d="M256 68 C264 116 272 124 320 132 C272 140 264 148 256 196 C248 148 240 140 192 132 C240 124 248 116 256 68 Z"/>
     <path d="M346 62 C349 80 352 83 370 86 C352 89 349 92 346 110 C343 92 340 89 322 86 C340 83 343 80 346 62 Z" opacity="0.9"/>
-    <!-- stem of the "i": knowledge layers absorbed upward -->
     <rect x="196" y="228" width="120" height="56" rx="28"/>
     <rect x="196" y="302" width="120" height="56" rx="28" opacity="0.78"/>
     <rect x="196" y="376" width="120" height="56" rx="28" opacity="0.56"/>
