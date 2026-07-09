@@ -179,8 +179,10 @@ function getGenerator(): Promise<TextGenerationPipeline> {
         post({ type: 'status', target: 'generator', status: 'unsupported' })
         throw new Error('webgpu-unavailable')
       }
-      // q4f16 needs shader-f16 support; q4 covers GPUs without it. The
-      // Gemma 3 builds are q4-only (q4f16 overflows on WebGPU).
+      // Dtype-per-device rules: q4f16 needs shader-f16 (Gemma 4 only; the
+      // Gemma 3 q4f16 builds overflow on WebGPU). q4 block quantization
+      // needs GatherBlockQuantized, which the WASM CPU engine lacks — CPU
+      // must use q8.
       const attempts: LoadAttempt[] =
         generationModelId === GENERATION_MODEL_ID
           ? [
@@ -190,9 +192,9 @@ function getGenerator(): Promise<TextGenerationPipeline> {
           : webgpu
             ? [
                 { device: 'webgpu', dtype: 'q4' },
-                { device: 'wasm', dtype: 'q4' },
+                { device: 'wasm', dtype: 'q8' },
               ]
-            : [{ device: 'wasm', dtype: 'q4' }]
+            : [{ device: 'wasm', dtype: 'q8' }]
       const generator = await loadWithFallback(attempts, async ({ device, dtype }) => {
         const p = await pipeline('text-generation', generationModelId, {
           dtype: dtype as 'q4f16',
