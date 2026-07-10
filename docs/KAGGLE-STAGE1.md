@@ -214,9 +214,15 @@ parts.append(Dataset.from_list(cx_rows))
 dic = load_dataset("seanghay/khmer-dictionary-44k", split="train")
 parts.append(dic.map(lambda e: {"text": f'{e["word"]}: {e.get("definition","")}'}).select_columns(["text"]))
 
-corpus = concatenate_datasets(parts)
-corpus = corpus.map(lambda e: {"text": re.sub(r"\s+", " ", e["text"]).strip()})
-corpus = corpus.filter(lambda e: len(e["text"]) > 200 and kratio(e["text"]) > 0.5)
+def scrub(e):
+    t = e["text"]
+    t = re.sub(r"<[^>]+>", " ", t)          # strip HTML/markup (v1 leaked </b></i>)
+    t = re.sub(r"[””“\"！!?？]{2,}", " ", t)  # collapse punctuation runs
+    t = re.sub(r"\s+", " ", t).strip()
+    return {"text": t}
+
+corpus = concatenate_datasets(parts).map(scrub)
+corpus = corpus.filter(lambda e: len(e["text"]) > 200 and kratio(e["text"]) > 0.6)
 print("docs:", len(corpus))   # aim for a few hundred k
 ```
 
