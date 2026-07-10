@@ -85,6 +85,7 @@ export const km: Translation = {
   settingsDownload: 'ទាញយក',
   settingsRetry: 'ព្យាយាមម្ដងទៀត',
   settingsDiagnose: 'សាកល្បងការតភ្ជាប់ទាញយកម៉ូដែល',
+  settingsAdvanced: 'កម្រិតខ្ពស់៖ ផ្លាស់ទីម៉ូដែលរវាងឧបករណ៍ និងវិនិច្ឆ័យ',
 
   modelShareHint:
     'ផ្លាស់ទីម៉ូដែល AI ដែលបានទាញយក ទៅឧបករណ៍ផ្សេងដោយគ្មានអ៊ីនធឺណិត៖ នាំចេញជាឯកសារ ផ្ញើតាម Quick Share / USB / កាត SD រួចនាំចូលនៅឧបករណ៍ម្ខាងទៀត។',

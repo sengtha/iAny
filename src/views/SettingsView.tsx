@@ -391,8 +391,11 @@ export function SettingsView() {
             </button>
           ))}
         </div>
-        <ModelShare />
-        <Diagnostics />
+        <details className="advanced">
+          <summary>{t('settingsAdvanced')}</summary>
+          <ModelShare />
+          <Diagnostics />
+        </details>
       </section>
 
       <CloudBackup />

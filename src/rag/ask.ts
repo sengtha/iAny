@@ -28,9 +28,10 @@ function buildPrompt(question: string, sources: ChunkHit[]): string {
       ? 'Answer in Khmer (ភាសាខ្មែរ).'
       : 'Answer in the same language as the question.'
   return [
-    'You are iAny, a private offline assistant. Answer the question using ONLY the context below, which comes from the user\'s personal knowledge base.',
-    'Cite sources inline as [1], [2] where relevant.',
-    `If the context does not contain the answer, say you don't have that information yet and suggest feeding iAny relevant material. ${langInstruction}`,
+    "You are iAny, a private offline assistant. Answer the question using ONLY the context below, which comes from the user's personal knowledge base.",
+    'Write a clear, professional answer in Markdown: lead with the direct answer, use short paragraphs, and use bullet points or **bold** only when they genuinely aid readability. Cite sources inline as [1], [2].',
+    'Be concise and factual — no filler, no speculation beyond the context.',
+    `If the context does not contain the answer, say so briefly and suggest feeding iAny relevant material. ${langInstruction}`,
     '',
     '--- CONTEXT ---',
     context || '(no matching content found)',
@@ -38,6 +39,21 @@ function buildPrompt(question: string, sources: ChunkHit[]): string {
     '',
     `Question: ${question}`,
   ].join('\n')
+}
+
+/**
+ * Extractive answers for Khmer questions on the tiny tier: the 270M model
+ * cannot write Khmer (yet — see docs/FINETUNE-KHMER.md), so instead of
+ * generating broken text, answer by quoting the best-matching passages
+ * verbatim. The Khmer is perfect by construction — it is the user's own
+ * content. Replaced by real generation once the fine-tuned model ships.
+ */
+function extractiveAnswer(sources: ChunkHit[]): string {
+  const quotes = sources
+    .slice(0, 2)
+    .map((s, i) => `**[${i + 1}] ${s.title}**\n\n> ${s.text.replace(/\n/g, '\n> ')}`)
+    .join('\n\n')
+  return `យោងតាមឯកសាររបស់អ្នក៖\n\n${quotes}`
 }
 
 export async function ask(
@@ -49,6 +65,10 @@ export async function ask(
   // tensor costs ~1 MB per prompt token, so a 1000-token RAG prompt spikes
   // ~1 GB regardless of model size. Keep the prompt drastically short.
   const tiny = getGenModelChoice() === 'tiny'
+  if (tiny && detectLang(question) === 'km') {
+    const sources = await retrieve(question, 4)
+    return { answer: sources.length ? extractiveAnswer(sources) : '', sources }
+  }
   // CPU (wasm) generation gets the same protection on any model size —
   // the logits spike scales with prompt length, not weights.
   const cpu = getLastGenDevice() === 'wasm'

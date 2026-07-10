@@ -83,6 +83,7 @@ export const en = {
   settingsDownload: 'Download',
   settingsRetry: 'Retry',
   settingsDiagnose: 'Test model download connections',
+  settingsAdvanced: 'Advanced: move models between devices, diagnostics',
 
   modelShareHint:
     'Move downloaded AI models to another device without internet: export to a file, send it with Quick Share / USB / SD card, then import on the other device.',

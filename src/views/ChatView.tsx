@@ -12,6 +12,7 @@ import { useModelStatus } from '../hooks/useModelStatus'
 import { useI18n } from '../i18n'
 import { ask, retrieve } from '../rag/ask'
 import { nextSmallerChoice, type ChatMessage } from '../types'
+import { Markdown } from '../ui/Markdown'
 
 function supportsWebGPU(): boolean {
   return 'gpu' in navigator
@@ -166,7 +167,11 @@ export function ChatView() {
         )}
         {messages.map((msg, i) => (
           <div key={i} className={`message ${msg.role}`}>
-            {msg.content && <div className="bubble">{msg.content}</div>}
+            {msg.content && (
+              <div className="bubble">
+                {msg.role === 'assistant' ? <Markdown text={msg.content} /> : msg.content}
+              </div>
+            )}
             {msg.sources && msg.sources.length > 0 && (
               <details className="sources" open={!msg.content}>
                 <summary>
