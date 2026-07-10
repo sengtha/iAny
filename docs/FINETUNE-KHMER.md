@@ -26,9 +26,20 @@ documents, or eloquent prose — it remains a 270M model.
 You need:
 
 - A machine with Python 3.11+ for data preparation (any laptop).
-- A rented GPU for training: one 24 GB card is ample for a 270M model.
-  Easiest options: **Google Colab Pro** (~$10/mo, pick an A100/L4 runtime)
-  or **RunPod / Lambda** (~$0.4–0.8/hr; total training is a few hours).
+- A GPU for training: one 16–24 GB card is ample for a 270M model.
+  **Cambodia-friendly options** (Colab Pro billing often fails from KH):
+
+  | Provider | Cost | Payment | Notes |
+  |---|---|---|---|
+  | **Kaggle Notebooks** | **Free** | none | 30 GPU-hrs/week (T4/P100). No card, works from KH. Best starting point — a 270M run fits easily. |
+  | **Vast.ai** | ~$0.2–0.5/hr | card + **crypto** | Cheapest rentable GPUs; crypto sidesteps card issues. |
+  | **RunPod** | ~$0.3–0.8/hr | card + **crypto** | Clean UX, per-second billing, persistent volumes. |
+  | **Modal** | free credits then per-sec | card | ~$30/mo free credits; serverless, script-driven. |
+  | **Paperspace Gradient** | free tier + paid | card | Free GPU notebooks (queue). |
+  | Colab (free tier) | Free | none | Usually works from KH even when *Pro* billing doesn't; T4, time-limited. |
+
+  Recommended path: prototype on **Kaggle free**, and if you need a bigger
+  card or longer runs, rent **Vast.ai/RunPod with crypto**.
 - A Hugging Face account (to download the base model; accept the Gemma
   license on the `google/gemma-3-270m-it` page once).
 - `wrangler` logged into your Cloudflare account (for the final upload —
@@ -53,10 +64,30 @@ Good open sources, roughly in order of quality:
 | Source | What | How |
 |---|---|---|
 | Khmer Wikipedia | Clean encyclopedic Khmer | `datasets.load_dataset("wikimedia/wikipedia", "20231101.km")` (use latest dump) |
-| CulturaX / HPLT `km` subset | Web text, large | `load_dataset("uonlp/CulturaX", "km")` |
-| SEA-LION corpus (AI Singapore) | Curated SEA-language web/news | see `aisingapore` on Hugging Face |
+| CulturaX `km` subset | Web text, large | `load_dataset("uonlp/CulturaX", "km")` |
+| OSCAR / mC4 `km` | Web crawl Khmer | `load_dataset("oscar-corpus/OSCAR-2301", "km")` |
+| SEA-LION corpus (AI Singapore) | Curated SEA-language web/news | `aisingapore` org on Hugging Face |
 | Openly licensed Khmer books/news | Highest quality | manual collection; verify licenses |
 | Your own iAny documents | Domain-matching | export a pack, extract text |
+
+**Khmer-specific resources** (from
+[seanghay/awesome-khmer-language](https://github.com/seanghay/awesome-khmer-language)
+— the definitive index; browse it for more):
+
+| Resource | Use in this project |
+|---|---|
+| `seanghay/khmer-dictionary-44k` | 44k Royal Academy entries — fold into Stage 1 to nail vocabulary/spelling |
+| `seanghay/khPOS` | 12k POS-tagged sentences — clean gold Khmer; also validates word segmentation |
+| `seanghay/albert-khmer-small` | Existing Khmer encoder trained on ~13M sentences — a *reference* for what a clean corpus looks like; points to its sources |
+| `khmercut` (seanghay) | Khmer word segmenter — a stronger alternative to the app's `Intl.Segmenter` if FTS quality needs it later |
+| PrahokBART corpus (paper) | Documents its Khmer CC + Wikipedia + Wikibooks pipeline — a good recipe to copy |
+
+> Reality check on Stage 2 (instruction data): there is **very little
+> native Khmer instruction/QA data** in existence — Cohere's **Aya**
+> collection has a modest Khmer slice, and that's about it. This is
+> exactly why we *generate* the RAG Q&A synthetically from an open teacher.
+> The scarcity is also the opportunity: your reviewed dataset would be
+> one of the only Khmer RAG instruction sets anywhere.
 
 ### 1.2 Clean it
 
