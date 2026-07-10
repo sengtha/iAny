@@ -97,6 +97,11 @@ trainer = SFTTrainer(
         per_device_train_batch_size=8,
         gradient_accumulation_steps=4,
         learning_rate=1e-4,          # full fine-tune; the model is tiny
+        lr_scheduler_type="cosine",  # + warmup: ~63% of params are the
+        warmup_ratio=0.05,           # embedding matrix; let it stabilize on
+                                     # Khmer before big transformer updates,
+                                     # so early gradient spikes don't wipe
+                                     # the pre-trained English weights.
         num_train_epochs=1,
         bf16=True,
         logging_steps=50,
@@ -212,6 +217,38 @@ python -m onnxruntime.quantization.preprocess  # then quantize:
 #   q4  -> webgpu   (matmul 4-bit; see onnx-community repos for reference configs)
 #   q8  -> wasm/CPU (dynamic int8)
 ```
+
+### ⚠️ CRITICAL: do NOT 4-bit-quantize the embedding layer
+
+This is the single mistake most likely to destroy the Khmer you spent
+Stage 1 teaching. Gemma 3 270M's architecture is lopsided: of its 270M
+parameters, **~170M live in the token-embedding matrix** (the price of
+the 256k Gemini vocabulary), leaving only ~100M in the actual transformer
+layers. If you crush that 170M embedding matrix to 4-bit, the vectors for
+rare/newly-learned Khmer tokens collide and the model reverts to script
+soup — even though training was perfect.
+
+**The rule:** apply q4 only to the ~100M of linear transformer weights;
+keep the embedding matrix at **fp16 or q8**. In practice, add the
+embedding node(s) to `nodes_to_exclude` when quantizing:
+
+```python
+from onnxruntime.quantization import quantize_dynamic, QuantType
+# Identify the embedding node name first (e.g. inspect the graph, or look
+# for '/model/embed_tokens/'); exclude it so it stays higher precision.
+quantize_dynamic(
+    "onnx-out/model.onnx",
+    "onnx-out/onnx/model_q4.onnx",
+    weight_type=QuantType.QInt4,       # or QUInt4 per your ORT version
+    nodes_to_exclude=["/model/embed_tokens/Gather", "/lm_head/MatMul"],
+)
+```
+
+Reference: the stock `onnx-community/gemma-3-270m-it-ONNX` q4 build already
+follows this pattern — diff your export's node precisions against it. And
+**always** run the Stage-3 eval on the *quantized* file, not just the
+PyTorch checkpoint: quantization is exactly where a good fine-tune quietly
+dies, and the embedding trap is the usual cause.
 
 The practical reference: mirror the file layout of
 `onnx-community/gemma-3-270m-it-ONNX` (config.json, tokenizer files,
