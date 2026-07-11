@@ -2,6 +2,7 @@
   "expo": {
     "name": "iAny",
     "slug": "iany",
+    "owner": "e-khmer-technology-co-ltd",
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
@@ -16,6 +17,11 @@
     },
     "plugins": [
       "expo-dev-client"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "8b77a260-1141-4d9b-be4a-8ae8ddda1a6e"
+      }
+    }
   }
 }
