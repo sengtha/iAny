@@ -6,7 +6,7 @@ export const EMBEDDING_MODEL_ID = 'onnx-community/embeddinggemma-300m-ONNX'
 /** EmbeddingGemma is a Matryoshka model: we truncate 768 -> 256 dims and
  *  renormalize. 3x smaller storage and faster HNSW with minimal quality loss. */
 export const EMBEDDING_DIMS = 256
-export type GenModelChoice = 'tiny' | 'small' | 'compact' | 'full' | 'max'
+export type GenModelChoice = 'tiny' | 'small' | 'compact' | 'full' | 'max' | 'khmer'
 
 export interface GenModelSpec {
   choice: GenModelChoice
@@ -20,6 +20,11 @@ export interface GenModelSpec {
   /** Qwen3: disable thinking mode per turn (its <think> blocks would
    *  otherwise stream into the chat). */
   noThink?: boolean
+  /** Force a single dtype for all devices (e.g. a model exported q8-only). */
+  dtype?: string
+  /** iAny's fine-tuned Khmer RAG model: use the Khmer training prompt and
+   *  skip the extractive fallback (it generates real Khmer answers). */
+  khmerRag?: boolean
 }
 
 /** Answering model tiers, smallest first (crash recovery steps down this
@@ -61,6 +66,17 @@ export const GEN_MODELS: GenModelSpec[] = [
     name: 'Gemma 4 E4B',
     cpuOk: false,
     minBytes: 1500 * 1e6,
+  },
+  {
+    // iAny's own Khmer fine-tune (Gemma 3 270M, continued-pretrained on
+    // Khmer then RAG-SFT). q8-only export; opt-in Khmer tier.
+    choice: 'khmer',
+    id: 'sengtha/iany-khmer-tiny-v1-ONNX',
+    name: 'iAny Khmer 270M',
+    cpuOk: true,
+    minBytes: 80 * 1e6,
+    dtype: 'q8',
+    khmerRag: true,
   },
 ]
 

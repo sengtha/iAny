@@ -365,6 +365,7 @@ export function SettingsView() {
               compact: t('settingsGeneratorCompact'),
               full: t('settingsGenerator'),
               max: t('settingsGeneratorMax'),
+              khmer: t('settingsGeneratorKhmer'),
             }[getGenModelChoice()]
           }
           model={status.generator}
@@ -386,6 +387,7 @@ export function SettingsView() {
                   compact: t('settingsGenCompact'),
                   full: t('settingsGenFull'),
                   max: t('settingsGenMax'),
+                  khmer: t('settingsGenKhmer'),
                 }[m.choice]
               }
             </button>

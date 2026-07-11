@@ -26,6 +26,7 @@ const ALLOWED_PREFIXES = [
   'onnx-community/gemma-3-270m-it-ONNX/',
   'onnx-community/gemma-4-E4B-it-ONNX/',
   'onnx-community/Qwen3-0.6B-ONNX/',
+  'sengtha/iany-khmer-tiny-v1-ONNX/',
 ]
 // OCR language data, served through the same mirror. Khmer uses the
 // high-accuracy models; English's fast model is accurate enough.

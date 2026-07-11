@@ -64,6 +64,20 @@ export async function ask(
   // memory killer there: Gemma's 262k vocabulary means the prefill logits
   // tensor costs ~1 MB per prompt token, so a 1000-token RAG prompt spikes
   // ~1 GB regardless of model size. Keep the prompt drastically short.
+  // iAny's fine-tuned Khmer model: generate a real grounded answer using the
+  // exact prompt it was trained on (docs/KAGGLE-STAGE2.md).
+  if (genModelSpec(getGenModelChoice()).khmerRag) {
+    const sources = await retrieve(question, 3)
+    if (!sources.length) return { answer: '', sources }
+    const context = sources.map((s, i) => `[${i + 1}] ${s.title}\n${s.text}`).join('\n\n')
+    const prompt = `បរិបទ៖\n${context}\n\nសំណួរ៖ ${question}\nចម្លើយ៖`
+    const answer = await ai.generate([{ role: 'user', content: prompt }], {
+      maxNewTokens: 256,
+      onToken: opts.onToken,
+    })
+    return { answer, sources }
+  }
+
   const tiny = getGenModelChoice() === 'tiny'
   if (tiny && detectLang(question) === 'km') {
     const sources = await retrieve(question, 4)

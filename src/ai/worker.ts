@@ -178,7 +178,8 @@ function getGenerator(): Promise<TextGenerationPipeline> {
     generatorPromise = (async () => {
       currentTarget = 'generator'
       const webgpu = !forceWasm && (await hasWebGPU())
-      const cpuOk = GEN_MODELS.find((m) => m.id === generationModelId)?.cpuOk ?? false
+      const spec = GEN_MODELS.find((m) => m.id === generationModelId)
+      const cpuOk = spec?.cpuOk ?? false
       // Gemma 4 tiers are too heavy for CPU inference; the Gemma 3 tiers
       // run on WASM at usable speed, so they work even without (working)
       // WebGPU.
@@ -190,17 +191,25 @@ function getGenerator(): Promise<TextGenerationPipeline> {
       // Gemma 3 q4f16 builds overflow on WebGPU). q4 block quantization
       // needs GatherBlockQuantized, which the WASM CPU engine lacks — CPU
       // must use q8.
-      const attempts: LoadAttempt[] = !cpuOk
-        ? [
-            { device: 'webgpu', dtype: 'q4f16' },
-            { device: 'webgpu', dtype: 'q4' },
-          ]
-        : webgpu
+      const attempts: LoadAttempt[] = spec?.dtype
+        ? // model exported with a single dtype (e.g. iAny Khmer, q8-only)
+          webgpu
           ? [
-              { device: 'webgpu', dtype: 'q4' },
-              { device: 'wasm', dtype: 'q8' },
+              { device: 'webgpu', dtype: spec.dtype },
+              { device: 'wasm', dtype: spec.dtype },
             ]
-          : [{ device: 'wasm', dtype: 'q8' }]
+          : [{ device: 'wasm', dtype: spec.dtype }]
+        : !cpuOk
+          ? [
+              { device: 'webgpu', dtype: 'q4f16' },
+              { device: 'webgpu', dtype: 'q4' },
+            ]
+          : webgpu
+            ? [
+                { device: 'webgpu', dtype: 'q4' },
+                { device: 'wasm', dtype: 'q8' },
+              ]
+            : [{ device: 'wasm', dtype: 'q8' }]
       const generator = await loadWithFallback(attempts, async ({ device, dtype }) => {
         const p = await pipeline('text-generation', generationModelId, {
           dtype: dtype as 'q4f16',
