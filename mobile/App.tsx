@@ -21,6 +21,8 @@ import {
 } from './src/db/database'
 import type { ChunkHit } from './src/domain/types'
 import { embedder, type EmbedderProgress } from './src/ai/embedder'
+import { generator, type GenProgress } from './src/ai/generator'
+import { ask } from './src/ai/ask'
 
 /**
  * Stage 2 smoke-test screen: on-device SQLite + FTS5 (Stage 1) plus opt-in
@@ -39,6 +41,8 @@ export default function App() {
   const [results, setResults] = useState<ChunkHit[]>([])
   const [busy, setBusy] = useState(false)
   const [emb, setEmb] = useState<EmbedderProgress>({ status: embedder.status })
+  const [gen, setGen] = useState<GenProgress>({ status: generator.status })
+  const [answer, setAnswer] = useState('')
 
   useEffect(() => {
     void (async () => {
@@ -63,6 +67,28 @@ export default function App() {
       await embedder.init(setEmb)
     } catch {
       // status already reflected via setEmb('error')
+    }
+  }
+
+  const onEnableGen = async () => {
+    try {
+      await generator.init(setGen)
+    } catch {
+      // status already reflected via setGen('error')
+    }
+  }
+
+  const onAsk = async () => {
+    if (!query.trim() || !generator.ready) return
+    setBusy(true)
+    setAnswer('')
+    try {
+      const res = await ask(query, activeEmbedder(), (t) => setAnswer((prev) => prev + t))
+      setResults(res.sources)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -122,8 +148,8 @@ export default function App() {
       <SafeAreaView style={styles.root}>
         <StatusBar style="auto" />
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-          <Text style={styles.h1}>iAny · native (Stage 2)</Text>
-          <Text style={styles.hint}>On-device SQLite + FTS5 + semantic search.</Text>
+          <Text style={styles.h1}>iAny · native (Stage 3)</Text>
+          <Text style={styles.hint}>On-device search + AI answers, fully offline.</Text>
 
           <View style={styles.embBox}>
             {emb.status === 'ready' ? (
@@ -144,6 +170,30 @@ export default function App() {
                 </Pressable>
                 {emb.status === 'error' && emb.error && (
                   <Text style={styles.errSmall}>⚠️ {emb.error}</Text>
+                )}
+              </>
+            )}
+          </View>
+
+          <View style={styles.embBox}>
+            {gen.status === 'ready' ? (
+              <Text style={styles.embOn}>✓ AI answers on — Gemma 3 1B</Text>
+            ) : gen.status === 'downloading' ? (
+              <Text style={styles.hint}>
+                Downloading Gemma… {Math.round((gen.progress ?? 0) * 100)}%
+              </Text>
+            ) : gen.status === 'loading' ? (
+              <View style={styles.row}>
+                <ActivityIndicator size="small" />
+                <Text style={styles.hint}>  Loading Gemma…</Text>
+              </View>
+            ) : (
+              <>
+                <Pressable style={styles.btnOutline} onPress={onEnableGen}>
+                  <Text style={styles.btnOutlineText}>Enable AI answers (~800 MB)</Text>
+                </Pressable>
+                {gen.status === 'error' && gen.error && (
+                  <Text style={styles.errSmall}>⚠️ {gen.error}</Text>
                 )}
               </>
             )}
@@ -175,9 +225,28 @@ export default function App() {
             onChangeText={setQuery}
             onSubmitEditing={onSearch}
           />
-          <Pressable style={styles.btn} onPress={onSearch} disabled={busy}>
-            <Text style={styles.btnText}>Search</Text>
-          </Pressable>
+          <View style={styles.row}>
+            <Pressable style={[styles.btn, styles.flex1]} onPress={onSearch} disabled={busy}>
+              <Text style={styles.btnText}>Search</Text>
+            </Pressable>
+            <View style={styles.gap} />
+            <Pressable
+              style={[styles.btn, styles.flex1, !gen.status || gen.status !== 'ready' ? styles.btnDim : null]}
+              onPress={onAsk}
+              disabled={busy || gen.status !== 'ready'}
+            >
+              <Text style={styles.btnText}>Ask AI</Text>
+            </Pressable>
+          </View>
+
+          {(answer.length > 0 || (busy && gen.status === 'ready')) && (
+            <View style={styles.answerCard}>
+              <Text style={styles.answerLabel}>Answer</Text>
+              <Text style={styles.answerText}>
+                {answer || '…'}
+              </Text>
+            </View>
+          )}
 
           {busy && <ActivityIndicator style={{ marginTop: 12 }} />}
 
@@ -266,6 +335,19 @@ const styles = StyleSheet.create({
   },
   embOn: { color: '#16a34a', fontWeight: '600' },
   row: { flexDirection: 'row', alignItems: 'center' },
+  flex1: { flex: 1 },
+  gap: { width: 10 },
+  btnDim: { backgroundColor: '#93b4f5' },
+  answerCard: {
+    marginTop: 12,
+    padding: 14,
+    borderRadius: 8,
+    backgroundColor: '#f0fdf4',
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+  },
+  answerLabel: { fontWeight: '700', marginBottom: 6, color: '#15803d' },
+  answerText: { color: '#14532d', fontSize: 15, lineHeight: 22 },
   btnOutline: {
     borderWidth: 1,
     borderColor: '#2563eb',
