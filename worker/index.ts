@@ -32,8 +32,10 @@ const ALLOWED_PREFIXES = [
   // EmbeddingGemma matches the PWA (portable packs) and handles Khmer well.
   'ggml-org/embeddinggemma-300M-GGUF/',
   'cstr/multilingual-e5-small-GGUF/',
-  // Native app (llama.rn) generation model — Gemma 3 1B GGUF.
+  // Native app (llama.rn) generation models — Gemma 3, GGUF. 270M fits weak
+  // phones (S10); 1B for capable devices.
   'ggml-org/gemma-3-1b-it-GGUF/',
+  'bartowski/google_gemma-3-270m-it-GGUF/',
 ]
 // OCR language data, served through the same mirror. Khmer uses the
 // high-accuracy models; English's fast model is accurate enough.

@@ -7,9 +7,12 @@ import { ensureModelFile, errStr } from './modelFile'
 type LlamaContext = Awaited<ReturnType<typeof initLlama>>
 
 /**
- * On-device text generation via llama.rn (llama.cpp) running Gemma 3 1B. The
- * answering half of iAny: given retrieved context, it writes a grounded answer
- * in the question's language (Khmer or English).
+ * On-device text generation via llama.rn (llama.cpp) running a small Gemma 3
+ * model (270M on weak phones like the S10; a larger model on capable devices).
+ * The answering half of iAny: given retrieved context, it writes a grounded
+ * answer in the question's language (Khmer or English). The 270M base model is
+ * only for proving the pipeline — real Khmer needs the fine-tuned model
+ * (converted to GGUF) or a bigger model on a newer phone.
  *
  * - Weights are pulled through the iAny mirror once, then reused offline.
  * - CPU-only (n_gpu_layers: 0) — mobile GPU drivers are unreliable.
