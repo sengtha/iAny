@@ -144,10 +144,12 @@ tests = [
    "question": "តើ ចិន មានប្រជាជនប៉ុន្មាន?"},
 ]
 for t in tests:
-    p = PROMPT.format(**t)
-    out = gen(p, max_new_tokens=80, do_sample=False)[0]["generated_text"]
+    # MUST pass messages (not a raw string) so the chat template is applied
+    # — the model was trained with it. A raw string returns empty output.
+    msgs = [{"role": "user", "content": PROMPT.format(**t)}]
+    out = gen(msgs, max_new_tokens=80, do_sample=False)
     print("Q:", t["question"])
-    print("A:", out[len(p):].strip(), "\n---")
+    print("A:", out[0]["generated_text"][-1]["content"].strip(), "\n---")
 ```
 
 ---
