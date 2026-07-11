@@ -1,7 +1,15 @@
 import type { ModelStatus } from '../types'
 
 export type AIRequest =
-  | { id: string; type: 'configure'; modelHost?: string; generationModel?: string }
+  | {
+      id: string
+      type: 'configure'
+      modelHost?: string
+      generationModel?: string
+      /** Mobile/touch devices: skip WebGPU for CPU-capable models — mobile
+       *  WebGPU drivers (esp. pre-2021) crash the tab uncatchably. */
+      preferCpu?: boolean
+    }
   | { id: string; type: 'preload'; target: 'embedder' | 'generator' }
   | { id: string; type: 'embed'; texts: string[]; kind: 'query' | 'document' }
   | {

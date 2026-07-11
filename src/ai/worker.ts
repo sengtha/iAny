@@ -172,14 +172,19 @@ let generatorDevice: 'webgpu' | 'wasm' = 'webgpu'
 /** Set when WebGPU *inference* failed (device loaded but OrtRun crashed —
  *  common on old mobile GPUs); forces CPU from then on. */
 let forceWasm = false
+/** Set from the client for phones/tablets — skip WebGPU for CPU-capable
+ *  models (mobile GPU drivers crash the tab). */
+let preferCpu = false
 let generatorPromise: Promise<TextGenerationPipeline> | null = null
 function getGenerator(): Promise<TextGenerationPipeline> {
   if (!generatorPromise) {
     generatorPromise = (async () => {
       currentTarget = 'generator'
-      const webgpu = !forceWasm && (await hasWebGPU())
       const spec = GEN_MODELS.find((m) => m.id === generationModelId)
       const cpuOk = spec?.cpuOk ?? false
+      // On phones, CPU-capable models skip WebGPU entirely (unreliable
+      // mobile drivers crash the tab). Gemma 4 (!cpuOk) still needs WebGPU.
+      const webgpu = !forceWasm && !(preferCpu && cpuOk) && (await hasWebGPU())
       // Gemma 4 tiers are too heavy for CPU inference; the Gemma 3 tiers
       // run on WASM at usable speed, so they work even without (working)
       // WebGPU.
@@ -358,6 +363,7 @@ self.onmessage = async (e: MessageEvent<AIRequest>) => {
         // exposes the same <host>/<model-id>/resolve/<revision>/<file> layout.
         if (req.modelHost) env.remoteHost = req.modelHost
         if (req.generationModel) generationModelId = req.generationModel
+        if (req.preferCpu !== undefined) preferCpu = req.preferCpu
         void purgeStalePartials([EMBEDDING_MODEL_ID, generationModelId])
         post({ id: req.id, type: 'result', data: null })
         break

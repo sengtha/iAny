@@ -146,12 +146,17 @@ class AIClient {
       // direct during local development).
       const modelHost =
         localStorage.getItem('iany.modelHost') ?? `${location.origin}/models`
+      // Coarse pointer = phone/tablet: their WebGPU is unreliable for LLM
+      // inference (the Galaxy S10 crashes the tab), so prefer CPU there.
+      const preferCpu =
+        typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches
       void this.request(
         {
           id: crypto.randomUUID(),
           type: 'configure',
           modelHost,
           generationModel: getGenModelId(),
+          preferCpu,
         },
         role,
       )
