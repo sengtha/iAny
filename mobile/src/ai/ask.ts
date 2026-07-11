@@ -14,7 +14,14 @@ export interface AskResult {
  * retrieved context and the question, and ask for the question's language.
  */
 function buildMessages(question: string, sources: ChunkHit[]): GenMessage[] {
-  const context = sources.map((s, i) => `[${i + 1}] ${s.title}\n${s.text}`).join('\n\n')
+  // Keep context tight — the on-device n_ctx is small (1024). Cap each chunk so
+  // 3 sources + question + answer fit.
+  const context = sources
+    .map((s, i) => {
+      const text = s.text.length > 500 ? `${s.text.slice(0, 500)}…` : s.text
+      return `[${i + 1}] ${s.title}\n${text}`
+    })
+    .join('\n\n')
   const langInstruction =
     detectLang(question) === 'km'
       ? 'Answer in Khmer (ភាសាខ្មែរ).'
@@ -41,7 +48,7 @@ export async function ask(
   embedder: Embedder | undefined,
   onToken: (token: string) => void,
 ): Promise<AskResult> {
-  const sources = await hybridSearch(question, embedder, 4)
+  const sources = await hybridSearch(question, embedder, 3)
   const answer = await generator.generate(buildMessages(question, sources), onToken)
   return { answer, sources }
 }

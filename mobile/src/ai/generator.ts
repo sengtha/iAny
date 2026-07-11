@@ -62,11 +62,15 @@ class LlamaGenerator {
     const info = await FileSystem.getInfoAsync(path)
     const sizeMb = info.exists && info.size ? (info.size / 1e6).toFixed(0) : '?'
     try {
-      // n_ctx 1024 keeps the KV-cache small (weak devices are memory-bound);
-      // 4 retrieved chunks + question + answer fit comfortably.
+      // Weak devices are memory-bound. Keep every buffer small: n_ctx 1024 for
+      // a small KV cache, and n_batch/n_ubatch 128 so the compute buffer (which
+      // scales with batch size) stays tiny — that buffer, not the mmap'd
+      // weights, is what tends to blow the allocation on a 2019 phone.
       this.ctx = await initLlama({
         model: path.replace(/^file:\/\//, ''),
         n_ctx: 1024,
+        n_batch: 128,
+        n_ubatch: 128,
         n_gpu_layers: 0,
       })
     } catch (e) {
