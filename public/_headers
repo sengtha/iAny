@@ -1,7 +1,0 @@
-# Cross-origin isolation → enables SharedArrayBuffer → onnxruntime-web uses
-# multiple WASM threads (2-4x faster CPU inference, esp. on phones).
-# The app is fully same-origin; model/ort/tess responses carry CORP too.
-/*
-  Cross-Origin-Opener-Policy: same-origin
-  Cross-Origin-Embedder-Policy: require-corp
-  Cross-Origin-Resource-Policy: cross-origin
