@@ -284,6 +284,10 @@ async function runGeneration(
   raw: boolean,
 ): Promise<string> {
   let leadingWhitespace = true
+  // Accumulate the answer from the streamed (skip_prompt) tokens rather than
+  // slicing the final text — string slicing breaks when the tokenizer's
+  // round-trip changes length (it was cutting the answer's first word).
+  let answer = ''
   const streamer = new TextStreamer(generator.tokenizer, {
     skip_prompt: true,
     skip_special_tokens: true,
@@ -295,26 +299,24 @@ async function runGeneration(
         t = t.replace(/^\s+/, '')
         if (t.length > 0) leadingWhitespace = false
       }
-      if (t) post({ id, type: 'token', token: t })
+      if (t) {
+        answer += t
+        post({ id, type: 'token', token: t })
+      }
     },
   })
   // raw: feed a pre-formatted string (no chat template). messages: let the
   // pipeline apply the model's chat template.
   const input = raw ? messages[0].content : messages
-  const output = await generator(input, {
+  await generator(input, {
     max_new_tokens: maxNewTokens,
     do_sample: false,
+    // Small models (esp. the 270M Khmer tune) loop under greedy decoding.
+    repetition_penalty: 1.3,
+    no_repeat_ngram_size: 3,
     streamer,
   })
-  if (raw) {
-    const text = (output as { generated_text: string }[])[0].generated_text
-    // Plain completion returns prompt+continuation; keep only the new part.
-    return stripThink(text.slice(messages[0].content.length))
-  }
-  const last = (
-    output as { generated_text: { role: string; content: string }[] }[]
-  )[0].generated_text.at(-1)
-  return stripThink(last?.content ?? '')
+  return stripThink(answer)
 }
 
 const GPU_RUNTIME_ERROR = /OrtRun|webgpu|wgpu|MapAsync|device.*lost|GPU/i

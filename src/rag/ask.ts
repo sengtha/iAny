@@ -48,12 +48,13 @@ function buildPrompt(question: string, sources: ChunkHit[]): string {
  * verbatim. The Khmer is perfect by construction — it is the user's own
  * content. Replaced by real generation once the fine-tuned model ships.
  */
-function extractiveAnswer(sources: ChunkHit[]): string {
+function extractiveAnswer(sources: ChunkHit[], lang: 'km' | 'en' = 'km'): string {
+  const header = lang === 'km' ? 'យោងតាមឯកសាររបស់អ្នក៖' : 'From your documents:'
   const quotes = sources
     .slice(0, 2)
     .map((s, i) => `**[${i + 1}] ${s.title}**\n\n> ${s.text.replace(/\n/g, '\n> ')}`)
     .join('\n\n')
-  return `យោងតាមឯកសាររបស់អ្នក៖\n\n${quotes}`
+  return `${header}\n\n${quotes}`
 }
 
 export async function ask(
@@ -69,6 +70,11 @@ export async function ask(
   if (genModelSpec(getGenModelChoice()).khmerRag) {
     const sources = await retrieve(question, 3)
     if (!sources.length) return { answer: '', sources }
+    // This model is Khmer-only; for a non-Khmer question, quote the sources
+    // instead of generating gibberish.
+    if (detectLang(question) !== 'km') {
+      return { answer: extractiveAnswer(sources, 'en'), sources }
+    }
     const context = sources.map((s, i) => `[${i + 1}] ${s.title}\n${s.text}`).join('\n\n')
     const prompt = `បរិបទ៖\n${context}\n\nសំណួរ៖ ${question}\nចម្លើយ៖`
     // The ONNX-exported tokenizer has no inline chat template, so apply the
