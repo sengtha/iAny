@@ -30,27 +30,69 @@ a phone — including the Galaxy S10 that crashes the PWA.
   debugging). Your Galaxy S10 works here.
 - **iOS:** Xcode + CocoaPods (`sudo gem install cocoapods`).
 
-## Build & run
+## Build in the cloud with EAS (no Mac toolchain needed)
+
+EAS Build compiles the app — including the native modules (llama.rn's
+llama.cpp, op-sqlite + sqlite-vec) — **in Expo's cloud** and gives you an
+installable APK. You don't need Android Studio, the Android SDK, or Xcode
+locally. You need only: Node, an Expo account, and your phone.
 
 ```bash
 cd mobile
 npm install
+npx expo install --fix          # reconcile native versions with the SDK
 
-# Reconcile native module versions with the installed Expo SDK.
-npx expo install --fix
-
-# Generate the native android/ and ios/ projects.
-npx expo prebuild
-
-# Run on a connected Android phone/emulator:
-npx expo run:android
-
-# …or iOS (Mac only):
-npx expo run:ios
+npm install -g eas-cli          # or use `npx eas-cli@latest` below
+eas login                       # your Expo account
+eas build:configure -p android  # adds a projectId to app.json (one time)
 ```
 
-`expo run:*` compiles the dev build, installs it, and starts Metro. After the
-first build you can just `npm start` and reopen the installed dev app.
+### The efficient loop (recommended)
+
+Build the **development client once** — it contains all the native code — then
+push every JS change (Stages 2–4) over Metro with no rebuild:
+
+```bash
+eas build --platform android --profile development
+```
+
+Wait ~15–25 min (first build compiles llama.cpp; later builds are cached).
+When it finishes you get a URL/QR — install that APK on your phone. Then:
+
+```bash
+npx expo start --dev-client
+```
+
+Open the installed **iAny (dev)** app; it loads the JS from your machine over
+Wi-Fi and hot-reloads. Because Stages 2–4 only change JavaScript (embeddings
+and generation both run through llama.rn, which is already compiled in), you
+**never rebuild** unless we add a new native dependency.
+
+### Standalone offline APK (for real offline testing / sharing)
+
+At milestones, build a self-contained APK that needs no computer:
+
+```bash
+eas build --platform android --profile preview
+```
+
+Download the APK, enable "install unknown apps," install, and run it fully
+offline.
+
+> **Monorepo note:** the app lives in `mobile/` inside the iAny git repo. Run
+> all `eas` commands from `mobile/`. If EAS complains about the git root or
+> uploads the whole repo, prefix the build with `EAS_NO_VCS=1` — it archives
+> the `mobile/` directory directly instead of going through git.
+
+## Local build (alternative, needs the toolchain)
+
+If you'd rather build on your own Mac:
+
+```bash
+cd mobile && npm install && npx expo install --fix
+npx expo prebuild
+npx expo run:android   # connected phone/emulator; run:ios on a Mac
+```
 
 ## sqlite-vec
 
