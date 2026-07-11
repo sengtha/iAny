@@ -305,6 +305,21 @@ async function runGeneration(
       }
     },
   })
+  // Stop at the chat turn-end token so weak models don't run past their
+  // answer into training noise. Covers Gemma (<end_of_turn>) and Qwen
+  // (<|im_end|>) plus the tokenizer's own eos.
+  const eosIds = new Set<number>()
+  const baseEos = (generator.tokenizer as { eos_token_id?: number }).eos_token_id
+  if (typeof baseEos === 'number') eosIds.add(baseEos)
+  for (const marker of ['<end_of_turn>', '<|im_end|>']) {
+    try {
+      const ids = generator.tokenizer.encode(marker, { add_special_tokens: false })
+      if (Array.isArray(ids) && ids.length === 1) eosIds.add(ids[0] as number)
+    } catch {
+      // marker not in this tokenizer's vocab — skip
+    }
+  }
+
   // raw: feed a pre-formatted string (no chat template). messages: let the
   // pipeline apply the model's chat template.
   const input = raw ? messages[0].content : messages
@@ -313,7 +328,7 @@ async function runGeneration(
     do_sample: false,
     // Small models (esp. the 270M Khmer tune) loop under greedy decoding.
     repetition_penalty: 1.3,
-    no_repeat_ngram_size: 3,
+    ...(eosIds.size ? { eos_token_id: [...eosIds] } : {}),
     streamer,
   })
   return stripThink(answer)

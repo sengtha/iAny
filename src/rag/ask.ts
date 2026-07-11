@@ -82,7 +82,7 @@ export async function ask(
     // still turns <start_of_turn>/<end_of_turn> into their special tokens.
     const formatted = `<start_of_turn>user\n${prompt}<end_of_turn>\n<start_of_turn>model\n`
     const answer = await ai.generate([{ role: 'user', content: formatted }], {
-      maxNewTokens: 200,
+      maxNewTokens: 128,
       raw: true,
       onToken: opts.onToken,
     })
