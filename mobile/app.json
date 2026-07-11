@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "iAny",
+    "slug": "iany",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "scheme": "iany",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.iany.app"
+    },
+    "android": {
+      "package": "com.iany.app"
+    },
+    "plugins": [
+      "expo-dev-client"
+    ]
+  }
+}
