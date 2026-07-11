@@ -41,6 +41,24 @@ function resolveUrl(file: string): string {
   return `${MODEL_MIRROR}/${EMBEDDING_MODEL_REPO}/resolve/main/${file}`
 }
 
+/** Native module errors often arrive with an empty message ("Unknown error").
+ *  Squeeze out whatever detail exists — message, code, or a stringified body. */
+function errStr(e: unknown): string {
+  if (e instanceof Error) {
+    const anyE = e as { code?: string | number; cause?: unknown }
+    const parts = [e.message || e.name]
+    if (anyE.code !== undefined) parts.push(`code=${anyE.code}`)
+    if (anyE.cause) parts.push(`cause=${String(anyE.cause)}`)
+    const s = parts.filter(Boolean).join(' ')
+    return s || 'Error with no message'
+  }
+  try {
+    return JSON.stringify(e)
+  } catch {
+    return String(e)
+  }
+}
+
 /** L2-normalize so cosine ranking == L2 ranking in sqlite-vec. */
 function normalize(v: number[]): Float32Array {
   const out = new Float32Array(v.length)
@@ -67,8 +85,7 @@ class LlamaEmbedder implements Embedder {
       this.initPromise = this._init(onProgress).catch((e) => {
         this.initPromise = null
         this.status = 'error'
-        const error = e instanceof Error ? e.message : String(e)
-        onProgress?.({ status: 'error', error })
+        onProgress?.({ status: 'error', error: errStr(e) })
         throw e
       })
     }
@@ -79,15 +96,24 @@ class LlamaEmbedder implements Embedder {
     const path = await this.ensureModel(onProgress)
     this.status = 'loading'
     onProgress?.({ status: 'loading' })
-    // CPU-only (n_gpu_layers: 0): mobile GPU drivers are unreliable and the
-    // model is small enough to embed quickly on CPU. Short context — chunks
-    // are <= ~400 tokens and e5 caps at 512.
-    this.ctx = await initLlama({
-      model: path.replace(/^file:\/\//, ''),
-      embedding: true,
-      n_ctx: 512,
-      n_gpu_layers: 0,
-    })
+    // Include the file and its size in any load failure — a "load failed" on a
+    // tiny file means the download got an error page, not a real model.
+    const info = await FileSystem.getInfoAsync(path)
+    const sizeMb = info.exists && info.size ? (info.size / 1e6).toFixed(1) : '?'
+    const name = path.split('/').pop()
+    try {
+      // CPU-only (n_gpu_layers: 0): mobile GPU drivers are unreliable and the
+      // model is small enough to embed on CPU. n_ctx 512 is e5's cap and
+      // covers our chunks. Pooling comes from the GGUF metadata.
+      this.ctx = await initLlama({
+        model: path.replace(/^file:\/\//, ''),
+        embedding: true,
+        n_ctx: 512,
+        n_gpu_layers: 0,
+      })
+    } catch (e) {
+      throw new Error(`model load failed (${errStr(e)}) [file=${name}, ${sizeMb}MB]`)
+    }
     this.status = 'ready'
     onProgress?.({ status: 'ready' })
   }
