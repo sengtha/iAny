@@ -71,8 +71,13 @@ export async function ask(
     if (!sources.length) return { answer: '', sources }
     const context = sources.map((s, i) => `[${i + 1}] ${s.title}\n${s.text}`).join('\n\n')
     const prompt = `បរិបទ៖\n${context}\n\nសំណួរ៖ ${question}\nចម្លើយ៖`
-    const answer = await ai.generate([{ role: 'user', content: prompt }], {
+    // The ONNX-exported tokenizer has no inline chat template, so apply the
+    // Gemma turn format manually and generate as raw text. The tokenizer
+    // still turns <start_of_turn>/<end_of_turn> into their special tokens.
+    const formatted = `<start_of_turn>user\n${prompt}<end_of_turn>\n<start_of_turn>model\n`
+    const answer = await ai.generate([{ role: 'user', content: formatted }], {
       maxNewTokens: 256,
+      raw: true,
       onToken: opts.onToken,
     })
     return { answer, sources }

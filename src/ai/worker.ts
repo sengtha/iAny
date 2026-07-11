@@ -276,6 +276,7 @@ async function runGeneration(
   generator: TextGenerationPipeline,
   messages: { role: string; content: string }[],
   maxNewTokens: number,
+  raw: boolean,
 ): Promise<string> {
   let leadingWhitespace = true
   const streamer = new TextStreamer(generator.tokenizer, {
@@ -292,11 +293,19 @@ async function runGeneration(
       if (t) post({ id, type: 'token', token: t })
     },
   })
-  const output = await generator(messages, {
+  // raw: feed a pre-formatted string (no chat template). messages: let the
+  // pipeline apply the model's chat template.
+  const input = raw ? messages[0].content : messages
+  const output = await generator(input, {
     max_new_tokens: maxNewTokens,
     do_sample: false,
     streamer,
   })
+  if (raw) {
+    const text = (output as { generated_text: string }[])[0].generated_text
+    // Plain completion returns prompt+continuation; keep only the new part.
+    return stripThink(text.slice(messages[0].content.length))
+  }
   const last = (
     output as { generated_text: { role: string; content: string }[] }[]
   )[0].generated_text.at(-1)
@@ -309,10 +318,11 @@ async function generate(
   id: string,
   messages: { role: string; content: string }[],
   maxNewTokens: number,
+  raw: boolean,
 ): Promise<string> {
   const generator = await getGenerator()
   try {
-    return await runGeneration(id, generator, messages, maxNewTokens)
+    return await runGeneration(id, generator, messages, maxNewTokens, raw)
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     // Old mobile GPUs can load the model and still fail during inference
@@ -334,7 +344,7 @@ async function generate(
     const cpuGenerator = await getGenerator()
     // Tell the UI to discard any tokens streamed before the GPU failure.
     post({ id, type: 'token', token: '', reset: true })
-    return runGeneration(id, cpuGenerator, messages, maxNewTokens)
+    return runGeneration(id, cpuGenerator, messages, maxNewTokens, raw)
   }
 }
 
@@ -364,7 +374,7 @@ self.onmessage = async (e: MessageEvent<AIRequest>) => {
         break
       }
       case 'generate': {
-        const text = await generate(req.id, req.messages, req.maxNewTokens)
+        const text = await generate(req.id, req.messages, req.maxNewTokens, req.raw ?? false)
         post({ id: req.id, type: 'result', data: text })
         break
       }

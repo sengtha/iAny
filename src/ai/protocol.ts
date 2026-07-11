@@ -9,6 +9,10 @@ export type AIRequest =
       type: 'generate'
       messages: { role: string; content: string }[]
       maxNewTokens: number
+      /** When set, messages[0].content is a fully pre-formatted prompt
+       *  string, generated as raw text (no chat template applied). Used for
+       *  models whose exported tokenizer lacks an inline chat template. */
+      raw?: boolean
     }
 
 export type AIResponse =

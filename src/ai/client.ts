@@ -282,7 +282,11 @@ class AIClient {
 
   async generate(
     messages: { role: string; content: string }[],
-    opts: { maxNewTokens?: number; onToken?: (t: string, reset?: boolean) => void } = {},
+    opts: {
+      maxNewTokens?: number
+      onToken?: (t: string, reset?: boolean) => void
+      raw?: boolean
+    } = {},
   ): Promise<string> {
     this.makeRoomFor('generator')
     if (this.status.generator.status === 'cached') {
@@ -297,6 +301,7 @@ class AIClient {
         type: 'generate',
         messages,
         maxNewTokens: opts.maxNewTokens ?? 1024,
+        raw: opts.raw,
       },
       'generator',
       opts.onToken,
