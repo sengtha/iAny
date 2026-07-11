@@ -15,6 +15,12 @@ import { chunkText, detectLang } from '../domain/chunk'
  * FTS live in separate virtual tables, so instead of the PWA's single fused
  * CTE we run each leg and merge with reciprocal rank fusion in TypeScript —
  * same math, clearer across virtual tables.
+ *
+ * IMPORTANT: op-sqlite's `execute` is asynchronous (returns a Promise), so
+ * every call is awaited. Awaiting also works if a version returns a plain
+ * value, so this is version-safe. (Stage 1 shipped calling it synchronously,
+ * which silently dropped writes and made reads return a Promise — the
+ * "Library stays 0" bug.)
  */
 
 const CANDIDATES = 30
@@ -27,25 +33,32 @@ export interface Embedder {
   embedQuery(text: string): Promise<Float32Array>
 }
 
-let db: DB | null = null
+let dbPromise: Promise<DB> | null = null
 /** True once the sqlite-vec extension is confirmed available (its vec0 table
  *  was created). Stage 1 ships without the extension, so this stays false and
  *  retrieval runs FTS-only; Stage 2 re-enables the op-sqlite sqliteVec build
  *  flag and this flips true automatically — no code change to the callers. */
 let vecEnabled = false
 
-export function getDb(): DB {
-  if (!db) {
-    db = open({ name: 'iany.db' })
-    migrate(db)
+export function getDb(): Promise<DB> {
+  if (!dbPromise) {
+    dbPromise = (async () => {
+      const d = open({ name: 'iany.db' })
+      await migrate(d)
+      return d
+    })()
+    dbPromise.catch(() => {
+      // Let the next caller retry a failed open/migrate instead of caching it.
+      dbPromise = null
+    })
   }
-  return db
+  return dbPromise
 }
 
-function migrate(d: DB): void {
-  d.execute('PRAGMA journal_mode = WAL;')
-  d.execute('PRAGMA foreign_keys = ON;')
-  d.execute(`
+async function migrate(d: DB): Promise<void> {
+  await d.execute('PRAGMA journal_mode = WAL;')
+  await d.execute('PRAGMA foreign_keys = ON;')
+  await d.execute(`
     CREATE TABLE IF NOT EXISTS packs (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -56,7 +69,7 @@ function migrate(d: DB): void {
       updated_at TEXT NOT NULL DEFAULT (datetime('now')),
       deleted_at TEXT
     );`)
-  d.execute(`
+  await d.execute(`
     CREATE TABLE IF NOT EXISTS documents (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
@@ -68,7 +81,7 @@ function migrate(d: DB): void {
       updated_at TEXT NOT NULL DEFAULT (datetime('now')),
       deleted_at TEXT
     );`)
-  d.execute(`
+  await d.execute(`
     CREATE TABLE IF NOT EXISTS chunks (
       id TEXT PRIMARY KEY,
       document_id TEXT NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
@@ -76,11 +89,11 @@ function migrate(d: DB): void {
       text TEXT NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );`)
-  d.execute('CREATE INDEX IF NOT EXISTS chunks_document_idx ON chunks(document_id);')
+  await d.execute('CREATE INDEX IF NOT EXISTS chunks_document_idx ON chunks(document_id);')
   // Keyword search. The trigram tokenizer handles Khmer (no word spaces) and
   // English uniformly. External-content-free: we store the text so ranking
   // and snippets work without extra joins.
-  d.execute(`
+  await d.execute(`
     CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(
       text,
       chunk_id UNINDEXED,
@@ -90,7 +103,7 @@ function migrate(d: DB): void {
   // flag (see mobile/package.json + SETUP.md). Absent in Stage 1 — the vec0
   // module isn't registered, so this throws; we swallow it and run FTS-only.
   try {
-    d.execute(`
+    await d.execute(`
       CREATE VIRTUAL TABLE IF NOT EXISTS chunks_vec USING vec0(
         chunk_id TEXT PRIMARY KEY,
         embedding float[${EMBEDDING_DIMS}]
@@ -124,14 +137,15 @@ export async function addDocument(
   input: { title: string; content: string; lang?: string; packId?: string | null },
   embedder?: Embedder,
 ): Promise<string> {
-  const d = getDb()
+  const d = await getDb()
   const docId = randomUUID()
   const lang = input.lang ?? detectLang(input.content)
   const chunks = chunkText(input.content)
 
-  const embeddings = embedder ? await embedder.embedDocuments(chunks.map((c) => c.text)) : null
+  const embeddings =
+    embedder && vecEnabled ? await embedder.embedDocuments(chunks.map((c) => c.text)) : null
 
-  d.execute(
+  await d.execute(
     `INSERT INTO documents (id, title, lang, source_type, pack_id, content)
      VALUES (?, ?, ?, 'text', ?, ?);`,
     [docId, input.title, lang, input.packId ?? null, input.content],
@@ -140,15 +154,15 @@ export async function addDocument(
   for (let i = 0; i < chunks.length; i++) {
     const c = chunks[i]
     const chunkId = randomUUID()
-    d.execute('INSERT INTO chunks (id, document_id, seq, text) VALUES (?, ?, ?, ?);', [
+    await d.execute('INSERT INTO chunks (id, document_id, seq, text) VALUES (?, ?, ?, ?);', [
       chunkId,
       docId,
       c.seq,
       c.text,
     ])
-    d.execute('INSERT INTO chunks_fts (text, chunk_id) VALUES (?, ?);', [c.text, chunkId])
-    if (vecEnabled && embeddings) {
-      d.execute('INSERT INTO chunks_vec (chunk_id, embedding) VALUES (?, ?);', [
+    await d.execute('INSERT INTO chunks_fts (text, chunk_id) VALUES (?, ?);', [c.text, chunkId])
+    if (embeddings) {
+      await d.execute('INSERT INTO chunks_vec (chunk_id, embedding) VALUES (?, ?);', [
         chunkId,
         vecLiteral(embeddings[i]),
       ])
@@ -173,7 +187,7 @@ export async function hybridSearch(
   embedder?: Embedder,
   limit = 6,
 ): Promise<ChunkHit[]> {
-  const d = getDb()
+  const d = await getDb()
   const ranks = new Map<string, number>() // chunk_id -> fused RRF score
 
   // Vector leg
@@ -181,7 +195,7 @@ export async function hybridSearch(
     try {
       const qv = await embedder.embedQuery(query)
       const rows = rowsOf(
-        d.execute(
+        await d.execute(
           `SELECT chunk_id FROM chunks_vec WHERE embedding MATCH ? ORDER BY distance LIMIT ?;`,
           [vecLiteral(qv), CANDIDATES],
         ),
@@ -200,7 +214,7 @@ export async function hybridSearch(
   const trimmed = query.trim()
   if (trimmed) {
     const rows = rowsOf(
-      d.execute(
+      await d.execute(
         `SELECT chunk_id FROM chunks_fts WHERE chunks_fts MATCH ? ORDER BY rank LIMIT ?;`,
         [ftsPhrase(trimmed), CANDIDATES],
       ),
@@ -215,13 +229,11 @@ export async function hybridSearch(
 
   // Resolve the top fused chunk_ids to full hits (with title, joined to the
   // owning document, excluding soft-deleted docs).
-  const top = [...ranks.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, limit)
+  const top = [...ranks.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit)
   const ids = top.map(([id]) => id)
   const placeholders = ids.map(() => '?').join(',')
   const rows = rowsOf(
-    d.execute(
+    await d.execute(
       `SELECT c.id AS chunk_id, c.document_id, d.title, c.seq, c.text
        FROM chunks c
        JOIN documents d ON d.id = c.document_id AND d.deleted_at IS NULL
@@ -255,10 +267,10 @@ export interface DocSummary {
   chunk_count: number
 }
 
-export function listDocuments(): DocSummary[] {
-  const d = getDb()
+export async function listDocuments(): Promise<DocSummary[]> {
+  const d = await getDb()
   const rows = rowsOf(
-    d.execute(
+    await d.execute(
       `SELECT d.id, d.title, d.lang, d.created_at,
               (SELECT COUNT(*) FROM chunks c WHERE c.document_id = d.id) AS chunk_count
        FROM documents d
@@ -275,14 +287,14 @@ export function listDocuments(): DocSummary[] {
   }))
 }
 
-export function deleteDocument(id: string): void {
-  const d = getDb()
+export async function deleteDocument(id: string): Promise<void> {
+  const d = await getDb()
   // Clean the virtual tables first (no cascade into vec0/fts5), then the row.
-  const rows = rowsOf(d.execute('SELECT id FROM chunks WHERE document_id = ?;', [id]))
+  const rows = rowsOf(await d.execute('SELECT id FROM chunks WHERE document_id = ?;', [id]))
   for (const r of rows) {
     const chunkId = r.id as string
-    d.execute('DELETE FROM chunks_fts WHERE chunk_id = ?;', [chunkId])
-    if (vecEnabled) d.execute('DELETE FROM chunks_vec WHERE chunk_id = ?;', [chunkId])
+    await d.execute('DELETE FROM chunks_fts WHERE chunk_id = ?;', [chunkId])
+    if (vecEnabled) await d.execute('DELETE FROM chunks_vec WHERE chunk_id = ?;', [chunkId])
   }
-  d.execute('DELETE FROM documents WHERE id = ?;', [id])
+  await d.execute('DELETE FROM documents WHERE id = ?;', [id])
 }

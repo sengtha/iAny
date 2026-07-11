@@ -38,16 +38,18 @@ export default function App() {
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
-    try {
-      getDb()
-      setDocs(listDocuments())
-      setReady(true)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    }
+    void (async () => {
+      try {
+        await getDb()
+        setDocs(await listDocuments())
+        setReady(true)
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e))
+      }
+    })()
   }, [])
 
-  const refresh = () => setDocs(listDocuments())
+  const refresh = async () => setDocs(await listDocuments())
 
   const onAdd = async () => {
     if (!content.trim()) return
@@ -56,7 +58,7 @@ export default function App() {
       await addDocument({ title: title.trim() || 'Untitled', content })
       setTitle('')
       setContent('')
-      refresh()
+      await refresh()
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -77,9 +79,9 @@ export default function App() {
     }
   }
 
-  const onDelete = (id: string) => {
-    deleteDocument(id)
-    refresh()
+  const onDelete = async (id: string) => {
+    await deleteDocument(id)
+    await refresh()
   }
 
   if (error) {
