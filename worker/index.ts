@@ -67,6 +67,11 @@ export default {
     if (url.pathname.startsWith('/api/backup/')) {
       return serveBackup(url, request, env)
     }
+    // Static assets: cross-origin isolation headers come from public/_headers
+    // (asset requests bypass this worker via run_worker_first). That
+    // isolation lets onnxruntime-web use multiple WASM threads — 2-4x faster
+    // CPU inference on phones. Worker-served model/backup responses carry a
+    // matching CORP header (see fileHeaders / serveBackup).
     return env.ASSETS.fetch(request)
   },
 }
@@ -98,6 +103,7 @@ async function serveBackup(url: URL, request: Request, env: Env): Promise<Respon
       'content-type': 'application/octet-stream',
       'content-length': String(obj.size),
       'cache-control': 'no-store',
+      'cross-origin-resource-policy': 'cross-origin',
       'x-backup-uploaded': obj.customMetadata?.uploaded ?? '',
     })
     return new Response(request.method === 'HEAD' ? null : obj.body, { headers })
@@ -111,6 +117,7 @@ function fileHeaders(contentType: string | undefined, size?: number): Headers {
     'content-type': contentType ?? 'application/octet-stream',
     'cache-control': 'public, max-age=31536000, immutable',
     'access-control-allow-origin': '*',
+    'cross-origin-resource-policy': 'cross-origin',
     'accept-ranges': 'bytes',
   })
   if (size !== undefined) headers.set('content-length', String(size))
