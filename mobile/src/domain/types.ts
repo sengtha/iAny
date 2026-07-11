@@ -16,18 +16,29 @@ export type Language = 'en' | 'km'
  */
 export const EMBEDDING_MODEL_REPO = 'cstr/multilingual-e5-small-GGUF'
 /** Candidate GGUF filenames, tried in order (uploaders name quants
- *  inconsistently). The first that exists on the mirror is downloaded. */
+ *  inconsistently across separator/case). The first that HEADs 200 on the
+ *  mirror is downloaded. cstr's documented convention is lowercase-hyphen
+ *  (`multilingual-e5-base-q4_k.gguf`), so q8_0 lowercase-hyphen is first. */
 export const EMBEDDING_MODEL_FILES = [
-  'multilingual-e5-small.Q8_0.gguf',
+  'multilingual-e5-small-q8_0.gguf',
   'multilingual-e5-small-Q8_0.gguf',
+  'multilingual-e5-small.Q8_0.gguf',
   'multilingual-e5-small.q8_0.gguf',
-  'multilingual-e5-small.F16.gguf',
-  'multilingual-e5-small.f16.gguf',
   'multilingual-e5-small-f16.gguf',
+  'multilingual-e5-small-F16.gguf',
+  'multilingual-e5-small.f16.gguf',
+  'multilingual-e5-small.F16.gguf',
+  'multilingual-e5-small-q6_k.gguf',
+  'multilingual-e5-small-q5_k_m.gguf',
+  'multilingual-e5-small-q4_k_m.gguf',
+  'multilingual-e5-small-q4_k.gguf',
 ]
 export const EMBEDDING_DIMS = 384
 /** iAny model mirror (Cloudflare worker pull-through cache). */
 export const MODEL_MIRROR = 'https://iany.sengtha.workers.dev/models'
+/** Read-only HF metadata proxy on the same worker (repo file lists), so the
+ *  app can discover the exact GGUF filename instead of guessing. */
+export const MODEL_API_MIRROR = 'https://iany.sengtha.workers.dev/hf-api'
 
 export const CHUNK_MAX_CHARS = 1200
 export const CHUNK_OVERLAP_SENTENCES = 1

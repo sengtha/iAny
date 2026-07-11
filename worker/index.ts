@@ -70,6 +70,9 @@ export default {
     if (url.pathname.startsWith('/api/backup/')) {
       return serveBackup(url, request, env)
     }
+    if (url.pathname.startsWith('/hf-api/')) {
+      return serveHfApi(url)
+    }
     // Static assets: cross-origin isolation headers come from public/_headers
     // (asset requests bypass this worker via run_worker_first). That
     // isolation lets onnxruntime-web use multiple WASM threads — 2-4x faster
@@ -77,6 +80,25 @@ export default {
     // matching CORP header (see fileHeaders / serveBackup).
     return env.ASSETS.fetch(request)
   },
+}
+
+// Read-only proxy for Hugging Face model metadata (file lists), so clients in
+// regions that can't reach huggingface.co can discover a repo's exact GGUF
+// filename instead of guessing. Restricted to `models/{owner}/{repo}`.
+const HF_API_RE = /^models\/[\w.-]+\/[\w.-]+$/
+
+async function serveHfApi(url: URL): Promise<Response> {
+  const path = url.pathname.slice('/hf-api/'.length)
+  if (!HF_API_RE.test(path)) return new Response('Forbidden', { status: 403 })
+  const upstream = await fetch(`${HF}/api/${path}`)
+  return new Response(upstream.body, {
+    status: upstream.status,
+    headers: {
+      'content-type': 'application/json',
+      'access-control-allow-origin': '*',
+      'cache-control': 'public, max-age=3600',
+    },
+  })
 }
 
 async function serveBackup(url: URL, request: Request, env: Env): Promise<Response> {

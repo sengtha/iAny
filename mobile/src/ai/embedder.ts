@@ -8,6 +8,7 @@ import {
   EMBEDDING_DIMS,
   EMBEDDING_MODEL_FILES,
   EMBEDDING_MODEL_REPO,
+  MODEL_API_MIRROR,
   MODEL_MIRROR,
 } from '../domain/types'
 import type { Embedder } from '../db/database'
@@ -103,7 +104,8 @@ class LlamaEmbedder implements Embedder {
       if (info.exists && info.size && info.size > 1_000_000) return dest
     }
 
-    // Find which candidate the mirror actually has.
+    // Find which candidate the mirror actually has (fast path), else ask the
+    // HF metadata proxy for the repo's real GGUF filename (robust path).
     let chosen: string | null = null
     for (const file of EMBEDDING_MODEL_FILES) {
       try {
@@ -116,8 +118,9 @@ class LlamaEmbedder implements Embedder {
         // network hiccup — try the next candidate
       }
     }
+    if (!chosen) chosen = await this.discoverFile()
     if (!chosen) {
-      throw new Error('embedding model not found on mirror (checked all candidates)')
+      throw new Error('embedding model not found on mirror (no .gguf in repo?)')
     }
 
     this.status = 'downloading'
@@ -142,6 +145,28 @@ class LlamaEmbedder implements Embedder {
     }
     await FileSystem.moveAsync({ from: tmp, to: dest })
     return dest
+  }
+
+  /** Ask the HF metadata proxy for the repo's actual GGUF files and pick one
+   *  (prefer q8_0, then f16, then anything). Returns null if unreachable. */
+  private async discoverFile(): Promise<string | null> {
+    try {
+      const res = await fetch(`${MODEL_API_MIRROR}/models/${EMBEDDING_MODEL_REPO}`)
+      if (!res.ok) return null
+      const data = (await res.json()) as { siblings?: { rfilename: string }[] }
+      const files = (data.siblings ?? [])
+        .map((s) => s.rfilename)
+        .filter((f) => f.toLowerCase().endsWith('.gguf'))
+      return (
+        files.find((f) => /q8_0/i.test(f)) ??
+        files.find((f) => /f16/i.test(f)) ??
+        files.find((f) => /q4_k/i.test(f)) ??
+        files[0] ??
+        null
+      )
+    } catch {
+      return null
+    }
   }
 
   private async embedOne(text: string): Promise<Float32Array> {
