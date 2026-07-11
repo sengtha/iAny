@@ -1,9 +1,0 @@
-# Cross-origin isolation → SharedArrayBuffer → onnxruntime-web multithreads
-# (2-4x faster CPU inference). Uses COEP 'credentialless', which — unlike
-# 'require-corp' — does NOT block subresources lacking a CORP header, so it
-# is safe across a service-worker upgrade from an already-installed client.
-# (Safari ignores credentialless → no isolation there, but no breakage.)
-/*
-  Cross-Origin-Opener-Policy: same-origin
-  Cross-Origin-Embedder-Policy: credentialless
-  Cross-Origin-Resource-Policy: cross-origin
