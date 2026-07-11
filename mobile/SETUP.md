@@ -94,20 +94,23 @@ npx expo prebuild
 npx expo run:android   # connected phone/emulator; run:ios on a Mac
 ```
 
-## sqlite-vec
+## Native modules per stage
 
-Vector search comes from the sqlite-vec extension, enabled via this block in
-`package.json`:
+To keep each cloud build small and easy to debug, native modules are added
+only when the code actually uses them:
 
-```json
-"op-sqlite": { "sqliteVec": true }
-```
+- **Stage 1 (now):** `@op-engineering/op-sqlite` only. FTS-only retrieval.
+- **Stage 2:** re-enable sqlite-vec by adding this block back to
+  `package.json`, which makes op-sqlite compile the extension in:
+  ```json
+  "op-sqlite": { "sqliteVec": true }
+  ```
+  The DB layer already detects the `vec0` module at runtime (`vecEnabled`) and
+  switches on vector + hybrid search automatically — no caller changes.
+- **Stage 3:** add `llama.rn` (llama.cpp) for on-device Gemma generation.
 
-op-sqlite bundles and registers the extension at build time when this flag is
-set — no runtime `load_extension` call. If `CREATE VIRTUAL TABLE ... USING
-vec0` throws, the flag didn't take: re-run `npx expo prebuild --clean` then
-rebuild. Stage 1 works without it (FTS-only); it becomes load-bearing in
-Stage 2.
+Adding a native module means the next EAS build recompiles native (longer),
+which is expected.
 
 ## Testing Stage 1 on the phone
 

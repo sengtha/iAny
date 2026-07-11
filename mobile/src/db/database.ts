@@ -28,6 +28,11 @@ export interface Embedder {
 }
 
 let db: DB | null = null
+/** True once the sqlite-vec extension is confirmed available (its vec0 table
+ *  was created). Stage 1 ships without the extension, so this stays false and
+ *  retrieval runs FTS-only; Stage 2 re-enables the op-sqlite sqliteVec build
+ *  flag and this flips true automatically — no code change to the callers. */
+let vecEnabled = false
 
 export function getDb(): DB {
   if (!db) {
@@ -82,12 +87,19 @@ function migrate(d: DB): void {
       tokenize = 'trigram'
     );`)
   // Vector search (sqlite-vec). Requires op-sqlite built with the sqliteVec
-  // flag (see mobile/package.json + SETUP.md).
-  d.execute(`
-    CREATE VIRTUAL TABLE IF NOT EXISTS chunks_vec USING vec0(
-      chunk_id TEXT PRIMARY KEY,
-      embedding float[${EMBEDDING_DIMS}]
-    );`)
+  // flag (see mobile/package.json + SETUP.md). Absent in Stage 1 — the vec0
+  // module isn't registered, so this throws; we swallow it and run FTS-only.
+  try {
+    d.execute(`
+      CREATE VIRTUAL TABLE IF NOT EXISTS chunks_vec USING vec0(
+        chunk_id TEXT PRIMARY KEY,
+        embedding float[${EMBEDDING_DIMS}]
+      );`)
+    vecEnabled = true
+  } catch {
+    vecEnabled = false
+    console.warn('[iAny] sqlite-vec not available — vector search disabled (FTS only)')
+  }
 }
 
 /** sqlite-vec accepts a JSON array for a float[] column. */
@@ -135,7 +147,7 @@ export async function addDocument(
       c.text,
     ])
     d.execute('INSERT INTO chunks_fts (text, chunk_id) VALUES (?, ?);', [c.text, chunkId])
-    if (embeddings) {
+    if (vecEnabled && embeddings) {
       d.execute('INSERT INTO chunks_vec (chunk_id, embedding) VALUES (?, ?);', [
         chunkId,
         vecLiteral(embeddings[i]),
@@ -165,7 +177,7 @@ export async function hybridSearch(
   const ranks = new Map<string, number>() // chunk_id -> fused RRF score
 
   // Vector leg
-  if (embedder) {
+  if (embedder && vecEnabled) {
     try {
       const qv = await embedder.embedQuery(query)
       const rows = rowsOf(
@@ -270,7 +282,7 @@ export function deleteDocument(id: string): void {
   for (const r of rows) {
     const chunkId = r.id as string
     d.execute('DELETE FROM chunks_fts WHERE chunk_id = ?;', [chunkId])
-    d.execute('DELETE FROM chunks_vec WHERE chunk_id = ?;', [chunkId])
+    if (vecEnabled) d.execute('DELETE FROM chunks_vec WHERE chunk_id = ?;', [chunkId])
   }
   d.execute('DELETE FROM documents WHERE id = ?;', [id])
 }
