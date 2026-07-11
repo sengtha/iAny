@@ -1,0 +1,53 @@
+name: EAS Build (mobile)
+
+# Trigger a cloud APK build of the native app from the GitHub website — no
+# local computer needed. Actions tab -> "EAS Build (mobile)" -> Run workflow ->
+# pick a profile. The build runs on Expo's servers; when it finishes, the log
+# and your expo.dev dashboard show a QR/link to install the APK on your phone.
+#
+# One-time setup (all doable from a phone browser):
+#   1. expo.dev -> Account settings -> Access tokens -> create a token.
+#   2. github.com -> this repo -> Settings -> Secrets and variables -> Actions
+#      -> New repository secret named EXPO_TOKEN with that token.
+#   3. Make sure mobile/app.json has your project's `owner` and
+#      `extra.eas.projectId` (see mobile/SETUP.md).
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: 'EAS build profile'
+        required: true
+        default: 'preview'
+        type: choice
+        options:
+          - preview
+          - development
+          - production
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build APK on EAS
+        run: eas build --platform android --profile ${{ github.event.inputs.profile }} --non-interactive --no-wait
