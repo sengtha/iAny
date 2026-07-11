@@ -99,14 +99,17 @@ npx expo run:android   # connected phone/emulator; run:ios on a Mac
 To keep each cloud build small and easy to debug, native modules are added
 only when the code actually uses them:
 
-- **Stage 1 (now):** `@op-engineering/op-sqlite` only. FTS-only retrieval.
-- **Stage 2:** re-enable sqlite-vec by adding this block back to
-  `package.json`, which makes op-sqlite compile the extension in:
+- **Stage 1:** `@op-engineering/op-sqlite`. Note op-sqlite ships *Vanilla
+  SQLite* — FTS5 and sqlite-vec are **off** unless enabled in `package.json`:
   ```json
-  "op-sqlite": { "sqliteVec": true }
+  "op-sqlite": { "fts5": true, "sqliteVec": true }
   ```
-  The DB layer already detects the `vec0` module at runtime (`vecEnabled`) and
-  switches on vector + hybrid search automatically — no caller changes.
+  Without `fts5`, `CREATE VIRTUAL TABLE ... USING fts5` fails at runtime with
+  `no such module: fts5`. The DB layer detects the `vec0` module at runtime
+  (`vecEnabled`) and turns on vector search automatically once an embedder
+  exists — no caller changes.
+- **Stage 2:** add the embedding model + wire the `Embedder` (vectors are
+  already stored via the `sqliteVec` flag above).
 - **Stage 3:** add `llama.rn` (llama.cpp) for on-device Gemma generation.
 
 Adding a native module means the next EAS build recompiles native (longer),
