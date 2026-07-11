@@ -62,8 +62,12 @@ export default function App() {
   // FTS-only. Docs fed before enabling embeddings simply have no vectors.
   const activeEmbedder = () => (embedder.ready ? embedder : undefined)
 
+  // Weak devices (e.g. the S10) can't hold both llama models in memory at once,
+  // so only one is resident at a time — loading either releases the other.
   const onEnableEmbeddings = async () => {
     try {
+      await generator.release()
+      setGen({ status: 'off' })
       await embedder.init(setEmb)
     } catch {
       // status already reflected via setEmb('error')
@@ -72,6 +76,8 @@ export default function App() {
 
   const onEnableGen = async () => {
     try {
+      await embedder.release()
+      setEmb({ status: 'off' })
       await generator.init(setGen)
     } catch {
       // status already reflected via setGen('error')
@@ -149,7 +155,10 @@ export default function App() {
         <StatusBar style="auto" />
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           <Text style={styles.h1}>iAny · native (Stage 3)</Text>
-          <Text style={styles.hint}>On-device search + AI answers, fully offline.</Text>
+          <Text style={styles.hint}>
+            On-device search + AI answers, fully offline. This device runs one model at a
+            time, so enabling one turns off the other.
+          </Text>
 
           <View style={styles.embBox}>
             {emb.status === 'ready' ? (

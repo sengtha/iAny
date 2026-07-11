@@ -1,3 +1,4 @@
+import * as FileSystem from 'expo-file-system'
 import { initLlama } from 'llama.rn'
 import { GEN_MODEL_FILES, GEN_MODEL_REPO } from '../domain/types'
 import { ensureModelFile, errStr } from './modelFile'
@@ -58,14 +59,18 @@ class LlamaGenerator {
     )
     this.status = 'loading'
     onProgress?.({ status: 'loading' })
+    const info = await FileSystem.getInfoAsync(path)
+    const sizeMb = info.exists && info.size ? (info.size / 1e6).toFixed(0) : '?'
     try {
+      // n_ctx 1024 keeps the KV-cache small (weak devices are memory-bound);
+      // 4 retrieved chunks + question + answer fit comfortably.
       this.ctx = await initLlama({
         model: path.replace(/^file:\/\//, ''),
-        n_ctx: 2048,
+        n_ctx: 1024,
         n_gpu_layers: 0,
       })
     } catch (e) {
-      throw new Error(`model load failed (${errStr(e)})`)
+      throw new Error(`model load failed (${errStr(e)}) [${sizeMb}MB]`)
     }
     this.status = 'ready'
     onProgress?.({ status: 'ready' })
