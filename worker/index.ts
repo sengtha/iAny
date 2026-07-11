@@ -29,6 +29,8 @@ const ALLOWED_PREFIXES = [
   'sengtha/iany-khmer-tiny-v1-ONNX/',
   // Native app (llama.rn) embedding model — GGUF served through this mirror
   // so devices in regions that can't reach huggingface.co still get it.
+  // EmbeddingGemma matches the PWA (portable packs) and handles Khmer well.
+  'ggml-org/embeddinggemma-300M-GGUF/',
   'cstr/multilingual-e5-small-GGUF/',
 ]
 // OCR language data, served through the same mirror. Khmer uses the

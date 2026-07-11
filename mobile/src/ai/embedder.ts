@@ -15,14 +15,15 @@ import type { Embedder } from '../db/database'
 
 /**
  * On-device text embeddings via llama.rn (llama.cpp) running
- * multilingual-e5-small. This is the native counterpart of the PWA's
- * EmbeddingGemma worker.
+ * EmbeddingGemma-300m — the same model the PWA uses, so vectors are portable
+ * between desktop and mobile.
  *
  * - The GGUF weights are pulled through the iAny mirror (Hugging Face is
  *   blocked in some regions) into app storage, once, then reused offline.
- * - e5 requires input prefixes: "query: " for searches, "passage: " for
- *   stored documents. Embeddings are L2-normalized so sqlite-vec's default
- *   (L2) KNN ranks them by cosine similarity.
+ * - EmbeddingGemma uses task prefixes (matching the PWA): "task: search result
+ *   | query: " for searches, "title: none | text: " for stored documents.
+ * - Output is 768-dim; we keep the first 256 (Matryoshka) and L2-normalize, so
+ *   sqlite-vec's default (L2) KNN ranks by cosine similarity — same as the PWA.
  * - Everything is best-effort: any failure leaves the app on FTS-only search.
  */
 
@@ -198,22 +199,23 @@ class LlamaEmbedder implements Embedder {
   private async embedOne(text: string): Promise<Float32Array> {
     if (!this.ctx) throw new Error('embedder not ready')
     const { embedding } = await this.ctx.embedding(text)
-    if (!embedding || embedding.length !== EMBEDDING_DIMS) {
+    if (!embedding || embedding.length < EMBEDDING_DIMS) {
       throw new Error(
-        `unexpected embedding size ${embedding?.length ?? 0} (expected ${EMBEDDING_DIMS})`,
+        `unexpected embedding size ${embedding?.length ?? 0} (need >= ${EMBEDDING_DIMS})`,
       )
     }
-    return normalize(embedding)
+    // Matryoshka: keep the first EMBEDDING_DIMS dims, then renormalize.
+    return normalize(embedding.slice(0, EMBEDDING_DIMS))
   }
 
   async embedDocuments(texts: string[]): Promise<Float32Array[]> {
     const out: Float32Array[] = []
-    for (const t of texts) out.push(await this.embedOne(`passage: ${t}`))
+    for (const t of texts) out.push(await this.embedOne(`title: none | text: ${t}`))
     return out
   }
 
   async embedQuery(text: string): Promise<Float32Array> {
-    return this.embedOne(`query: ${text}`)
+    return this.embedOne(`task: search result | query: ${text}`)
   }
 
   /** Free native memory (e.g. before loading the generator in Stage 3). */

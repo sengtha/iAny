@@ -103,16 +103,16 @@ async function migrate(d: DB): Promise<void> {
   // flag (see mobile/package.json + SETUP.md). Absent early — the vec0 module
   // isn't registered, so this throws; we swallow it and run FTS-only.
   //
-  // SCHEMA_VERSION bumps whenever the vec table shape changes. Version 2
-  // switched the embedding model (EmbeddingGemma 256d -> e5-small 384d), so
-  // the old fixed-width vec0 table must be dropped and rebuilt. No vector data
-  // existed before this, so the drop is lossless; re-feeding regenerates
+  // SCHEMA_VERSION bumps whenever the vec table shape changes, so the old
+  // fixed-width vec0 table is dropped and rebuilt. v2 tried e5-small (384d);
+  // v3 settled on EmbeddingGemma truncated to 256d (matches the PWA). No real
+  // vector data has shipped, so the drop is lossless; re-feeding regenerates
   // vectors at the new width.
-  const SCHEMA_VERSION = 2
+  const SCHEMA_VERSION = 3
   const verRows = rowsOf(await d.execute('PRAGMA user_version;'))
   const userVersion = Number(verRows[0]?.user_version ?? 0)
   try {
-    if (userVersion < 2) {
+    if (userVersion < SCHEMA_VERSION) {
       await d.execute('DROP TABLE IF EXISTS chunks_vec;')
     }
     await d.execute(`

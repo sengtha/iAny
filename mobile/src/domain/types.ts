@@ -7,33 +7,27 @@
 export type Language = 'en' | 'km'
 
 /**
- * Native embedding model: multilingual-e5-small (GGUF, run by llama.rn).
- * Small (~130 MB q8) and fast on weak phones, covers Khmer + English. e5 is
- * NOT a Matryoshka model, so we keep its full 384 dims (no truncation). The
- * model is pulled through the iAny mirror because Hugging Face is unreachable
- * from some regions (Cambodia). Upgradeable later (e.g. bge-m3 / EmbeddingGemma
- * for stronger Khmer) by changing these constants + re-indexing.
+ * Native embedding model: EmbeddingGemma-300m (GGUF, run by llama.rn) — the
+ * SAME model the PWA uses, so a knowledge pack embedded on desktop stays
+ * searchable on mobile (marketplace/sync portability). Gemma-architecture, so
+ * llama.rn (built for Gemma) can load it; officially supported by llama.cpp.
+ * Multilingual with strong Khmer. Pulled through the iAny mirror (Hugging Face
+ * is blocked in some regions). Matryoshka: we truncate the 768-dim output to
+ * 256 + renormalize, exactly like the PWA.
  */
-export const EMBEDDING_MODEL_REPO = 'cstr/multilingual-e5-small-GGUF'
-/** Candidate GGUF filenames, tried in order (uploaders name quants
- *  inconsistently across separator/case). The first that HEADs 200 on the
- *  mirror is downloaded. cstr's documented convention is lowercase-hyphen
- *  (`multilingual-e5-base-q4_k.gguf`), so q8_0 lowercase-hyphen is first. */
+export const EMBEDDING_MODEL_REPO = 'ggml-org/embeddinggemma-300M-GGUF'
+/** Candidate GGUF filenames, tried in order; if none match, the embedder asks
+ *  the HF metadata proxy for the repo's real .gguf and prefers q8_0. */
 export const EMBEDDING_MODEL_FILES = [
-  'multilingual-e5-small-q8_0.gguf',
-  'multilingual-e5-small-Q8_0.gguf',
-  'multilingual-e5-small.Q8_0.gguf',
-  'multilingual-e5-small.q8_0.gguf',
-  'multilingual-e5-small-f16.gguf',
-  'multilingual-e5-small-F16.gguf',
-  'multilingual-e5-small.f16.gguf',
-  'multilingual-e5-small.F16.gguf',
-  'multilingual-e5-small-q6_k.gguf',
-  'multilingual-e5-small-q5_k_m.gguf',
-  'multilingual-e5-small-q4_k_m.gguf',
-  'multilingual-e5-small-q4_k.gguf',
+  'embeddinggemma-300M-Q8_0.gguf',
+  'embeddinggemma-300M-q8_0.gguf',
+  'embeddinggemma-300m-Q8_0.gguf',
+  'embeddinggemma-300M-f16.gguf',
+  'embeddinggemma-300M-F16.gguf',
+  'embeddinggemma-300M-Q4_K_M.gguf',
 ]
-export const EMBEDDING_DIMS = 384
+/** Matryoshka truncation 768 -> 256 + renormalize. Must match the PWA. */
+export const EMBEDDING_DIMS = 256
 /** iAny model mirror (Cloudflare worker pull-through cache). */
 export const MODEL_MIRROR = 'https://iany.sengtha.workers.dev/models'
 /** Read-only HF metadata proxy on the same worker (repo file lists), so the

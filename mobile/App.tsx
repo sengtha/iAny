@@ -140,7 +140,7 @@ export default function App() {
             ) : (
               <>
                 <Pressable style={styles.btnOutline} onPress={onEnableEmbeddings}>
-                  <Text style={styles.btnOutlineText}>Enable semantic search (~130 MB)</Text>
+                  <Text style={styles.btnOutlineText}>Enable semantic search (~320 MB)</Text>
                 </Pressable>
                 {emb.status === 'error' && emb.error && (
                   <Text style={styles.errSmall}>⚠️ {emb.error}</Text>
