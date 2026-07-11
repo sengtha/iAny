@@ -29,18 +29,18 @@ export const EMBEDDING_MODEL_FILES = [
 /** Matryoshka truncation 768 -> 256 + renormalize. Must match the PWA. */
 export const EMBEDDING_DIMS = 256
 /**
- * Native generation model: Gemma 3 270M instruct (GGUF, llama.rn). Tiny
- * (~200 MB q4) so it loads even on a 2019 Galaxy S10 — the S10's llama.rn
- * ceiling is ~300-500 MB, below the 806 MB of Gemma 1B. This proves the
- * generation pipeline on weak hardware; Khmer quality is limited at 270M.
- * Capable phones use a bigger model (Gemma 1B / 3n E2B) for good Khmer —
- * quality scales with the device.
+ * Native generation model: iAny's fine-tuned Khmer model (Gemma 3 270M,
+ * continued-pretrained + SFT on Khmer), converted from safetensors to GGUF via
+ * HF's gguf-my-repo Space. ~290 MB q8_0 — fits the 2019 Galaxy S10 (whose
+ * llama.rn ceiling is ~300-500 MB, below Gemma 1B's 806 MB). Unlike base 270M
+ * (which can't write Khmer at all), this is trained for Khmer. Capable phones
+ * use a bigger model for better quality — quality scales with the device.
  */
-export const GEN_MODEL_REPO = 'bartowski/google_gemma-3-270m-it-GGUF'
+export const GEN_MODEL_REPO = 'sengtha/iany-khmer-tiny-v1-Q8_0-GGUF'
 export const GEN_MODEL_FILES = [
-  'google_gemma-3-270m-it-Q4_K_M.gguf',
-  'google_gemma-3-270m-it-Q8_0.gguf',
-  'google_gemma-3-270m-it-Q4_0.gguf',
+  'iany-khmer-tiny-v1-Q8_0.gguf',
+  'iany-khmer-tiny-v1-q8_0.gguf',
+  'iany-khmer-tiny-v1.Q8_0.gguf',
 ]
 
 /** iAny model mirror (Cloudflare worker pull-through cache). */

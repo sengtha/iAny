@@ -36,6 +36,9 @@ const ALLOWED_PREFIXES = [
   // phones (S10); 1B for capable devices.
   'ggml-org/gemma-3-1b-it-GGUF/',
   'bartowski/google_gemma-3-270m-it-GGUF/',
+  // iAny's own Khmer fine-tune (Gemma 3 270M), converted to GGUF — the real
+  // S10 generation model.
+  'sengtha/iany-khmer-tiny-v1-Q8_0-GGUF/',
 ]
 // OCR language data, served through the same mirror. Khmer uses the
 // high-accuracy models; English's fast model is accurate enough.

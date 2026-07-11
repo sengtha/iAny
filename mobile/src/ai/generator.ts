@@ -84,18 +84,23 @@ class LlamaGenerator {
   }
 
   /**
-   * Generate an answer, streaming tokens to onToken. Passing `messages` lets
-   * llama.rn apply Gemma's chat template (read from the GGUF).
+   * Generate an answer, streaming tokens to onToken.
+   * - Pass a `string` for a fully pre-formatted RAW prompt (used by the Khmer
+   *   fine-tune, whose tokenizer has no chat template — we apply the Gemma turn
+   *   format manually, matching how it was trained).
+   * - Pass `messages` to let llama.rn apply the model's chat template (for
+   *   general models that ship one).
    */
   async generate(
-    messages: GenMessage[],
+    input: string | GenMessage[],
     onToken: (token: string) => void,
     maxTokens = 256,
   ): Promise<string> {
     if (!this.ctx) throw new Error('generator not ready')
+    const base = typeof input === 'string' ? { prompt: input } : { messages: input }
     const result = await this.ctx.completion(
       {
-        messages,
+        ...base,
         n_predict: maxTokens,
         temperature: 0.3,
         // Small models loop under pure greedy; a light penalty helps.

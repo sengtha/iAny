@@ -186,7 +186,7 @@ export default function App() {
 
           <View style={styles.embBox}>
             {gen.status === 'ready' ? (
-              <Text style={styles.embOn}>✓ AI answers on — Gemma 3 270M</Text>
+              <Text style={styles.embOn}>✓ AI answers on — iAny Khmer 270M</Text>
             ) : gen.status === 'downloading' ? (
               <Text style={styles.hint}>
                 Downloading Gemma… {Math.round((gen.progress ?? 0) * 100)}%
@@ -199,7 +199,7 @@ export default function App() {
             ) : (
               <>
                 <Pressable style={styles.btnOutline} onPress={onEnableGen}>
-                  <Text style={styles.btnOutlineText}>Enable AI answers (~200 MB)</Text>
+                  <Text style={styles.btnOutlineText}>Enable AI answers (~290 MB)</Text>
                 </Pressable>
                 {gen.status === 'error' && gen.error && (
                   <Text style={styles.errSmall}>⚠️ {gen.error}</Text>
