@@ -20,12 +20,14 @@ import {
   type DocSummary,
 } from './src/db/database'
 import type { ChunkHit } from './src/domain/types'
+import { embedder, type EmbedderProgress } from './src/ai/embedder'
 
 /**
- * Stage 1 smoke-test screen: prove that on-device SQLite ingest + FTS5
- * (trigram, Khmer-safe) retrieval works end-to-end on the phone. No models
- * yet — vector search and generation arrive in Stage 2/3. This screen exists
- * to validate the storage foundation, not as the final UI.
+ * Stage 2 smoke-test screen: on-device SQLite + FTS5 (Stage 1) plus opt-in
+ * semantic embeddings (multilingual-e5-small via llama.rn). Enabling
+ * embeddings downloads the model once through the iAny mirror, then feed +
+ * search use hybrid vector + keyword retrieval. Not the final UI — this
+ * validates the pipeline.
  */
 export default function App() {
   const [ready, setReady] = useState(false)
@@ -36,6 +38,7 @@ export default function App() {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<ChunkHit[]>([])
   const [busy, setBusy] = useState(false)
+  const [emb, setEmb] = useState<EmbedderProgress>({ status: embedder.status })
 
   useEffect(() => {
     void (async () => {
@@ -51,11 +54,23 @@ export default function App() {
 
   const refresh = async () => setDocs(await listDocuments())
 
+  // Pass the embedder only once it's loaded; otherwise retrieval/ingest run
+  // FTS-only. Docs fed before enabling embeddings simply have no vectors.
+  const activeEmbedder = () => (embedder.ready ? embedder : undefined)
+
+  const onEnableEmbeddings = async () => {
+    try {
+      await embedder.init(setEmb)
+    } catch {
+      // status already reflected via setEmb('error')
+    }
+  }
+
   const onAdd = async () => {
     if (!content.trim()) return
     setBusy(true)
     try {
-      await addDocument({ title: title.trim() || 'Untitled', content })
+      await addDocument({ title: title.trim() || 'Untitled', content }, activeEmbedder())
       setTitle('')
       setContent('')
       await refresh()
@@ -70,8 +85,7 @@ export default function App() {
     if (!query.trim()) return
     setBusy(true)
     try {
-      // No embedder in Stage 1 → FTS-only retrieval.
-      setResults(await hybridSearch(query, undefined, 6))
+      setResults(await hybridSearch(query, activeEmbedder(), 6))
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -108,8 +122,32 @@ export default function App() {
       <SafeAreaView style={styles.root}>
         <StatusBar style="auto" />
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-          <Text style={styles.h1}>iAny · native (Stage 1)</Text>
-          <Text style={styles.hint}>On-device SQLite + FTS5. Feed text, then search it.</Text>
+          <Text style={styles.h1}>iAny · native (Stage 2)</Text>
+          <Text style={styles.hint}>On-device SQLite + FTS5 + semantic search.</Text>
+
+          <View style={styles.embBox}>
+            {emb.status === 'ready' ? (
+              <Text style={styles.embOn}>✓ Semantic search on — meaning + keywords</Text>
+            ) : emb.status === 'downloading' ? (
+              <Text style={styles.hint}>
+                Downloading model… {Math.round((emb.progress ?? 0) * 100)}%
+              </Text>
+            ) : emb.status === 'loading' ? (
+              <View style={styles.row}>
+                <ActivityIndicator size="small" />
+                <Text style={styles.hint}>  Loading model…</Text>
+              </View>
+            ) : (
+              <>
+                <Pressable style={styles.btnOutline} onPress={onEnableEmbeddings}>
+                  <Text style={styles.btnOutlineText}>Enable semantic search (~130 MB)</Text>
+                </Pressable>
+                {emb.status === 'error' && emb.error && (
+                  <Text style={styles.errSmall}>⚠️ {emb.error}</Text>
+                )}
+              </>
+            )}
+          </View>
 
           <Text style={styles.label}>Feed</Text>
           <TextInput
@@ -217,4 +255,23 @@ const styles = StyleSheet.create({
   docMeta: { color: '#888', fontSize: 12 },
   delete: { color: '#dc2626', fontWeight: '500' },
   err: { color: '#dc2626', padding: 24, textAlign: 'center' },
+  errSmall: { color: '#dc2626', marginTop: 8, fontSize: 13 },
+  embBox: {
+    marginTop: 8,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#f5f7ff',
+    borderWidth: 1,
+    borderColor: '#e0e6ff',
+  },
+  embOn: { color: '#16a34a', fontWeight: '600' },
+  row: { flexDirection: 'row', alignItems: 'center' },
+  btnOutline: {
+    borderWidth: 1,
+    borderColor: '#2563eb',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+  },
+  btnOutlineText: { color: '#2563eb', fontWeight: '600' },
 })

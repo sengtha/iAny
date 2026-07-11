@@ -24,6 +24,13 @@
             "kotlinVersion": "1.9.25"
           }
         }
+      ],
+      [
+        "llama.rn",
+        {
+          "forceCxx20": true,
+          "enableOpenCL": false
+        }
       ]
     ],
     "extra": {

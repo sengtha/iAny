@@ -6,11 +6,28 @@
  */
 export type Language = 'en' | 'km'
 
-/** Pinned so vectors stay portable across devices and knowledge packs. */
-export const EMBEDDING_MODEL_ID = 'google/embeddinggemma-300m'
-/** Matryoshka truncation 768 -> 256 dims + renormalize: 3x smaller storage,
- *  faster KNN, negligible quality loss. Must match the PWA. */
-export const EMBEDDING_DIMS = 256
+/**
+ * Native embedding model: multilingual-e5-small (GGUF, run by llama.rn).
+ * Small (~130 MB q8) and fast on weak phones, covers Khmer + English. e5 is
+ * NOT a Matryoshka model, so we keep its full 384 dims (no truncation). The
+ * model is pulled through the iAny mirror because Hugging Face is unreachable
+ * from some regions (Cambodia). Upgradeable later (e.g. bge-m3 / EmbeddingGemma
+ * for stronger Khmer) by changing these constants + re-indexing.
+ */
+export const EMBEDDING_MODEL_REPO = 'cstr/multilingual-e5-small-GGUF'
+/** Candidate GGUF filenames, tried in order (uploaders name quants
+ *  inconsistently). The first that exists on the mirror is downloaded. */
+export const EMBEDDING_MODEL_FILES = [
+  'multilingual-e5-small.Q8_0.gguf',
+  'multilingual-e5-small-Q8_0.gguf',
+  'multilingual-e5-small.q8_0.gguf',
+  'multilingual-e5-small.F16.gguf',
+  'multilingual-e5-small.f16.gguf',
+  'multilingual-e5-small-f16.gguf',
+]
+export const EMBEDDING_DIMS = 384
+/** iAny model mirror (Cloudflare worker pull-through cache). */
+export const MODEL_MIRROR = 'https://iany.sengtha.workers.dev/models'
 
 export const CHUNK_MAX_CHARS = 1200
 export const CHUNK_OVERLAP_SENTENCES = 1

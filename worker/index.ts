@@ -27,6 +27,9 @@ const ALLOWED_PREFIXES = [
   'onnx-community/gemma-4-E4B-it-ONNX/',
   'onnx-community/Qwen3-0.6B-ONNX/',
   'sengtha/iany-khmer-tiny-v1-ONNX/',
+  // Native app (llama.rn) embedding model — GGUF served through this mirror
+  // so devices in regions that can't reach huggingface.co still get it.
+  'cstr/multilingual-e5-small-GGUF/',
 ]
 // OCR language data, served through the same mirror. Khmer uses the
 // high-accuracy models; English's fast model is accurate enough.
