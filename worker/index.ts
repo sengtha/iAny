@@ -48,6 +48,8 @@ const ALLOWED_PREFIXES = [
   // The S10 Khmer model: Qwen3 0.6B trimmed to a 32k Khmer vocab (tiny logits
   // buffer, Khmer-trained, non-Gemma). Converted from alphaedge-ai's model.
   'sengtha/Qwen3-0.6B-khm-32768-Q8_0-GGUF/',
+  // Limit test: bigger base Qwen3 (1.7B, full vocab) to probe the S10 ceiling.
+  'Qwen/Qwen3-1.7B-GGUF/',
 ]
 // OCR language data, served through the same mirror. Khmer uses the
 // high-accuracy models; English's fast model is accurate enough.
