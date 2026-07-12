@@ -12,10 +12,11 @@ IDs). MMS sounds bad only because it saw little Khmer data — fine-tuning it on
   picking one female = filter by `speaker_id`. No diarization needed.
 - Each female speaker has ~55–70h — you need only 10–30h, so there's headroom.
 
-> **Reality check:** VITS fine-tuning takes **1–3+ days on one GPU**, so it will
-> not finish in a single Kaggle 12h session. The training config **checkpoints to
-> HF and resumes**, so you run it across several sessions. If you have Colab Pro
-> (A100), it's much faster.
+> **Time:** fine-tuning (not from-scratch) is fast because MMS already knows
+> Khmer. A solid first voice at **30k steps ≈ 5–9h on a Kaggle T4** (often fits
+> one 12h session; ~2–3h on an A100). Want extra polish? 60–100k steps → a
+> second session. The config **checkpoints to HF every 500 steps and resumes**,
+> so crossing the 12h limit is automatic if you go long.
 
 ---
 
@@ -212,4 +213,5 @@ onnxruntime — small and CPU-only, matching iAny's offline tiers.
   (grapheme VITS or StyleTTS 2 from scratch) on this same prepared data.
 - **Clean data helps most.** You have far more than 30h — if some clips are noisy,
   filter them; a smaller clean set beats a big noisy one.
-- **Compute.** T4/P100 works with resume; an A100 (Colab Pro) finishes far faster.
+- **Compute.** 30k steps ≈ 5–9h on a Kaggle T4 (a good first voice, often one
+  session); ~2–3h on an A100. More steps = more polish, via resume.
