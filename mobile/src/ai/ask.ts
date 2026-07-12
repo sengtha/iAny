@@ -27,6 +27,8 @@ function buildMessages(question: string, sources: ChunkHit[]): GenMessage[] {
     `Context:\n${context || '(none)'}`,
     '',
     `Question: ${question}`,
+    // Qwen3 soft switch: disable its <think> reasoning block.
+    '/no_think',
   ].join('\n')
   return [{ role: 'user', content }]
 }

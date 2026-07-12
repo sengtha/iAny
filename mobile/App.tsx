@@ -63,12 +63,10 @@ export default function App() {
   // FTS-only. Docs fed before enabling embeddings simply have no vectors.
   const activeEmbedder = () => (embedder.ready ? embedder : undefined)
 
-  // Weak devices (e.g. the S10) can't hold both llama models in memory at once,
-  // so only one is resident at a time — loading either releases the other.
+  // Both models can stay resident (the S10 has the memory) — needed so Ask
+  // uses semantic retrieval (embedder) AND generation (generator) together.
   const onEnableEmbeddings = async () => {
     try {
-      await generator.release()
-      setGen({ status: 'off' })
       await embedder.init(setEmb)
     } catch {
       // status already reflected via setEmb('error')
@@ -77,8 +75,6 @@ export default function App() {
 
   const onEnableGen = async () => {
     try {
-      await embedder.release()
-      setEmb({ status: 'off' })
       await generator.init(setGen)
     } catch {
       // status already reflected via setGen('error')
@@ -94,10 +90,17 @@ export default function App() {
     let firstAt = 0
     let tokens = 0
     try {
+      let raw = ''
       const res = await ask(query, activeEmbedder(), (t) => {
         if (!firstAt) firstAt = Date.now()
         tokens++
-        setAnswer((prev) => prev + t)
+        raw += t
+        // Hide Qwen3 <think>…</think> (complete or still-streaming) from view.
+        const shown = raw
+          .replace(/<think>[\s\S]*?<\/think>/g, '')
+          .replace(/<think>[\s\S]*$/, '')
+          .replace(/^\s+/, '')
+        setAnswer(shown)
       })
       const end = Date.now()
       if (tokens > 0 && firstAt > 0) {
@@ -173,8 +176,8 @@ export default function App() {
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           <Text style={styles.h1}>iAny · native (Stage 3)</Text>
           <Text style={styles.hint}>
-            On-device search + AI answers, fully offline. This device runs one model at a
-            time, so enabling one turns off the other.
+            On-device search + AI answers, fully offline. Enable BOTH for grounded Khmer
+            replies — semantic search finds your notes, AI answers writes them up.
           </Text>
 
           <View style={styles.embBox}>
