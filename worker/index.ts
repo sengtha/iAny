@@ -42,6 +42,9 @@ const ALLOWED_PREFIXES = [
   // Small-vocab diagnostic (SmolLM2, ~49k vocab vs Gemma's 262k) to test
   // whether Gemma's vocabulary is what blocks generation on the S10.
   'bartowski/SmolLM2-135M-Instruct-GGUF/',
+  // Medium-vocab multilingual (Qwen2.5-0.5B, ~152k vocab) — smaller logits
+  // buffer than Gemma, some Khmer; candidate S10 generation model.
+  'bartowski/Qwen2.5-0.5B-Instruct-GGUF/',
 ]
 // OCR language data, served through the same mirror. Khmer uses the
 // high-accuracy models; English's fast model is accurate enough.
