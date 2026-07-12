@@ -45,6 +45,9 @@ const ALLOWED_PREFIXES = [
   // Medium-vocab multilingual (Qwen2.5-0.5B, ~152k vocab) — smaller logits
   // buffer than Gemma, some Khmer; candidate S10 generation model.
   'bartowski/Qwen2.5-0.5B-Instruct-GGUF/',
+  // The S10 Khmer model: Qwen3 0.6B trimmed to a 32k Khmer vocab (tiny logits
+  // buffer, Khmer-trained, non-Gemma). Converted from alphaedge-ai's model.
+  'sengtha/Qwen3-0.6B-khm-32768-Q8_0-GGUF/',
 ]
 // OCR language data, served through the same mirror. Khmer uses the
 // high-accuracy models; English's fast model is accurate enough.

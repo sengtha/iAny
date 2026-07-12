@@ -36,13 +36,14 @@ export const EMBEDDING_DIMS = 256
  * (which can't write Khmer at all), this is trained for Khmer. Capable phones
  * use a bigger model for better quality — quality scales with the device.
  */
-// Qwen2.5-0.5B-Instruct: vocab ~152k (vs Gemma's 262k) so its logits buffer
-// (~155MB @ n_ctx 256) is smaller than the ~268MB that broke the S10, and it
-// has some multilingual/Khmer ability — the S10 Khmer-generation candidate.
-export const GEN_MODEL_REPO = 'bartowski/Qwen2.5-0.5B-Instruct-GGUF'
+// The S10 Khmer model: Qwen3 0.6B trimmed to a 32,768-token Khmer vocabulary
+// (alphaedge-ai/Qwen3-0.6B-khm-32768, converted to GGUF). The small vocab means
+// a tiny logits buffer (loads + runs fast on the S10), it's Khmer-trained, and
+// Qwen3 avoids the llama.rn Gemma-3 load bug.
+export const GEN_MODEL_REPO = 'sengtha/Qwen3-0.6B-khm-32768-Q8_0-GGUF'
 export const GEN_MODEL_FILES = [
-  'Qwen2.5-0.5B-Instruct-Q4_K_M.gguf',
-  'Qwen2.5-0.5B-Instruct-Q8_0.gguf',
+  'Qwen3-0.6B-khm-32768-Q8_0.gguf',
+  'Qwen3-0.6B-khm-32768-q8_0.gguf',
 ]
 
 /** iAny model mirror (Cloudflare worker pull-through cache). */
