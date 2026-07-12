@@ -74,8 +74,8 @@ class LlamaGenerator {
       // small too.
       this.ctx = await initLlama({
         model: path.replace(/^file:\/\//, ''),
-        n_ctx: 1024,
-        n_batch: 32,
+        n_ctx: 256,
+        n_batch: 8,
         n_ubatch: 8,
         n_gpu_layers: 0,
       })
