@@ -39,12 +39,14 @@ snapshot_download("alphaedge-ai/Qwen3-0.6B-khm-32768", local_dir="khm")
    cmake --build build --config Release -j --target llama-quantize >/dev/null
 !./llama.cpp/build/bin/llama-quantize khm-f16.gguf Qwen3-0.6B-khm-32768-Q8_0.gguf Q8_0
 
-# 6. Upload to your HF account (needs a WRITE token: huggingface-cli login)
+# 6. Upload to your HF account. Use ONE authenticated client for both
+#    create_repo AND upload_file (a fresh HfApi() has no token -> 401).
+#    The token must be a WRITE token (huggingface.co/settings/tokens).
 from huggingface_hub import HfApi
 from getpass import getpass
-HfApi(token=getpass("HF write token: ")).create_repo(
-    "sengtha/Qwen3-0.6B-khm-32768-Q8_0-GGUF", exist_ok=True)
-HfApi().upload_file(
+api = HfApi(token=getpass("HF WRITE token: "))
+api.create_repo("sengtha/Qwen3-0.6B-khm-32768-Q8_0-GGUF", exist_ok=True)
+api.upload_file(
     path_or_fileobj="Qwen3-0.6B-khm-32768-Q8_0.gguf",
     path_in_repo="Qwen3-0.6B-khm-32768-Q8_0.gguf",
     repo_id="sengtha/Qwen3-0.6B-khm-32768-Q8_0-GGUF",
