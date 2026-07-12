@@ -14,9 +14,9 @@ export interface AskResult {
  */
 function buildMessages(question: string, sources: ChunkHit[]): GenMessage[] {
   const context = sources
-    .slice(0, 1)
+    .slice(0, 2)
     .map((s, i) => {
-      const text = s.text.length > 250 ? `${s.text.slice(0, 250)}…` : s.text
+      const text = s.text.length > 300 ? `${s.text.slice(0, 300)}…` : s.text
       return `[${i + 1}] ${s.title}\n${text}`
     })
     .join('\n\n')

@@ -74,12 +74,10 @@ class LlamaGenerator {
       // small too.
       this.ctx = await initLlama({
         model: path.replace(/^file:\/\//, ''),
-        // Limit test for 1.7B: minimize the context so the load allocation is
-        // as small as possible — tells us whether the 1.7B failure is the
-        // context buffer (this helps) or the raw model weights (it won't).
-        n_ctx: 512,
-        n_batch: 32,
-        n_ubatch: 32,
+        // The 0.6B trimmed Khmer model loads comfortably with a real window.
+        n_ctx: 2048,
+        n_batch: 64,
+        n_ubatch: 64,
         n_gpu_layers: 0,
       })
     } catch (e) {

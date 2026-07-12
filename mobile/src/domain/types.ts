@@ -40,13 +40,14 @@ export const EMBEDDING_DIMS = 256
 // (alphaedge-ai/Qwen3-0.6B-khm-32768, converted to GGUF). The small vocab means
 // a tiny logits buffer (loads + runs fast on the S10), it's Khmer-trained, and
 // Qwen3 avoids the llama.rn Gemma-3 load bug.
-// Limit test: base Qwen3-1.7B (official GGUF, full 151k vocab) to find the
-// S10's ceiling — ~3x params + bigger logits buffer than the trimmed 0.6B.
-export const GEN_MODEL_REPO = 'unsloth/Qwen3-1.7B-GGUF'
+// The S10's working model — its tested ceiling is ~0.6B (1.7B weights won't
+// load). Qwen3 0.6B trimmed to a 32k Khmer vocab (alphaedge-ai, converted to
+// GGUF). Loads + runs at ~26 tok/s; quality improves by fine-tuning THIS on
+// the Khmer dataset (see docs), not by going bigger.
+export const GEN_MODEL_REPO = 'sengtha/Qwen3-0.6B-khm-32768-Q8_0-GGUF'
 export const GEN_MODEL_FILES = [
-  'Qwen3-1.7B-Q4_K_M.gguf',
-  'Qwen3-1.7B-Q4_0.gguf',
-  'Qwen3-1.7B-Q8_0.gguf',
+  'Qwen3-0.6B-khm-32768-Q8_0.gguf',
+  'Qwen3-0.6B-khm-32768-q8_0.gguf',
 ]
 
 /** iAny model mirror (Cloudflare worker pull-through cache). */
