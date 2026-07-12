@@ -43,6 +43,7 @@ export default function App() {
   const [emb, setEmb] = useState<EmbedderProgress>({ status: embedder.status })
   const [gen, setGen] = useState<GenProgress>({ status: generator.status })
   const [answer, setAnswer] = useState('')
+  const [speed, setSpeed] = useState<string | null>(null)
 
   useEffect(() => {
     void (async () => {
@@ -88,8 +89,23 @@ export default function App() {
     if (!query.trim() || !generator.ready) return
     setBusy(true)
     setAnswer('')
+    setSpeed(null)
+    const t0 = Date.now()
+    let firstAt = 0
+    let tokens = 0
     try {
-      const res = await ask(query, activeEmbedder(), (t) => setAnswer((prev) => prev + t))
+      const res = await ask(query, activeEmbedder(), (t) => {
+        if (!firstAt) firstAt = Date.now()
+        tokens++
+        setAnswer((prev) => prev + t)
+      })
+      const end = Date.now()
+      if (tokens > 0 && firstAt > 0) {
+        const genSec = Math.max((end - firstAt) / 1000, 0.001)
+        const tps = (tokens / genSec).toFixed(1)
+        const ttft = ((firstAt - t0) / 1000).toFixed(1)
+        setSpeed(`⚡ ${tokens} tokens · ${tps} tok/s · first token ${ttft}s`)
+      }
       setResults(res.sources)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -254,6 +270,7 @@ export default function App() {
               <Text style={styles.answerText}>
                 {answer || '…'}
               </Text>
+              {speed && <Text style={styles.speed}>{speed}</Text>}
             </View>
           )}
 
@@ -357,6 +374,7 @@ const styles = StyleSheet.create({
   },
   answerLabel: { fontWeight: '700', marginBottom: 6, color: '#15803d' },
   answerText: { color: '#14532d', fontSize: 15, lineHeight: 22 },
+  speed: { color: '#166534', fontSize: 12, marginTop: 10, fontWeight: '600' },
   btnOutline: {
     borderWidth: 1,
     borderColor: '#2563eb',
