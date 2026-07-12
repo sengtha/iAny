@@ -74,9 +74,12 @@ class LlamaGenerator {
       // small too.
       this.ctx = await initLlama({
         model: path.replace(/^file:\/\//, ''),
-        n_ctx: 256,
-        n_batch: 8,
-        n_ubatch: 8,
+        // Qwen loads fine on the S10, so give it a real context window — a
+        // Khmer RAG prompt easily exceeds a few hundred tokens, and overflowing
+        // n_ctx crashes generation.
+        n_ctx: 2048,
+        n_batch: 64,
+        n_ubatch: 64,
         n_gpu_layers: 0,
       })
     } catch (e) {
@@ -101,20 +104,24 @@ class LlamaGenerator {
   ): Promise<string> {
     if (!this.ctx) throw new Error('generator not ready')
     const base = typeof input === 'string' ? { prompt: input } : { messages: input }
-    const result = await this.ctx.completion(
-      {
-        ...base,
-        n_predict: maxTokens,
-        temperature: 0.3,
-        // Small models loop under pure greedy; a light penalty helps.
-        penalty_repeat: 1.2,
-        stop: ['<end_of_turn>', '<eos>'],
-      },
-      (data: { token?: string }) => {
-        if (data.token) onToken(data.token)
-      },
-    )
-    return (result as { text?: string }).text ?? ''
+    try {
+      const result = await this.ctx.completion(
+        {
+          ...base,
+          n_predict: maxTokens,
+          temperature: 0.3,
+          // Small models loop under pure greedy; a light penalty helps.
+          penalty_repeat: 1.2,
+          stop: ['<end_of_turn>', '<eos>', '<|im_end|>'],
+        },
+        (data: { token?: string }) => {
+          if (data.token) onToken(data.token)
+        },
+      )
+      return (result as { text?: string }).text ?? ''
+    } catch (e) {
+      throw new Error(`generation failed (${errStr(e)})`)
+    }
   }
 
   async release(): Promise<void> {

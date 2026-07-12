@@ -108,7 +108,8 @@ export default function App() {
       }
       setResults(res.sources)
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      // Show generation errors inline — don't nuke the whole app.
+      setAnswer(`⚠️ ${e instanceof Error ? e.message : String(e)}`)
     } finally {
       setBusy(false)
     }
