@@ -115,9 +115,9 @@ model = get_peft_model(model, peft_cfg)
 # ---------- Stage A: continued pre-training on raw Khmer ----------
 # Source 1: FineWeb-2 Khmer (parquet, ungated) — big + cleaner than Wikipedia.
 # (CC-100 no longer loads: newest `datasets` dropped script-based datasets.)
-# CAP small: max_steps=5000 only consumes ~82M tokens, and 100k FineWeb docs
-# already ~= that. Loading millions of blocks OOM-kills the 13GB kernel during
-# packing — the trainer just cycles the smaller set to reach max_steps.
+# CAP small: CPT only consumes ~20M tokens (see max_steps below), and 100k
+# FineWeb docs already exceed that. Loading millions of blocks OOM-kills the
+# 13GB kernel during packing — the trainer just cycles the smaller set.
 texts, CAP = [], 100_000
 try:
     fw = load_dataset("HuggingFaceFW/fineweb-2", "khm_Khmr",
@@ -158,8 +158,8 @@ for f in inputs:
     except Exception as e:
         print(f"  {f}: skipped ({e})")
 # Hard cap total blocks -> bounds packing memory so the kernel doesn't OOM-die.
-# ~300k blocks (100k FineWeb + ~200k ParaCrawl) ~= 80M tokens = what 5000 steps
-# needs; the trainer cycles it. Raise only if you confirm RAM headroom.
+# ~300k blocks (100k FineWeb + ~200k ParaCrawl) is ample for the ~20M tokens CPT
+# consumes; the trainer cycles it. Raise only if you confirm RAM headroom.
 texts = texts[:300_000]
 print(f"CPT blocks total (capped): {len(texts)}")
 
