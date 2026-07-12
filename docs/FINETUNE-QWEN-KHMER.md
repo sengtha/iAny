@@ -50,7 +50,8 @@ You've uploaded ParaCrawl DEDUP — here's the exact order:
    `ALL input files: [...paracrawl...]`, a `+N Khmer lines` line for it, and a
    big `CPT blocks total:` (well over 1,000,000). If it's only ~300k, the
    ParaCrawl file wasn't picked up — paste me the `ALL input files:` line.
-7. Close the tab. Check back in **~3–5 hours** (FineWeb-2 + 1.5M ParaCrawl).
+7. Close the tab. Check back in **~5 hours** (CPT is capped at `max_steps=5000`
+   so it always finishes and uploads inside Kaggle's 12h limit).
    When done it prints `DONE -> sengtha/Qwen3-0.6B-khm-ft-Q8_0-GGUF`.
 8. Send me **"done"** → I wire it into iAny → you rebuild the APK on your phone.
 
@@ -154,7 +155,11 @@ print(f"CPT blocks total: {len(texts)}")
 # Optional: cap total to keep CPT within a few hours -> texts = texts[:800_000]
 
 cpt_ds = Dataset.from_dict({"text": texts})
-cpt_args = SFTConfig(output_dir="cpt", num_train_epochs=1,
+# max_steps caps CPT so it ALWAYS finishes + uploads inside Kaggle's 12h limit
+# (the run only saves at the very end, so a timeout would lose everything).
+# 5000 steps x 16 x 1024 ~= 80M tokens -> plenty for a 0.6B to learn Khmer,
+# ~5h on T4. Raise it if you have headroom; lower to 3000 for a ~3h run.
+cpt_args = SFTConfig(output_dir="cpt", max_steps=5000,
     per_device_train_batch_size=2, gradient_accumulation_steps=8,
     learning_rate=2e-4, fp16=True, gradient_checkpointing=True,
     max_length=1024, packing=True, logging_steps=20, save_strategy="no", report_to="none")
