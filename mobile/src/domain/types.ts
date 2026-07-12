@@ -36,11 +36,13 @@ export const EMBEDDING_DIMS = 256
  * (which can't write Khmer at all), this is trained for Khmer. Capable phones
  * use a bigger model for better quality — quality scales with the device.
  */
-export const GEN_MODEL_REPO = 'sengtha/iany-khmer-tiny-v1-Q8_0-GGUF'
+// Diagnostic: base Gemma 3 270M (clean, untouched GGUF) to isolate whether the
+// S10 can run generation at all vs the converted Khmer GGUF being malformed.
+export const GEN_MODEL_REPO = 'bartowski/google_gemma-3-270m-it-GGUF'
 export const GEN_MODEL_FILES = [
-  'iany-khmer-tiny-v1-Q8_0.gguf',
-  'iany-khmer-tiny-v1-q8_0.gguf',
-  'iany-khmer-tiny-v1.Q8_0.gguf',
+  'google_gemma-3-270m-it-Q8_0.gguf',
+  'google_gemma-3-270m-it-Q4_K_M.gguf',
+  'google_gemma-3-270m-it-Q4_0.gguf',
 ]
 
 /** iAny model mirror (Cloudflare worker pull-through cache). */
