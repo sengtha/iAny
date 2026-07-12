@@ -36,6 +36,28 @@ can't answer them), so the HF token comes from **Kaggle Secrets**.
 5. Paste the cell below, then **Save Version → "Save & Run All (Commit)"**. It
    runs in the background; check back in an hour or two.
 
+## Run it now (checklist)
+
+You've uploaded ParaCrawl DEDUP — here's the exact order:
+
+1. **Paste the full cell** (below) into the notebook, replacing any old version.
+   The current cell reads CC-100 **and** your attached ParaCrawl file.
+2. **Settings (right panel):** Accelerator = **GPU T4 ×2**, **Internet = On**.
+3. **Add-ons → Secrets:** `HF_TOKEN` = your HF **Write** token (checkbox ON).
+4. Confirm your ParaCrawl dataset shows under **Input** (right panel).
+5. **Save Version → "Save & Run All (Commit)"** → it runs in the background.
+6. **Sanity-check the first minute of logs:** you want to see
+   `attached files: [...paracrawl...]` and a big `CPT blocks total:` (well over
+   1,000,000). If `CPT blocks total` is only ~300k, the ParaCrawl file wasn't
+   found — check the Input panel and the file extension.
+7. Close the tab. Check back in **~3–5 hours** (CC-100 + 1.5M ParaCrawl lines).
+   When done it prints `DONE -> sengtha/Qwen3-0.6B-khm-ft-Q8_0-GGUF`.
+8. Send me **"done"** → I wire it into iAny → you rebuild the APK on your phone.
+
+If step 6 shows the total is huge and CPT is crawling, it's fine to
+**Cancel**, add `texts = texts[:800_000]` after the print, and re-run — that
+caps it to a ~2–3h job without losing much quality.
+
 ## What the notebook trains on
 
 - **CPT corpus (Stage A):** **CC-100 Khmer** (deduplicated CommonCrawl —
@@ -62,7 +84,7 @@ import subprocess, sys
 subprocess.run([sys.executable,"-m","pip","install","-q",
                 "transformers>=4.51","trl>=0.12","peft","datasets","accelerate"])
 
-import json, glob, re, torch, pathlib
+import json, glob, re, gzip, torch, pathlib
 from datasets import Dataset, load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import LoraConfig, get_peft_model
@@ -99,16 +121,25 @@ except Exception as e:
     wiki = load_dataset("wikimedia/wikipedia", "20231101.km", split="train")
     texts += [t for t in wiki["text"] if t and t.strip()]
 
-# Source 2: anything you attached. Reads .txt / .tsv, splits each line on tabs,
-# keeps whichever column is Khmer — so ParaCrawl EN<TAB>KM bitext AND plain
-# Khmer .txt both work with one loop.
+# Source 2: anything you attached. Reads .txt / .tsv / .gz, splits each line on
+# tabs, keeps whichever column is Khmer — so ParaCrawl EN<TAB>KM bitext AND
+# plain Khmer .txt both work with one loop.
 KH = re.compile(r'[ក-៿]')          # Khmer Unicode block
-for f in glob.glob("/kaggle/input/**/*.txt", recursive=True) + \
-         glob.glob("/kaggle/input/**/*.tsv", recursive=True):
-    for line in pathlib.Path(f).read_text().splitlines():
+def read_lines(p):
+    p = pathlib.Path(p)
+    op = gzip.open if p.suffix == ".gz" else open
+    with op(p, "rt", encoding="utf-8", errors="ignore") as fh:
+        return fh.read().splitlines()
+attached = (glob.glob("/kaggle/input/**/*.txt", recursive=True) +
+            glob.glob("/kaggle/input/**/*.tsv", recursive=True) +
+            glob.glob("/kaggle/input/**/*.gz",  recursive=True))
+for f in attached:
+    for line in read_lines(f):
         km = next((p.strip() for p in line.split("\t") if KH.search(p)), None)
         if km: texts.append(km)
+print(f"attached files: {attached}")
 print(f"CPT blocks total: {len(texts)}")
+# Optional: cap total to keep CPT within a few hours -> texts = texts[:800_000]
 
 cpt_ds = Dataset.from_dict({"text": texts})
 cpt_args = SFTConfig(output_dir="cpt", num_train_epochs=1,
