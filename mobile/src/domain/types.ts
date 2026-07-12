@@ -42,11 +42,11 @@ export const EMBEDDING_DIMS = 256
 // Qwen3 avoids the llama.rn Gemma-3 load bug.
 // Limit test: base Qwen3-1.7B (official GGUF, full 151k vocab) to find the
 // S10's ceiling — ~3x params + bigger logits buffer than the trimmed 0.6B.
-export const GEN_MODEL_REPO = 'Qwen/Qwen3-1.7B-GGUF'
+export const GEN_MODEL_REPO = 'unsloth/Qwen3-1.7B-GGUF'
 export const GEN_MODEL_FILES = [
   'Qwen3-1.7B-Q4_K_M.gguf',
-  'Qwen3-1.7B-q4_k_m.gguf',
   'Qwen3-1.7B-Q4_0.gguf',
+  'Qwen3-1.7B-Q8_0.gguf',
 ]
 
 /** iAny model mirror (Cloudflare worker pull-through cache). */
