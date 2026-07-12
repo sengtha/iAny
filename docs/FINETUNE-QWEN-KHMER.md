@@ -47,9 +47,10 @@ You've uploaded ParaCrawl DEDUP — here's the exact order:
 4. Confirm your ParaCrawl dataset shows under **Input** (right panel).
 5. **Save Version → "Save & Run All (Commit)"** → it runs in the background.
 6. **Sanity-check the first minute of logs:** you want to see
-   `ALL input files: [...paracrawl...]`, a `+N Khmer lines` line for it, and a
-   big `CPT blocks total:` (well over 1,000,000). If it's only ~300k, the
-   ParaCrawl file wasn't picked up — paste me the `ALL input files:` line.
+   `ALL input files: [...paracrawl...]`, a `+N Khmer lines` line for it, and
+   `CPT blocks total (capped): 300000`. (The corpus is intentionally capped at
+   300k blocks — that's what 5000 steps needs; loading millions OOM-kills the
+   kernel.) If ParaCrawl isn't listed, paste me the `ALL input files:` line.
 7. Close the tab. Check back in **~5 hours** (CPT is capped at `max_steps=5000`
    so it always finishes and uploads inside Kaggle's 12h limit).
    When done it prints `DONE -> sengtha/Qwen3-0.6B-khm-ft-Q8_0-GGUF`.
@@ -62,10 +63,11 @@ caps it to a ~2–3h job without losing much quality.
 ## What the notebook trains on
 
 - **CPT corpus (Stage A):** **FineWeb-2 Khmer** (`HuggingFaceFW/fineweb-2`,
-  config `khm_Khmr` — parquet, ungated, streamed + capped at 300k docs) —
-  **plus** any Khmer text you attach (ParaCrawl, your own text). More raw Khmer
-  = smarter. If FineWeb-2 fails to load, it auto-falls back to Khmer Wikipedia so
-  the run never dies here. (CC-100 no longer loads — newest `datasets` dropped
+  config `khm_Khmr` — parquet, ungated) plus any Khmer text you attach
+  (ParaCrawl, your own). **Total blocks are hard-capped at 300k (~80M tokens)** —
+  that's exactly what `max_steps=5000` consumes, and loading more OOM-kills
+  Kaggle's 13GB kernel during packing. If FineWeb-2 fails to load, it auto-falls
+  back to Khmer Wikipedia. (CC-100 no longer loads — newest `datasets` dropped
   script-based datasets.)
 - **SFT rows (Stage B):** your `{context, question, answer}` JSON. A few hundred
   good rows is plenty. If you attach none, Stage B is skipped and you still get
@@ -112,8 +114,10 @@ model = get_peft_model(model, peft_cfg)
 # ---------- Stage A: continued pre-training on raw Khmer ----------
 # Source 1: FineWeb-2 Khmer (parquet, ungated) — big + cleaner than Wikipedia.
 # (CC-100 no longer loads: newest `datasets` dropped script-based datasets.)
-# Streamed + capped.
-texts, CAP = [], 300_000
+# CAP small: max_steps=5000 only consumes ~82M tokens, and 100k FineWeb docs
+# already ~= that. Loading millions of blocks OOM-kills the 13GB kernel during
+# packing — the trainer just cycles the smaller set to reach max_steps.
+texts, CAP = [], 100_000
 try:
     fw = load_dataset("HuggingFaceFW/fineweb-2", "khm_Khmr",
                       split="train", streaming=True)
@@ -149,10 +153,14 @@ for f in inputs:
             km = next((p.strip() for p in line.split("\t") if KH.search(p)), None)
             if km: texts.append(km)
         print(f"  {f}: +{len(texts)-n0} Khmer lines")
+        if len(texts) >= 300_000: break   # enough attached data; stop reading
     except Exception as e:
         print(f"  {f}: skipped ({e})")
-print(f"CPT blocks total: {len(texts)}")
-# Optional: cap total to keep CPT within a few hours -> texts = texts[:800_000]
+# Hard cap total blocks -> bounds packing memory so the kernel doesn't OOM-die.
+# ~300k blocks (100k FineWeb + ~200k ParaCrawl) ~= 80M tokens = what 5000 steps
+# needs; the trainer cycles it. Raise only if you confirm RAM headroom.
+texts = texts[:300_000]
+print(f"CPT blocks total (capped): {len(texts)}")
 
 cpt_ds = Dataset.from_dict({"text": texts})
 # max_steps caps CPT so it ALWAYS finishes + uploads inside Kaggle's 12h limit
