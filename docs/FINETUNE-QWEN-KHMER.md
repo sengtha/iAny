@@ -51,8 +51,9 @@ You've uploaded ParaCrawl DEDUP — here's the exact order:
    `CPT blocks total (capped): 300000`. (The corpus is intentionally capped at
    300k blocks — that's what 5000 steps needs; loading millions OOM-kills the
    kernel.) If ParaCrawl isn't listed, paste me the `ALL input files:` line.
-7. Close the tab. Check back in **~5 hours** (CPT is capped at `max_steps=5000`
-   so it always finishes and uploads inside Kaggle's 12h limit).
+7. Close the tab. Check back in **~2 hours** (CPT is capped at `max_steps=2500`,
+   `len=512`, `batch=8` so it finishes fast and uploads well inside the 12h
+   limit). Watch the log for `{'loss': ...}` lines — that's live progress.
    When done it prints `DONE -> sengtha/Qwen3-0.6B-khm-ft-Q8_0-GGUF`.
 8. Send me **"done"** → I wire it into iAny → you rebuild the APK on your phone.
 
@@ -163,14 +164,15 @@ texts = texts[:300_000]
 print(f"CPT blocks total (capped): {len(texts)}")
 
 cpt_ds = Dataset.from_dict({"text": texts})
-# max_steps caps CPT so it ALWAYS finishes + uploads inside Kaggle's 12h limit
-# (the run only saves at the very end, so a timeout would lose everything).
-# 5000 steps x 16 x 1024 ~= 80M tokens -> plenty for a 0.6B to learn Khmer,
-# ~5h on T4. Raise it if you have headroom; lower to 3000 for a ~3h run.
-cpt_args = SFTConfig(output_dir="cpt", max_steps=5000,
-    per_device_train_batch_size=2, gradient_accumulation_steps=8,
+# Tuned to FINISH on a T4 (batch=2 / len=1024 was ~7h+ and blew the 12h cap):
+#  - max_length 512 -> half the compute per token, Khmer CPT doesn't need 1024
+#  - batch 8 -> actually uses the GPU (LoRA on a frozen 0.6B fits easily)
+#  - max_steps 2500 x (8*2*512)=8192 tok ~= 20M tokens -> solid first CPT, ~1.5h
+# logging_steps=20 prints loss so you can watch progress. Raise max_steps later.
+cpt_args = SFTConfig(output_dir="cpt", max_steps=2500,
+    per_device_train_batch_size=8, gradient_accumulation_steps=2,
     learning_rate=2e-4, fp16=True, gradient_checkpointing=True,
-    max_length=1024, packing=True, logging_steps=20, save_strategy="no", report_to="none")
+    max_length=512, packing=True, logging_steps=20, save_strategy="no", report_to="none")
 SFTTrainer(model=model, args=cpt_args, train_dataset=cpt_ds,
            processing_class=tok).train()
 
