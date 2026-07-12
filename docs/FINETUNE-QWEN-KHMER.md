@@ -1,34 +1,45 @@
-# Fine-tune Qwen3-0.6B for smarter Khmer (S10 model) — Kaggle batch
+# Fine-tune Qwen3-0.6B to be *smart* in Khmer (S10 model) — Kaggle batch
 
-The S10's ceiling is ~0.6B, so we make the 0.6B *better* by fine-tuning it on
-your Khmer dataset. Start from the already-trimmed Khmer Qwen3
-(`alphaedge-ai/Qwen3-0.6B-khm-32768`): it keeps the 32k vocab that fits the S10
-and is Khmer-adapted, so you only need **SFT** (no full continued-pretrain like
-the Gemma run).
+The S10's ceiling is ~0.6B, so we make the 0.6B *better* by training it on Khmer.
+Start from the already-trimmed Khmer Qwen3 (`alphaedge-ai/Qwen3-0.6B-khm-32768`):
+it keeps the 32k vocab that fits the S10 and is already Khmer-adapted, so we're
+*strengthening* it, not starting cold.
 
-This runs as a **Kaggle batch job** (Save & Run All → background, up to 12h) —
-one notebook does everything: train → merge → convert to GGUF → upload. No
-interactive prompts (batch can't answer them), so the HF token comes from
-**Kaggle Secrets**.
+**Two stages, because "smart in Khmer" needs both:**
+
+- **Stage A — Continued pre-training (CPT):** feed it *raw* Khmer text (plain
+  paragraphs, no Q/A). This is where the model actually **learns Khmer** —
+  vocabulary, grammar, facts. This was missing from the SFT-only version, and
+  it's the stage that makes it *smart* rather than just polite.
+- **Stage B — SFT:** your `{context, question, answer}` rows, so it learns to
+  *use* that Khmer knowledge in iAny's exact answer format.
+
+SFT alone = shallow. CPT + SFT = actually knows things in Khmer.
+
+This runs as **one Kaggle batch job** (Save & Run All → background, up to 12h):
+CPT → SFT → merge → convert to GGUF → upload. No interactive prompts (batch
+can't answer them), so the HF token comes from **Kaggle Secrets**.
 
 ## Setup (once, before running)
 
-1. New Kaggle notebook. **Add Data →** attach your Khmer dataset.
+1. New Kaggle notebook.
 2. **Settings:** Accelerator = **GPU T4 ×2** is fine (we pin to one GPU),
-   **Internet = On** (needed to pull the base model + push to HF).
-3. **Add-ons → Secrets →** add a secret named **`HF_TOKEN`** = your HF **Write**
-   token.
-4. Paste the cell below, fix the dataset path, then **Save Version → "Save & Run
-   All (Commit)"**. It runs in the background; check back in an hour or two.
+   **Internet = On** (pulls base model + Khmer Wikipedia, pushes to HF).
+3. **Add-ons → Secrets →** add secret **`HF_TOKEN`** = your HF **Write** token.
+4. *(Optional but recommended)* **Add Data →** attach your own Khmer text
+   (`.txt`) and/or your `{context, question, answer}` dataset (`.json`). The
+   notebook auto-detects them under `/kaggle/input/`.
+5. Paste the cell below, then **Save Version → "Save & Run All (Commit)"**. It
+   runs in the background; check back in an hour or two.
 
-## Your data
+## What the notebook trains on
 
-A list of Khmer **context / question / answer** rows (reuse your Gemma SFT
-data, reshaped):
-
-```json
-{"context": "…ខ្មែរ…", "question": "…?", "answer": "…ខ្មែរ…"}
-```
+- **CPT corpus (Stage A):** Khmer Wikipedia (auto-downloaded, ~10k+ articles) —
+  **plus** any `.txt` files you attach. More raw Khmer = smarter. 10MB helps;
+  100MB+ is real fluency.
+- **SFT rows (Stage B):** your `{context, question, answer}` JSON. A few hundred
+  good rows is plenty. If you attach none, Stage B is skipped and you still get
+  the CPT-improved model.
 
 ## The notebook (one batch cell)
 
@@ -42,10 +53,10 @@ import subprocess, sys
 subprocess.run([sys.executable,"-m","pip","install","-q",
                 "transformers>=4.51","trl>=0.12","peft","datasets","accelerate"])
 
-import json, torch, pathlib
-from datasets import Dataset
+import json, glob, torch, pathlib
+from datasets import Dataset, load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from peft import LoraConfig
+from peft import LoraConfig, get_peft_model
 from trl import SFTTrainer, SFTConfig
 from huggingface_hub import login, HfApi
 login(HF_TOKEN)
@@ -54,32 +65,60 @@ BASE = "alphaedge-ai/Qwen3-0.6B-khm-32768"
 OUT_REPO = "sengtha/Qwen3-0.6B-khm-ft-Q8_0-GGUF"
 
 tok = AutoTokenizer.from_pretrained(BASE)
+if tok.pad_token is None: tok.pad_token = tok.eos_token
 model = AutoModelForCausalLM.from_pretrained(BASE, torch_dtype=torch.float16, device_map={"": 0})
 
-# --- your data -> iAny's exact inference prompt (adapt the path) ---
-raw = json.load(open("/kaggle/input/YOUR-DATASET/data.json"))
-def to_chat(ex):
-    user = ("Answer the question using only the context below, from the user's notes.\n"
-            "Be brief. Answer in Khmer (ភាសាខ្មែរ).\n\n"
-            f"Context:\n{ex['context']}\n\nQuestion: {ex['question']}\n/no_think")
-    return {"messages": [{"role": "user", "content": user},
-                         {"role": "assistant", "content": ex["answer"]}]}
-ds = Dataset.from_list([to_chat(e) for e in raw])
-
-# --- LoRA SFT (fp16 for T4) ---
+# One LoRA adapter, trained through BOTH stages (kept resident between them).
 peft_cfg = LoraConfig(r=16, lora_alpha=32, lora_dropout=0.05, task_type="CAUSAL_LM",
     target_modules=["q_proj","k_proj","v_proj","o_proj","gate_proj","up_proj","down_proj"])
-args = SFTConfig(output_dir="out", num_train_epochs=3,
+model = get_peft_model(model, peft_cfg)
+
+# ---------- Stage A: continued pre-training on raw Khmer ----------
+# Khmer Wikipedia (auto) + any .txt you attached under /kaggle/input/.
+texts = []
+try:
+    wiki = load_dataset("wikimedia/wikipedia", "20231101.km", split="train")
+    texts += [t for t in wiki["text"] if t and t.strip()]
+    print(f"Khmer Wikipedia: {len(texts)} articles")
+except Exception as e:
+    print("wiki skipped:", e)
+for f in glob.glob("/kaggle/input/**/*.txt", recursive=True):
+    texts += [b for b in pathlib.Path(f).read_text().split("\n\n") if b.strip()]
+print(f"CPT blocks total: {len(texts)}")
+
+cpt_ds = Dataset.from_dict({"text": texts})
+cpt_args = SFTConfig(output_dir="cpt", num_train_epochs=1,
     per_device_train_batch_size=2, gradient_accumulation_steps=8,
     learning_rate=2e-4, fp16=True, gradient_checkpointing=True,
-    max_length=1024, logging_steps=10, save_strategy="no", report_to="none")
-SFTTrainer(model=model, args=args, train_dataset=ds,
-           peft_config=peft_cfg, processing_class=tok).train()
+    max_length=1024, packing=True, logging_steps=20, save_strategy="no", report_to="none")
+SFTTrainer(model=model, args=cpt_args, train_dataset=cpt_ds,
+           processing_class=tok).train()
+
+# ---------- Stage B: SFT on your Q&A (iAny's exact prompt) ----------
+qa_files = glob.glob("/kaggle/input/**/*.json", recursive=True)
+if qa_files:
+    raw = json.load(open(qa_files[0]))
+    def to_chat(ex):
+        user = ("Answer the question using only the context below, from the user's notes.\n"
+                "Be brief. Answer in Khmer (ភាសាខ្មែរ).\n\n"
+                f"Context:\n{ex['context']}\n\nQuestion: {ex['question']}\n/no_think")
+        return {"messages": [{"role": "user", "content": user},
+                             {"role": "assistant", "content": ex["answer"]}]}
+    sft_ds = Dataset.from_list([to_chat(e) for e in raw])
+    sft_args = SFTConfig(output_dir="sft", num_train_epochs=3,
+        per_device_train_batch_size=2, gradient_accumulation_steps=8,
+        learning_rate=2e-4, fp16=True, gradient_checkpointing=True,
+        max_length=1024, logging_steps=10, save_strategy="no", report_to="none")
+    SFTTrainer(model=model, args=sft_args, train_dataset=sft_ds,
+               processing_class=tok).train()
+    print(f"SFT on {len(sft_ds)} rows")
+else:
+    print("no Q&A json attached -> skipping SFT (CPT-only model)")
 
 merged = model.merge_and_unload()
 merged.save_pretrained("khm-ft"); tok.save_pretrained("khm-ft")
 
-# --- convert to GGUF (force the qwen2 pre-tokenizer for the trimmed tokenizer) ---
+# ---------- convert to GGUF (force qwen2 pre-tokenizer for the trimmed vocab) ----------
 subprocess.run(["git","clone","--depth","1","https://github.com/ggml-org/llama.cpp"])
 subprocess.run([sys.executable,"-m","pip","install","-q","-r","llama.cpp/requirements.txt"])
 needle = 'raise NotImplementedError("BPE pre-tokenizer was not recognized - update get_vocab_base_pre()")'
@@ -92,7 +131,7 @@ subprocess.run("cd llama.cpp && cmake -B build -DLLAMA_CURL=OFF && "
                "cmake --build build --config Release -j --target llama-quantize", shell=True)
 subprocess.run(["./llama.cpp/build/bin/llama-quantize","khm-ft-f16.gguf","model.gguf","Q8_0"])
 
-# --- upload the GGUF (token from secrets, no prompt) ---
+# ---------- upload the GGUF (token from secrets, no prompt) ----------
 api = HfApi(token=HF_TOKEN)
 api.create_repo(OUT_REPO, exist_ok=True)
 api.upload_file(path_or_fileobj="model.gguf",
@@ -104,14 +143,27 @@ print("DONE ->", OUT_REPO)
 
 The batch run uploads `sengtha/Qwen3-0.6B-khm-ft-Q8_0-GGUF` at the end (it
 survives the session wipe because it's on HF). Send me that repo name → I point
-iAny at it → rebuild → your fine-tuned Khmer model on the S10.
+iAny at it → rebuild → your smarter Khmer model on the S10.
+
+## How to make it smarter (the levers, in order)
+
+1. **More raw Khmer for CPT.** #1 factor. Wikipedia is the free baseline; attach
+   your own `.txt` corpus (books, articles, your Gemma data as plain text) to go
+   further. 100MB+ is where real fluency shows up.
+2. **More epochs on a big corpus** beats many epochs on a tiny one. If CPT data
+   is large, 1 epoch is fine; if small, bump to 2–3.
+3. **More/better Q&A rows** for SFT — improves *answer style*, not knowledge.
 
 ## Notes / lessons baked in
 
-- **T4 has no bf16** → fp16 (as in your Gemma run).
+- **CPT before SFT** — teaches Khmer knowledge first, answer format second.
+- **One LoRA through both stages** — `get_peft_model` once, kept resident, so
+  Stage B builds on Stage A instead of resetting.
+- **`packing=True` for CPT** — packs raw text into full 1024-token windows
+  (efficient for plain-text pretraining).
+- **T4 has no bf16** → fp16.
 - **CUDA_VISIBLE_DEVICES=0** → avoids the T4×2 device-split crash.
 - **Token via Kaggle Secrets** → batch can't answer a getpass prompt.
-- **Upload to HF at the end** → outputs persist past the batch session.
-- **Data is the lever.** A few hundred good Khmer (context, question, answer)
-  rows already beat the base model; a few thousand is great. Same dataset later
-  feeds bigger fine-tunes for the Pi/PWA tiers.
+- **Auto-detects your attached data** — `.txt` → CPT corpus, `.json` → SFT rows.
+  Attach nothing and it still trains on Khmer Wikipedia. Same dataset later feeds
+  bigger fine-tunes for the Pi/PWA tiers.
