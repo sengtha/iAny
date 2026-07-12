@@ -39,6 +39,9 @@ const ALLOWED_PREFIXES = [
   // iAny's own Khmer fine-tune (Gemma 3 270M), converted to GGUF — the real
   // S10 generation model.
   'sengtha/iany-khmer-tiny-v1-Q8_0-GGUF/',
+  // Small-vocab diagnostic (SmolLM2, ~49k vocab vs Gemma's 262k) to test
+  // whether Gemma's vocabulary is what blocks generation on the S10.
+  'bartowski/SmolLM2-135M-Instruct-GGUF/',
 ]
 // OCR language data, served through the same mirror. Khmer uses the
 // high-accuracy models; English's fast model is accurate enough.
