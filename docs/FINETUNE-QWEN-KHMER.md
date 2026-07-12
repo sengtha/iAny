@@ -83,6 +83,9 @@ HF_TOKEN = UserSecretsClient().get_secret("HF_TOKEN")
 import subprocess, sys
 subprocess.run([sys.executable,"-m","pip","install","-q",
                 "transformers>=4.51","trl>=0.12","peft","datasets","accelerate"])
+# Kaggle ships torchao 0.10, which the latest peft rejects (wants >=0.16). We
+# don't use torchao for fp16 LoRA, so remove it -> peft skips the torchao path.
+subprocess.run([sys.executable,"-m","pip","uninstall","-y","torchao"])
 
 import json, glob, re, gzip, torch, pathlib
 from datasets import Dataset, load_dataset
