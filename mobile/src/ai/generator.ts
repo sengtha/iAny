@@ -65,15 +65,18 @@ class LlamaGenerator {
     const info = await FileSystem.getInfoAsync(path)
     const sizeMb = info.exists && info.size ? (info.size / 1e6).toFixed(0) : '?'
     try {
-      // Weak devices are memory-bound. Keep every buffer small: n_ctx 1024 for
-      // a small KV cache, and n_batch/n_ubatch 128 so the compute buffer (which
-      // scales with batch size) stays tiny — that buffer, not the mmap'd
-      // weights, is what tends to blow the allocation on a 2019 phone.
+      // Gemma's 262k-token vocabulary makes the generation logits/compute
+      // buffer the real memory killer on weak devices — it scales with the
+      // physical batch (n_ubatch): 128 x 262144 x 4B ~= 134 MB just for logits,
+      // which the S10 can't allocate (embedding never builds this buffer, which
+      // is why it loads and generation doesn't). Tiny n_ubatch shrinks it ~16x
+      // (~8 MB). Prefill is slower, but it fits. n_ctx 1024 keeps the KV cache
+      // small too.
       this.ctx = await initLlama({
         model: path.replace(/^file:\/\//, ''),
         n_ctx: 1024,
-        n_batch: 128,
-        n_ubatch: 128,
+        n_batch: 32,
+        n_ubatch: 8,
         n_gpu_layers: 0,
       })
     } catch (e) {
