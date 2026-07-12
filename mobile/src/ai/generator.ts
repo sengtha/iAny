@@ -74,12 +74,12 @@ class LlamaGenerator {
       // small too.
       this.ctx = await initLlama({
         model: path.replace(/^file:\/\//, ''),
-        // Qwen loads fine on the S10, so give it a real context window — a
-        // Khmer RAG prompt easily exceeds a few hundred tokens, and overflowing
-        // n_ctx crashes generation.
-        n_ctx: 2048,
-        n_batch: 64,
-        n_ubatch: 64,
+        // Limit test for 1.7B: minimize the context so the load allocation is
+        // as small as possible — tells us whether the 1.7B failure is the
+        // context buffer (this helps) or the raw model weights (it won't).
+        n_ctx: 512,
+        n_batch: 32,
+        n_ubatch: 32,
         n_gpu_layers: 0,
       })
     } catch (e) {
