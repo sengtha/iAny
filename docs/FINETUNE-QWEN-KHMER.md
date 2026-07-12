@@ -26,20 +26,29 @@ can't answer them), so the HF token comes from **Kaggle Secrets**.
 2. **Settings:** Accelerator = **GPU T4 ×2** is fine (we pin to one GPU),
    **Internet = On** (pulls base model + Khmer Wikipedia, pushes to HF).
 3. **Add-ons → Secrets →** add secret **`HF_TOKEN`** = your HF **Write** token.
-4. *(Optional but recommended)* **Add Data →** attach your own Khmer text
-   (`.txt`) and/or your `{context, question, answer}` dataset (`.json`). The
-   notebook auto-detects them under `/kaggle/input/`.
+4. *(Recommended)* **Add Data →** attach more Khmer text to make it smarter:
+   - **ParaCrawl English-Khmer** (paracrawl.eu → English-Khmer v2 → **DEDUP**):
+     1.5M EN↔KM sentence pairs. Download it, upload as a Kaggle dataset. The
+     notebook reads the tab-separated file and keeps the Khmer column.
+   - Your own Khmer `.txt`, and/or your `{context, question, answer}` `.json`.
+
+   All auto-detected under `/kaggle/input/` — no paths to edit.
 5. Paste the cell below, then **Save Version → "Save & Run All (Commit)"**. It
    runs in the background; check back in an hour or two.
 
 ## What the notebook trains on
 
-- **CPT corpus (Stage A):** Khmer Wikipedia (auto-downloaded, ~10k+ articles) —
-  **plus** any `.txt` files you attach. More raw Khmer = smarter. 10MB helps;
-  100MB+ is real fluency.
+- **CPT corpus (Stage A):** **CC-100 Khmer** (deduplicated CommonCrawl —
+  ~100× Wikipedia, streamed + capped at 300k lines) — **plus** any Khmer text
+  you attach (ParaCrawl `.tsv`/`.txt`, your own `.txt`). More raw Khmer =
+  smarter. If CC-100 fails to load, it auto-falls back to Khmer Wikipedia so the
+  run never dies here.
 - **SFT rows (Stage B):** your `{context, question, answer}` JSON. A few hundred
   good rows is plenty. If you attach none, Stage B is skipped and you still get
   the CPT-improved model.
+
+Wikipedia alone is small (~10k articles, many stubs) and uneven — that's why the
+default is CC-100, with ParaCrawl as the recommended add-on.
 
 ## The notebook (one batch cell)
 
@@ -53,7 +62,7 @@ import subprocess, sys
 subprocess.run([sys.executable,"-m","pip","install","-q",
                 "transformers>=4.51","trl>=0.12","peft","datasets","accelerate"])
 
-import json, glob, torch, pathlib
+import json, glob, re, torch, pathlib
 from datasets import Dataset, load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import LoraConfig, get_peft_model
@@ -74,16 +83,31 @@ peft_cfg = LoraConfig(r=16, lora_alpha=32, lora_dropout=0.05, task_type="CAUSAL_
 model = get_peft_model(model, peft_cfg)
 
 # ---------- Stage A: continued pre-training on raw Khmer ----------
-# Khmer Wikipedia (auto) + any .txt you attached under /kaggle/input/.
-texts = []
+# Source 1: CC-100 Khmer (deduplicated CommonCrawl, the corpus behind XLM-R's
+# Khmer) — far larger + cleaner than Wikipedia. Streamed + capped.
+texts, CAP = [], 300_000
 try:
+    cc = load_dataset("cc100", lang="km", split="train",
+                      streaming=True, trust_remote_code=True)
+    for ex in cc:
+        t = ex.get("text", "").strip()
+        if t: texts.append(t)
+        if len(texts) >= CAP: break
+    print(f"CC-100 Khmer: {len(texts)} lines")
+except Exception as e:
+    print("cc100 skipped -> wikipedia fallback:", e)
     wiki = load_dataset("wikimedia/wikipedia", "20231101.km", split="train")
     texts += [t for t in wiki["text"] if t and t.strip()]
-    print(f"Khmer Wikipedia: {len(texts)} articles")
-except Exception as e:
-    print("wiki skipped:", e)
-for f in glob.glob("/kaggle/input/**/*.txt", recursive=True):
-    texts += [b for b in pathlib.Path(f).read_text().split("\n\n") if b.strip()]
+
+# Source 2: anything you attached. Reads .txt / .tsv, splits each line on tabs,
+# keeps whichever column is Khmer — so ParaCrawl EN<TAB>KM bitext AND plain
+# Khmer .txt both work with one loop.
+KH = re.compile(r'[ក-៿]')          # Khmer Unicode block
+for f in glob.glob("/kaggle/input/**/*.txt", recursive=True) + \
+         glob.glob("/kaggle/input/**/*.tsv", recursive=True):
+    for line in pathlib.Path(f).read_text().splitlines():
+        km = next((p.strip() for p in line.split("\t") if KH.search(p)), None)
+        if km: texts.append(km)
 print(f"CPT blocks total: {len(texts)}")
 
 cpt_ds = Dataset.from_dict({"text": texts})
@@ -147,12 +171,23 @@ iAny at it → rebuild → your smarter Khmer model on the S10.
 
 ## How to make it smarter (the levers, in order)
 
-1. **More raw Khmer for CPT.** #1 factor. Wikipedia is the free baseline; attach
-   your own `.txt` corpus (books, articles, your Gemma data as plain text) to go
-   further. 100MB+ is where real fluency shows up.
+1. **More raw Khmer for CPT.** #1 factor. Default is CC-100; add **ParaCrawl
+   DEDUP** (1.5M EN↔KM pairs, Khmer side extracted) and your own `.txt`. Raise
+   `CAP` (or remove it) for more CC-100. 100MB+ total is where real fluency
+   shows up.
 2. **More epochs on a big corpus** beats many epochs on a tiny one. If CPT data
    is large, 1 epoch is fine; if small, bump to 2–3.
 3. **More/better Q&A rows** for SFT — improves *answer style*, not knowledge.
+
+### Corpus options (from the awesome-khmer-language list)
+
+- **CC-100 `km`** — ungated, one-line load. The default. ~5M Khmer sentences.
+- **ParaCrawl EN-Khmer DEDUP** — 1.5M clean-ish pairs; Khmer side → CPT, and the
+  pairs can later teach EN↔KM translation. Web-mined, so use the DEDUP version.
+- **OSCAR-2301 `km`** — even bigger; **gated** (accept terms once, then your HF
+  token works). Best upgrade for maximum data. Same code shape as CC-100.
+- **seanghay's HF datasets** — curated Khmer; browse `huggingface.co/seanghay`
+  and attach any as `.txt`.
 
 ## Notes / lessons baked in
 
@@ -164,6 +199,11 @@ iAny at it → rebuild → your smarter Khmer model on the S10.
 - **T4 has no bf16** → fp16.
 - **CUDA_VISIBLE_DEVICES=0** → avoids the T4×2 device-split crash.
 - **Token via Kaggle Secrets** → batch can't answer a getpass prompt.
-- **Auto-detects your attached data** — `.txt` → CPT corpus, `.json` → SFT rows.
-  Attach nothing and it still trains on Khmer Wikipedia. Same dataset later feeds
-  bigger fine-tunes for the Pi/PWA tiers.
+- **CC-100 needs `trust_remote_code=True`** — it uses a loader script that newer
+  `datasets` refuses otherwise; streaming + `CAP` keeps runtime sane.
+- **Khmer-column extraction** — the attach loop splits each line on tabs and
+  keeps the Khmer field, so ParaCrawl bitext (`EN<TAB>KM`) and plain Khmer
+  `.txt` both work with one loop.
+- **Auto-detects your attached data** — `.txt`/`.tsv` → CPT corpus, `.json` →
+  SFT rows. Attach nothing and it still trains on CC-100 (Wikipedia fallback).
+  Same corpus later feeds bigger fine-tunes for the Pi/PWA tiers.
