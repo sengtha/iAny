@@ -47,10 +47,10 @@ You've uploaded ParaCrawl DEDUP — here's the exact order:
 4. Confirm your ParaCrawl dataset shows under **Input** (right panel).
 5. **Save Version → "Save & Run All (Commit)"** → it runs in the background.
 6. **Sanity-check the first minute of logs:** you want to see
-   `attached files: [...paracrawl...]` and a big `CPT blocks total:` (well over
-   1,000,000). If `CPT blocks total` is only ~300k, the ParaCrawl file wasn't
-   found — check the Input panel and the file extension.
-7. Close the tab. Check back in **~3–5 hours** (CC-100 + 1.5M ParaCrawl lines).
+   `ALL input files: [...paracrawl...]`, a `+N Khmer lines` line for it, and a
+   big `CPT blocks total:` (well over 1,000,000). If it's only ~300k, the
+   ParaCrawl file wasn't picked up — paste me the `ALL input files:` line.
+7. Close the tab. Check back in **~3–5 hours** (FineWeb-2 + 1.5M ParaCrawl).
    When done it prints `DONE -> sengtha/Qwen3-0.6B-khm-ft-Q8_0-GGUF`.
 8. Send me **"done"** → I wire it into iAny → you rebuild the APK on your phone.
 
@@ -60,11 +60,12 @@ caps it to a ~2–3h job without losing much quality.
 
 ## What the notebook trains on
 
-- **CPT corpus (Stage A):** **CC-100 Khmer** (deduplicated CommonCrawl —
-  ~100× Wikipedia, streamed + capped at 300k lines) — **plus** any Khmer text
-  you attach (ParaCrawl `.tsv`/`.txt`, your own `.txt`). More raw Khmer =
-  smarter. If CC-100 fails to load, it auto-falls back to Khmer Wikipedia so the
-  run never dies here.
+- **CPT corpus (Stage A):** **FineWeb-2 Khmer** (`HuggingFaceFW/fineweb-2`,
+  config `khm_Khmr` — parquet, ungated, streamed + capped at 300k docs) —
+  **plus** any Khmer text you attach (ParaCrawl, your own text). More raw Khmer
+  = smarter. If FineWeb-2 fails to load, it auto-falls back to Khmer Wikipedia so
+  the run never dies here. (CC-100 no longer loads — newest `datasets` dropped
+  script-based datasets.)
 - **SFT rows (Stage B):** your `{context, question, answer}` JSON. A few hundred
   good rows is plenty. If you attach none, Stage B is skipped and you still get
   the CPT-improved model.
@@ -108,39 +109,47 @@ peft_cfg = LoraConfig(r=16, lora_alpha=32, lora_dropout=0.05, task_type="CAUSAL_
 model = get_peft_model(model, peft_cfg)
 
 # ---------- Stage A: continued pre-training on raw Khmer ----------
-# Source 1: CC-100 Khmer (deduplicated CommonCrawl, the corpus behind XLM-R's
-# Khmer) — far larger + cleaner than Wikipedia. Streamed + capped.
+# Source 1: FineWeb-2 Khmer (parquet, ungated) — big + cleaner than Wikipedia.
+# (CC-100 no longer loads: newest `datasets` dropped script-based datasets.)
+# Streamed + capped.
 texts, CAP = [], 300_000
 try:
-    cc = load_dataset("cc100", lang="km", split="train",
-                      streaming=True, trust_remote_code=True)
-    for ex in cc:
-        t = ex.get("text", "").strip()
+    fw = load_dataset("HuggingFaceFW/fineweb-2", "khm_Khmr",
+                      split="train", streaming=True)
+    for ex in fw:
+        t = (ex.get("text") or "").strip()
         if t: texts.append(t)
         if len(texts) >= CAP: break
-    print(f"CC-100 Khmer: {len(texts)} lines")
+    print(f"FineWeb-2 Khmer: {len(texts)} docs")
 except Exception as e:
-    print("cc100 skipped -> wikipedia fallback:", e)
+    print("fineweb-2 skipped -> wikipedia fallback:", e)
     wiki = load_dataset("wikimedia/wikipedia", "20231101.km", split="train")
     texts += [t for t in wiki["text"] if t and t.strip()]
 
-# Source 2: anything you attached. Reads .txt / .tsv / .gz, splits each line on
-# tabs, keeps whichever column is Khmer — so ParaCrawl EN<TAB>KM bitext AND
-# plain Khmer .txt both work with one loop.
+# Source 2: anything you attached, ANY extension. Detects gzip by magic bytes,
+# splits each line on tabs, keeps whichever column is Khmer — so ParaCrawl
+# EN<TAB>KM bitext AND plain Khmer text both work regardless of filename.
 KH = re.compile(r'[ក-៿]')          # Khmer Unicode block
 def read_lines(p):
-    p = pathlib.Path(p)
-    op = gzip.open if p.suffix == ".gz" else open
+    with open(p, "rb") as fh:
+        gz = fh.read(2) == b"\x1f\x8b"
+    op = gzip.open if gz else open
     with op(p, "rt", encoding="utf-8", errors="ignore") as fh:
         return fh.read().splitlines()
-attached = (glob.glob("/kaggle/input/**/*.txt", recursive=True) +
-            glob.glob("/kaggle/input/**/*.tsv", recursive=True) +
-            glob.glob("/kaggle/input/**/*.gz",  recursive=True))
-for f in attached:
-    for line in read_lines(f):
-        km = next((p.strip() for p in line.split("\t") if KH.search(p)), None)
-        if km: texts.append(km)
-print(f"attached files: {attached}")
+
+# list EVERY input file (except the SFT json) so the log shows what's really there
+inputs = [f for f in glob.glob("/kaggle/input/**/*", recursive=True)
+          if pathlib.Path(f).is_file() and not f.lower().endswith(".json")]
+print("ALL input files:", inputs)
+for f in inputs:
+    try:
+        n0 = len(texts)
+        for line in read_lines(f):
+            km = next((p.strip() for p in line.split("\t") if KH.search(p)), None)
+            if km: texts.append(km)
+        print(f"  {f}: +{len(texts)-n0} Khmer lines")
+    except Exception as e:
+        print(f"  {f}: skipped ({e})")
 print(f"CPT blocks total: {len(texts)}")
 # Optional: cap total to keep CPT within a few hours -> texts = texts[:800_000]
 
@@ -215,13 +224,15 @@ iAny at it → rebuild → your smarter Khmer model on the S10.
 
 ### Corpus options (from the awesome-khmer-language list)
 
-- **CC-100 `km`** — ungated, one-line load. The default. ~5M Khmer sentences.
+- **FineWeb-2 `khm_Khmr`** — the default. Parquet, ungated, streams cleanly;
+  large + well-filtered. (Replaced CC-100, which no longer loads on modern
+  `datasets`.)
 - **ParaCrawl EN-Khmer DEDUP** — 1.5M clean-ish pairs; Khmer side → CPT, and the
   pairs can later teach EN↔KM translation. Web-mined, so use the DEDUP version.
 - **OSCAR-2301 `km`** — even bigger; **gated** (accept terms once, then your HF
-  token works). Best upgrade for maximum data. Same code shape as CC-100.
+  token works). Best upgrade for maximum data. Same `load_dataset` shape.
 - **seanghay's HF datasets** — curated Khmer; browse `huggingface.co/seanghay`
-  and attach any as `.txt`.
+  and attach any as text.
 
 ## Notes / lessons baked in
 
