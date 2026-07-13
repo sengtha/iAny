@@ -193,7 +193,7 @@ audio = VitsAudioConfig(sample_rate=22050, win_length=1024, hop_length=256,
 KH = "".join(chr(c) for c in range(0x1780, 0x1800))
 chars = CharactersConfig(
     characters_class="TTS.tts.utils.text.characters.Graphemes",
-    characters=KH, punctuations="!,.?:;()\"'៖។៕ៗ​ ",
+    characters=KH, punctuations="!,.?:;()\"'​ ",
     pad="_", eos="~", bos="^", blank="@",
 )
 
