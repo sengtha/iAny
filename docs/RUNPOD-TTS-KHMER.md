@@ -22,76 +22,89 @@ listenable much earlier; checkpoints push to HF and the run resumes.
 2. Template: **RunPod PyTorch 2.x**. **Container disk: 150 GB** (audio is large).
 3. Connect → **Jupyter Lab** → new notebook. **Stop the pod when done.**
 
-## 2. Pick the voice (run this first on the pod, then listen)
+## 2. Inspect + pick the voice (streaming — no 495GB download)
+
+The dataset is **parquet with audio embedded** (not loose WAVs). We stream it and
+decode clips ourselves with soundfile (`decode=False` sidesteps the datasets
+audio-codec dependency that errors on newer versions).
 
 ```python
 import subprocess, sys
-subprocess.run([sys.executable,"-m","pip","install","-q",
-                "huggingface_hub","pandas","librosa","soundfile"])
-from huggingface_hub import hf_hub_download, list_repo_files, snapshot_download, login
-from IPython.display import Audio, display
-import pandas as pd, glob, os
+subprocess.run([sys.executable,"-m","pip","install","-q","datasets","soundfile","librosa","numpy"])
+import io, numpy as np, soundfile as sf
+from datasets import load_dataset, Audio
+from IPython.display import Audio as Player, display
+from huggingface_hub import login
+from collections import defaultdict
 
 login("hf_xxxxxxxx")                       # <-- your HF Write token
 REPO = "DDD-Cambodia/khmer-speech-dataset"
 
-# metadata only (not the 495GB of audio)
-meta_dir = snapshot_download(REPO, repo_type="dataset",
-    allow_patterns=["*.csv","*.tsv","*.json","*.jsonl"])
-meta_files = [f for f in glob.glob(meta_dir+"/**/*", recursive=True) if os.path.isfile(f)]
-print("METADATA FILES:", meta_files)
-meta = pd.read_csv([f for f in meta_files if f.endswith((".csv",".tsv"))][0])
-print("COLUMNS:", meta.columns.tolist()); print(meta.head())
+# schema (no decode) -> auto-detect columns
+ds = load_dataset(REPO, split="train", streaming=True)
+feats = ds.features
+print("FEATURES:", {k: type(v).__name__ for k,v in feats.items()})
+AUD = next(k for k,v in feats.items() if type(v).__name__ == "Audio")
+def find(c): return next((k for k in feats if any(x in k.lower() for x in c)), None)
+SPK    = find(["speaker","spk"])
+GENDER = find(["gender","sex"])
+TEXT   = find(["text","transcript","sentence","script"])
+print("AUDIO=",AUD," SPK=",SPK," GENDER=",GENDER," TEXT=",TEXT)
 
-# --- after checking COLUMNS, set the real names, then re-run from here ---
-SPK, GENDER = "speaker_id", "gender"       # <-- fix to the real column names
-fem = meta[meta[GENDER].astype(str).str.lower().str.startswith("f")]
-print("female speakers (clips each):\n", fem.groupby(SPK).size().sort_values(ascending=False))
+# stream WITHOUT decoding audio; decode clips manually with soundfile
+ds = ds.cast_column(AUD, Audio(decode=False))
+def decode(a):
+    b = a["bytes"] if a.get("bytes") else open(a["path"],"rb").read()
+    y, sr = sf.read(io.BytesIO(b), dtype="float32")
+    return (y.mean(1) if y.ndim > 1 else y), sr
 
-# play 3 clips per female speaker
-allw = [f for f in list_repo_files(REPO, repo_type="dataset") if f.endswith(".wav")]
-for spk in fem[SPK].unique():
-    picks = [f for f in allw if os.path.basename(f).startswith(f"{spk}_khm_")][:3]
-    print(f"\n===== speaker {spk} =====")
-    for w in picks:
-        display(Audio(hf_hub_download(REPO, w, repo_type="dataset")))
+# collect 2 clips per female speaker to listen
+samp = defaultdict(list); n = 0
+for ex in ds:
+    n += 1
+    if GENDER and not str(ex[GENDER]).lower().startswith("f"): continue
+    spk = str(ex[SPK])
+    if len(samp[spk]) < 2: samp[spk].append((ex[AUD], str(ex[TEXT])[:50]))
+    if n >= 15000 or (len(samp) >= 5 and all(len(v) >= 2 for v in samp.values())): break
+print("female speakers found:", list(samp.keys()))
+for spk, clips in samp.items():
+    print(f"\n==== {spk} ====")
+    for a, txt in clips:
+        y, sr = decode(a); print(txt); display(Player(y, rate=sr))
 ```
 
-Listen, pick the `speaker_id` you like → that's your `CHOSEN_SPK` for §3.
+Listen, pick the `speaker_id` you like → set it as `CHOSEN_SPK` in §3.
 
-## 3. Prepare the data (one cell)
+> If only one speaker appears, the shards are grouped by speaker — raise
+> `n >= 15000` higher to reach the others, or just use the one you heard.
+
+## 3. Extract that speaker to an LJSpeech folder (streaming)
+
+Reuses `ds` / `decode` / `AUD` / `SPK` / `TEXT` from §2 (same kernel).
 
 ```python
-import os, glob, subprocess, sys, pathlib, pandas as pd
-HF_TOKEN = os.environ["HF_TOKEN"]
-subprocess.run([sys.executable,"-m","pip","install","-q","coqui-tts","librosa","soundfile","huggingface_hub"])
-from huggingface_hub import login, snapshot_download
-login(HF_TOKEN)
-
-REPO       = "DDD-Cambodia/khmer-speech-dataset"
-CHOSEN_SPK = "SPK_ID_HERE"                 # <-- from Cell 1
-SPK, TEXT  = "speaker_id", "text"          # <-- match the dataset's real columns
-
-# download ONLY this speaker's audio + metadata (~1/12 of the corpus, not 495GB)
-data_dir = snapshot_download(REPO, repo_type="dataset",
-    allow_patterns=[f"{CHOSEN_SPK}_khm_*.wav","*.csv","*.tsv","*.json","*.jsonl"],
-    max_workers=8)
-
-# resample to 22.05kHz mono (VITS default) and build LJSpeech-style metadata
-import librosa, soundfile as sf
+CHOSEN_SPK   = "SPK_HERE"       # <-- from §2
+TARGET_HOURS = 15               # plenty for a great VITS voice; raise for more
+import pathlib, librosa
 out = pathlib.Path("khm_tts"); (out/"wavs").mkdir(parents=True, exist_ok=True)
-meta = pd.read_csv(glob.glob(data_dir+"/**/*.csv", recursive=True)[0])
-meta = meta[meta[SPK].astype(str) == str(CHOSEN_SPK)]
-rows = []
-for _, r in meta.iterrows():
-    hits = glob.glob(f"{data_dir}/**/*{r.get('sentence_id','')}*.wav", recursive=True)
-    if not hits: continue
-    y, _ = librosa.load(hits[0], sr=22050, mono=True)
-    name = pathlib.Path(hits[0]).stem
+rows = []; sec = 0.0; i = 0
+for ex in ds:                                   # ds is decode=False from §2
+    if str(ex[SPK]) != CHOSEN_SPK: continue
+    y, sr = decode(ex[AUD])
+    if sr != 22050:
+        y = librosa.resample(np.asarray(y, dtype="float32"), orig_sr=sr, target_sr=22050)
+    name = f"{CHOSEN_SPK}_{i:06d}"; i += 1
     sf.write(out/"wavs"/f"{name}.wav", y, 22050)
-    rows.append(f"{name}|{str(r[TEXT]).strip()}|{str(r[TEXT]).strip()}")
+    t = str(ex[TEXT]).strip().replace("|", " ").replace("\n", " ")
+    rows.append(f"{name}|{t}|{t}")
+    sec += len(y)/22050
+    if i % 200 == 0: print(f"{i} clips, {sec/3600:.2f}h")
+    if sec >= TARGET_HOURS*3600: break
 (out/"metadata.csv").write_text("\n".join(rows), encoding="utf-8")
-print("clips:", len(rows))
+print("DONE:", i, "clips,", round(sec/3600,2), "h ->", out)
+
+# coqui-tts is needed for §4 training
+subprocess.run([sys.executable,"-m","pip","install","-q","coqui-tts"])
 ```
 
 ## 4. Train grapheme VITS (one cell — resumable)
