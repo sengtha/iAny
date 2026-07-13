@@ -78,32 +78,47 @@ Listen, pick the `speaker_id` you like → set it as `CHOSEN_SPK` in §3.
 > If only one speaker appears, the shards are grouped by speaker — raise
 > `n >= 15000` higher to reach the others, or just use the one you heard.
 
-## 3. Extract that speaker to an LJSpeech folder (streaming)
+## 3. Extract that speaker to an LJSpeech folder (fast, shard-by-shard)
 
-Reuses `ds` / `decode` / `AUD` / `SPK` / `TEXT` from §2 (same kernel).
+Streaming + filtering one speaker over HF's default (single-connection ~10 MB/s)
+pipe is painfully slow. Instead: enable **`hf_transfer`** (multi-connection) and
+download whole parquet shards, filter to your speaker locally, delete each shard.
+Prints per-shard progress so you can see it move.
 
 ```python
-CHOSEN_SPK   = "SPK_HERE"       # <-- from §2
-TARGET_HOURS = 15               # plenty for a great VITS voice; raise for more
-import pathlib, librosa
+import os, io, subprocess, sys, pathlib, numpy as np
+subprocess.run([sys.executable,"-m","pip","install","-q","hf_transfer","pyarrow","soundfile","librosa"])
+import soundfile as sf, librosa, pyarrow.parquet as pq
+import huggingface_hub.constants as C; C.HF_HUB_ENABLE_HF_TRANSFER = True
+from huggingface_hub import HfApi, hf_hub_download
+
+REPO = "DDD-Cambodia/khmer-speech-dataset"
+CHOSEN_SPK = "f-adt1-0001"      # <-- from §2
+TARGET_HOURS = 12               # plenty for a great VITS voice; raise for more
+SPK, AUD, TEXT = "speaker_id", "audio", "transcript"
+
+shards = [f for f in HfApi().list_repo_files(REPO, repo_type="dataset") if f.endswith(".parquet")]
+print(len(shards), "parquet shards", flush=True)
 out = pathlib.Path("khm_tts"); (out/"wavs").mkdir(parents=True, exist_ok=True)
 rows = []; sec = 0.0; i = 0
-for ex in ds:                                   # ds is decode=False from §2
-    if str(ex[SPK]) != CHOSEN_SPK: continue
-    y, sr = decode(ex[AUD])
-    if sr != 22050:
-        y = librosa.resample(np.asarray(y, dtype="float32"), orig_sr=sr, target_sr=22050)
-    name = f"{CHOSEN_SPK}_{i:06d}"; i += 1
-    sf.write(out/"wavs"/f"{name}.wav", y, 22050)
-    t = str(ex[TEXT]).strip().replace("|", " ").replace("\n", " ")
-    rows.append(f"{name}|{t}|{t}")
-    sec += len(y)/22050
-    if i % 200 == 0: print(f"{i} clips, {sec/3600:.2f}h")
+for si, shard in enumerate(shards):
+    p = hf_hub_download(REPO, shard, repo_type="dataset")
+    tbl = pq.read_table(p, columns=[SPK, AUD, TEXT]).to_pydict()
+    for spk, aud, txt in zip(tbl[SPK], tbl[AUD], tbl[TEXT]):
+        if str(spk) != CHOSEN_SPK: continue
+        b = aud["bytes"] if aud.get("bytes") else open(aud["path"], "rb").read()
+        y, sr = sf.read(io.BytesIO(b), dtype="float32")
+        if getattr(y, "ndim", 1) > 1: y = y.mean(1)
+        if sr != 22050: y = librosa.resample(np.asarray(y, dtype="float32"), orig_sr=sr, target_sr=22050)
+        nm = f"{CHOSEN_SPK}_{i:06d}"; i += 1
+        sf.write(out/"wavs"/f"{nm}.wav", y, 22050)
+        tt = str(txt).strip().replace("|", " ").replace("\n", " ")
+        rows.append(f"{nm}|{tt}|{tt}"); sec += len(y)/22050
+    os.remove(p)                                   # delete shard -> disk stays small
+    print(f"shard {si+1}/{len(shards)} | {i} clips | {sec/3600:.2f}h", flush=True)
     if sec >= TARGET_HOURS*3600: break
 (out/"metadata.csv").write_text("\n".join(rows), encoding="utf-8")
-print("DONE:", i, "clips,", round(sec/3600,2), "h ->", out)
-
-# coqui-tts is needed for §4 training
+print("DONE:", i, "clips,", round(sec/3600, 2), "h", flush=True)
 subprocess.run([sys.executable,"-m","pip","install","-q","coqui-tts"])
 ```
 
