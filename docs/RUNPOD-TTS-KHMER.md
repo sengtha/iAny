@@ -196,7 +196,9 @@ import string
 KH = "".join(chr(c) for c in range(0x1780, 0x1800)) + string.ascii_letters + string.digits
 chars = CharactersConfig(
     characters_class="TTS.tts.utils.text.characters.Graphemes",
-    characters=KH, punctuations="!,.?:;()\"'​ ",
+    # symbols not listed here are silently discarded during caching (harmless —
+    # affects only prosody). Add any your corpus uses; % - / etc. included.
+    characters=KH, punctuations="!,.?:;()\"'«»“”-–—%/​ ",
     pad="_", eos="~", bos="^", blank="@",
 )
 
