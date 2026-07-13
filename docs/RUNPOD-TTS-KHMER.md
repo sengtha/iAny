@@ -156,8 +156,13 @@ for si in sorted(shards_of[CHOSEN_SPK]):            # reuse shards_of from 3a
     if sec >= TARGET_HOURS*3600: break
 (out/"metadata.csv").write_text("\n".join(rows), encoding="utf-8")
 print("DONE:", i, "clips,", round(sec/3600, 2), "h", flush=True)
-subprocess.run([sys.executable,"-m","pip","install","-q","coqui-tts"])
+# coqui-tts needs a transformers that has isin_mps_friendly -> pin it, then
+# RESTART THE KERNEL before running §4 (transformers is already imported).
+subprocess.run([sys.executable,"-m","pip","install","-q","coqui-tts","transformers==4.46.3"])
 ```
+
+> After this, **Kernel → Restart** before §4 (the data on disk survives). If the
+> §4 import still fails on `isin_mps_friendly`, try `transformers==4.44.2`.
 
 ## 4. Train grapheme VITS (one cell — resumable)
 
