@@ -39,7 +39,9 @@ OUT_REPO = "sengtha/Qwen3-0.6B-khm-ft-Q8_0-GGUF"
 tok = AutoTokenizer.from_pretrained(BASE)
 if tok.pad_token is None: tok.pad_token = tok.eos_token
 # bf16 full-precision load; FULL fine-tuning (no LoRA) — best for learning Khmer.
-model = AutoModelForCausalLM.from_pretrained(BASE, torch_dtype=torch.bfloat16, device_map={"": 0})
+# attn_implementation="sdpa" is a big speedup over eager attention.
+model = AutoModelForCausalLM.from_pretrained(BASE, torch_dtype=torch.bfloat16,
+    attn_implementation="sdpa", device_map={"": 0})
 
 # ---------- Stage A: FULL continued pre-training on raw Khmer ----------
 # FineWeb-2 Khmer (parquet, ungated). A100 has plenty of RAM -> take a lot more
@@ -67,9 +69,13 @@ if PARA_REPO:
     print("with ParaCrawl:", len(texts))
 
 cpt_ds = Dataset.from_dict({"text": texts})
-cpt_args = SFTConfig(output_dir="cpt", max_steps=12000,   # ~400M tokens of CPT
+# No gradient_checkpointing: an 80GB A100 doesn't need it for a 0.6B, and it
+# recomputes every step (~10x slowdown seen). sdpa attention + fused adamw +
+# dataloader workers keep the GPU fed. -> ~1-2 it/s instead of 0.1.
+cpt_args = SFTConfig(output_dir="cpt", max_steps=8000,    # ~260M tokens of CPT
     per_device_train_batch_size=16, gradient_accumulation_steps=2,
-    learning_rate=1e-4, bf16=True, gradient_checkpointing=True,
+    learning_rate=1e-4, bf16=True,
+    dataloader_num_workers=8, optim="adamw_torch_fused",
     max_length=1024, packing=True, logging_steps=50,
     save_steps=2000, save_total_limit=1, report_to="none")
 SFTTrainer(model=model, args=cpt_args, train_dataset=cpt_ds, processing_class=tok).train()
