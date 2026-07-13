@@ -189,8 +189,11 @@ audio = VitsAudioConfig(sample_rate=22050, win_length=1024, hop_length=256,
                         num_mels=80, mel_fmin=0, mel_fmax=None)
 
 # Khmer graphemes — feed text directly, NO phonemes (dodges weak eSpeak-khm).
-# Whole Khmer block (consonants, vowels, diacritics, digits, signs) + ZWSP/space.
-KH = "".join(chr(c) for c in range(0x1780, 0x1800))
+# Whole Khmer block (consonants, vowels, diacritics, digits, signs) + ASCII
+# letters/digits (transcripts contain loanwords like "vitamin a"; without these
+# coqui discards them and the voice can't say embedded English/numbers) + ZWSP/space.
+import string
+KH = "".join(chr(c) for c in range(0x1780, 0x1800)) + string.ascii_letters + string.digits
 chars = CharactersConfig(
     characters_class="TTS.tts.utils.text.characters.Graphemes",
     characters=KH, punctuations="!,.?:;()\"'​ ",
