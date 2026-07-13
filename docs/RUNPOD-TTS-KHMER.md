@@ -110,40 +110,52 @@ subprocess.run([sys.executable,"-m","pip","install","-q","coqui-tts"])
 ## 4. Train grapheme VITS (one cell — resumable)
 
 ```python
-import torch, glob
+import glob, pathlib
 from trainer import Trainer, TrainerArgs
 from TTS.tts.configs.shared_configs import BaseDatasetConfig, CharactersConfig
 from TTS.tts.configs.vits_config import VitsConfig
 from TTS.tts.datasets import load_tts_samples
 from TTS.tts.models.vits import Vits, VitsAudioConfig
 from TTS.tts.utils.text.tokenizer import TTSTokenizer
+from TTS.utils.audio import AudioProcessor
 
 OUT = "vits_khm"
 dataset = BaseDatasetConfig(formatter="ljspeech", meta_file_train="metadata.csv", path="khm_tts")
 
-# Khmer character set — feed graphemes directly, NO phonemes (dodges eSpeak-khm).
-KH = "".join(chr(c) for c in range(0x1780, 0x17FF))     # Khmer Unicode block
-chars = CharactersConfig(characters=KH, punctuations="।៕។!?,.…៖ ៗ", pad="<PAD>",
-                         eos="<EOS>", bos="<BOS>", blank="<BLNK>", characters_class="TTS.tts.utils.text.characters.Graphemes")
+audio = VitsAudioConfig(sample_rate=22050, win_length=1024, hop_length=256,
+                        num_mels=80, mel_fmin=0, mel_fmax=None)
+
+# Khmer graphemes — feed text directly, NO phonemes (dodges weak eSpeak-khm).
+# Whole Khmer block (consonants, vowels, diacritics, digits, signs) + ZWSP/space.
+KH = "".join(chr(c) for c in range(0x1780, 0x1800))
+chars = CharactersConfig(
+    characters_class="TTS.tts.utils.text.characters.Graphemes",
+    characters=KH, punctuations="!,.?:;()\"'៖។៕ៗ​ ",
+    pad="_", eos="~", bos="^", blank="@",
+)
 
 config = VitsConfig(
-    audio=VitsAudioConfig(sample_rate=22050),
-    run_name="khm_female_vits", batch_size=32, eval_batch_size=16,
+    audio=audio, run_name="khm_female_vits",
+    batch_size=16, eval_batch_size=8, batch_group_size=5,
     num_loader_workers=8, num_eval_loader_workers=4,
-    epochs=1000, save_step=2000, save_n_checkpoints=2,
-    print_step=50, mixed_precision=True, output_path=OUT,
-    datasets=[dataset], use_phonemes=False, characters=chars,
+    run_eval=True, test_delay_epochs=-1, epochs=1000,
+    text_cleaner="basic_cleaners", use_phonemes=False,
+    compute_input_seq_cache=True, print_step=25, print_eval=False,
+    mixed_precision=True, output_path=OUT, datasets=[dataset],
+    characters=chars, save_step=1000, save_n_checkpoints=2, cudnn_benchmark=True,
     test_sentences=["សួស្តី តើអ្នកសុខសប្បាយជាទេ?", "ថ្ងៃនេះអាកាសធាតុល្អណាស់។"],
 )
-ap_samples_train, ap_samples_eval = load_tts_samples(dataset, eval_split=True, eval_split_size=0.01)
+
+ap = AudioProcessor.init_from_config(config)
 tokenizer, config = TTSTokenizer.init_from_config(config)
-model = Vits(config, ap=None, tokenizer=tokenizer, speaker_manager=None)
+train_samples, eval_samples = load_tts_samples(dataset, eval_split=True, eval_split_size=0.01)
+model = Vits(config, ap, tokenizer, speaker_manager=None)
 
 # resume from the newest local checkpoint if a prior session left one
 ckpts = sorted(glob.glob(f"{OUT}/**/checkpoint_*.pth", recursive=True))
-trainer = Trainer(TrainerArgs(continue_path=str(pathlib.Path(ckpts[-1]).parent) if ckpts else ""),
-                  config, OUT, model=model,
-                  train_samples=ap_samples_train, eval_samples=ap_samples_eval)
+cont = str(pathlib.Path(ckpts[-1]).parent) if ckpts else ""
+trainer = Trainer(TrainerArgs(continue_path=cont), config, OUT, model=model,
+                  train_samples=train_samples, eval_samples=eval_samples)
 trainer.fit()
 ```
 
@@ -151,7 +163,7 @@ trainer.fit()
 
 ```python
 from huggingface_hub import HfApi
-api = HfApi(token=HF_TOKEN); REPO_OUT = "sengtha/khmer-tts-female-v1"
+api = HfApi(); REPO_OUT = "sengtha/khmer-tts-female-v1"   # uses your login() token
 api.create_repo(REPO_OUT, exist_ok=True)
 best = sorted(glob.glob("vits_khm/**/best_model.pth", recursive=True))
 cfg  = sorted(glob.glob("vits_khm/**/config.json", recursive=True))
