@@ -41,14 +41,12 @@ export const EMBEDDING_DIMS = 256
 // a tiny logits buffer (loads + runs fast on the S10), it's Khmer-trained, and
 // Qwen3 avoids the llama.rn Gemma-3 load bug.
 // The S10's working model — its tested ceiling is ~0.6B (1.7B weights won't
-// load). Qwen3 0.6B trimmed to a 32k Khmer vocab (alphaedge-ai, converted to
-// GGUF). Loads + runs at ~26 tok/s; quality improves by fine-tuning THIS on
-// the Khmer dataset (see docs), not by going bigger.
-export const GEN_MODEL_REPO = 'sengtha/Qwen3-0.6B-khm-32768-Q8_0-GGUF'
-export const GEN_MODEL_FILES = [
-  'Qwen3-0.6B-khm-32768-Q8_0.gguf',
-  'Qwen3-0.6B-khm-32768-q8_0.gguf',
-]
+// load). Qwen3 0.6B trimmed to a 32k Khmer vocab (alphaedge-ai), then
+// fine-tuned on iAny's Khmer corpus (CPT on FineWeb-2 + ParaCrawl) for better
+// Khmer. Same 32k vocab -> still ~600MB, loads + runs at ~26 tok/s on the S10.
+// To A/B against the base, swap REPO back to '...-khm-32768-Q8_0-GGUF'.
+export const GEN_MODEL_REPO = 'sengtha/Qwen3-0.6B-khm-ft-Q8_0-GGUF'
+export const GEN_MODEL_FILES = ['Qwen3-0.6B-khm-ft-Q8_0.gguf']
 
 /** iAny model mirror (Cloudflare worker pull-through cache). */
 export const MODEL_MIRROR = 'https://iany.sengtha.workers.dev/models'
