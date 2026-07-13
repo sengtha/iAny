@@ -12,20 +12,52 @@ exportable to ONNX for phone / Raspberry Pi.
 Framework: **coqui-tts** (the maintained fork of Coqui TTS) — has a proven VITS
 recipe and supports character (grapheme) input via `use_phonemes=False`.
 
-## 1. Pick the voice first (do this on Kaggle/Colab-free, interactive)
+Follow this doc top to bottom — it is self-contained (you don't need the MMS
+doc). VITS from scratch ≈ **1–2 days A100** for a great voice, but it's
+listenable much earlier; checkpoints push to HF and the run resumes.
 
-Run **Cell 1 of `FINETUNE-KHMER-TTS.md`** to listen to the 5 female speakers and
-choose one `speaker_id`. You only need the ID here.
+## 1. Launch the pod
 
-## 2. Launch the pod
+1. **runpod.io → Deploy → Pods →** GPU **A100** (Community Cloud = cheaper).
+2. Template: **RunPod PyTorch 2.x**. **Container disk: 150 GB** (audio is large).
+3. Connect → **Jupyter Lab** → new notebook. **Stop the pod when done.**
 
-1. **runpod.io → Deploy → Pods →** GPU **A100 80GB** (Community Cloud = cheaper).
-2. Template: **RunPod PyTorch 2.x**. **Disk: 100GB+** (audio is large).
-3. Env var `HF_TOKEN` = HF Write token.
-4. Connect → Jupyter. **Stop the pod when done.**
+## 2. Pick the voice (run this first on the pod, then listen)
 
-VITS from scratch ≈ **1–2 days A100** for a great voice, but it's listenable
-much earlier. Checkpoints save to disk + push to HF; re-run to resume.
+```python
+import subprocess, sys
+subprocess.run([sys.executable,"-m","pip","install","-q",
+                "huggingface_hub","pandas","librosa","soundfile"])
+from huggingface_hub import hf_hub_download, list_repo_files, snapshot_download, login
+from IPython.display import Audio, display
+import pandas as pd, glob, os
+
+login("hf_xxxxxxxx")                       # <-- your HF Write token
+REPO = "DDD-Cambodia/khmer-speech-dataset"
+
+# metadata only (not the 495GB of audio)
+meta_dir = snapshot_download(REPO, repo_type="dataset",
+    allow_patterns=["*.csv","*.tsv","*.json","*.jsonl"])
+meta_files = [f for f in glob.glob(meta_dir+"/**/*", recursive=True) if os.path.isfile(f)]
+print("METADATA FILES:", meta_files)
+meta = pd.read_csv([f for f in meta_files if f.endswith((".csv",".tsv"))][0])
+print("COLUMNS:", meta.columns.tolist()); print(meta.head())
+
+# --- after checking COLUMNS, set the real names, then re-run from here ---
+SPK, GENDER = "speaker_id", "gender"       # <-- fix to the real column names
+fem = meta[meta[GENDER].astype(str).str.lower().str.startswith("f")]
+print("female speakers (clips each):\n", fem.groupby(SPK).size().sort_values(ascending=False))
+
+# play 3 clips per female speaker
+allw = [f for f in list_repo_files(REPO, repo_type="dataset") if f.endswith(".wav")]
+for spk in fem[SPK].unique():
+    picks = [f for f in allw if os.path.basename(f).startswith(f"{spk}_khm_")][:3]
+    print(f"\n===== speaker {spk} =====")
+    for w in picks:
+        display(Audio(hf_hub_download(REPO, w, repo_type="dataset")))
+```
+
+Listen, pick the `speaker_id` you like → that's your `CHOSEN_SPK` for §3.
 
 ## 3. Prepare the data (one cell)
 
