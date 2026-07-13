@@ -58,10 +58,13 @@ INSTR = ("បង្កើតសំណួរមួយជាភាសាខ្ម�
 
 def gen_qa(para):
     msgs = [{"role": "user", "content": INSTR + FEWSHOT + "អត្ថបទ៖ " + para + "\n"}]
-    inp = tok.apply_chat_template(msgs, add_generation_prompt=True, return_tensors="pt").to(model.device)
+    # newer transformers returns a dict from apply_chat_template -> return_dict + unpack
+    enc = tok.apply_chat_template(msgs, add_generation_prompt=True,
+                                  return_tensors="pt", return_dict=True)
+    enc = {k: v.to(model.device) for k, v in enc.items()}
     with torch.no_grad():
-        out = model.generate(inp, max_new_tokens=160, do_sample=True, temperature=0.7, top_p=0.9)
-    txt = tok.decode(out[0][inp.shape[1]:], skip_special_tokens=True)
+        out = model.generate(**enc, max_new_tokens=160, do_sample=True, temperature=0.7, top_p=0.9)
+    txt = tok.decode(out[0][enc["input_ids"].shape[1]:], skip_special_tokens=True)
     m = re.search(r'\{.*\}', txt, re.S)
     if not m: return None
     try:
