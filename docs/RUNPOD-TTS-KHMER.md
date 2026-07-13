@@ -278,11 +278,32 @@ print("wrote out.wav")
 > digits (206 tokens), NOT what `config.json` says. Rebuild `config.characters`
 > as above before exporting, or the model loads with the wrong tokenizer.
 
-## 7. On-device (phone / Pi) — later
+## 7. On-device (phone / Pi) — ONNX export
 
-Export the VITS to **ONNX** and run with **onnxruntime** or **sherpa-onnx**
-(handles the grapheme frontend). Small, CPU-only, fully offline — matches iAny's
-tiers, and the same file serves the Raspberry Pi.
+**Status:** trained voice is on HF (`sengtha/khmer-tts-female-v1`:
+`best_model.pth` + `config.json`). ONNX export is **pending** — see blocker.
+
+### ⚠️ Blocker: coqui `model.export_onnx()` hangs
+It hangs indefinitely tracing VITS's **stochastic duration predictor** — on both
+CPU and GPU, torch 2.2 and current, dynamo and legacy exporters. Not a slowness
+issue; the trace never returns. So coqui's built-in export is a dead end here.
+
+### Plan (tested next step, not live trial-and-error)
+1. **sherpa-onnx export** — the standard coqui-VITS→mobile path. sherpa-onnx has
+   its own exporter (`scripts/coqui/`) that wraps the generator with explicit
+   `(x, x_lengths, noise_scale, length_scale, noise_scale_w)` inputs and exports
+   cleanly, sidestepping the SDP hang. Produces `model.onnx` + `tokens.txt`.
+   Ref: coqui-ai/TTS Discussion #3194; k2-fsa/sherpa-onnx.
+2. **On-device runtime:** sherpa-onnx (Android/RN/Pi) runs the model + handles
+   the grapheme tokenizer via `tokens.txt` — no JS tokenizer port needed. Or
+   plain `onnxruntime` + a JS port of the vocab in `tts_meta.json` (the
+   Khmer+ASCII+digits set, with `add_blank` interleaving).
+3. **Remember the vocab fix:** the saved `config.json` has only 144 Khmer tokens;
+   the model is **206** (Khmer + ASCII letters + digits). Rebuild
+   `config.characters.characters` (see §6) before any export.
+4. **iAny integration:** TTS module (normalize text → tokens → onnx → PCM →
+   play), 🔊 speak button on answers, English/number → Khmer normalization,
+   serve the onnx through the Cloudflare mirror.
 
 ## Notes / how to get the best voice
 
