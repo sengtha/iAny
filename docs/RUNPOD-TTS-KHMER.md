@@ -78,44 +78,81 @@ Listen, pick the `speaker_id` you like → set it as `CHOSEN_SPK` in §3.
 > If only one speaker appears, the shards are grouped by speaker — raise
 > `n >= 15000` higher to reach the others, or just use the one you heard.
 
-## 3. Extract that speaker to an LJSpeech folder (fast, shard-by-shard)
+## 3a. Profile speakers (which one actually has data + where)
 
-Streaming + filtering one speaker over HF's default (single-connection ~10 MB/s)
-pipe is painfully slow. Instead: enable **`hf_transfer`** (multi-connection) and
-download whole parquet shards, filter to your speaker locally, delete each shard.
-Prints per-shard progress so you can see it move.
+The `speaker_id` in §2's sample list can be a near-empty placeholder (e.g.
+`f-adt1-0001` had 16 clips total). And a speaker's clips are **spread across many
+shards**, so scanning shards in order wastes downloads. First map every speaker's
+hours + which shards they're in, reading only the tiny `speaker_id`+`duration`
+columns (no audio) in parallel.
 
 ```python
-import os, io, subprocess, sys, pathlib, numpy as np
-subprocess.run([sys.executable,"-m","pip","install","-q","hf_transfer","pyarrow","soundfile","librosa"])
-import soundfile as sf, librosa, pyarrow.parquet as pq
-import huggingface_hub.constants as C; C.HF_HUB_ENABLE_HF_TRANSFER = True
-from huggingface_hub import HfApi, hf_hub_download
+import subprocess, sys
+subprocess.run([sys.executable,"-m","pip","install","-q","pyarrow","soundfile","librosa"])
+import pyarrow.parquet as pq
+from huggingface_hub import HfFileSystem, login
+from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
+login("hf_xxxxxxxx")                       # <-- your HF token
 
 REPO = "DDD-Cambodia/khmer-speech-dataset"
-CHOSEN_SPK = "f-adt1-0001"      # <-- from §2
-TARGET_HOURS = 12               # plenty for a great VITS voice; raise for more
-SPK, AUD, TEXT = "speaker_id", "audio", "transcript"
+fs = HfFileSystem()
+paths = sorted(fs.glob(f"datasets/{REPO}/data/train-*.parquet"))
+print(len(paths), "shards", flush=True)
 
-shards = [f for f in HfApi().list_repo_files(REPO, repo_type="dataset") if f.endswith(".parquet")]
-print(len(shards), "parquet shards", flush=True)
+def scan(ip):
+    idx, pth = ip
+    with fs.open(pth) as f:
+        t = pq.read_table(f, columns=["speaker_id", "duration"]).to_pydict()
+    return idx, list(zip(t["speaker_id"], t["duration"]))
+
+dur = defaultdict(float); cnt = defaultdict(int); shards_of = defaultdict(set); done = 0
+with ThreadPoolExecutor(max_workers=16) as ex:      # 16 = fast but may hit HTTP 429s (it retries)
+    for idx, pairs in ex.map(scan, list(enumerate(paths))):
+        for s, d in pairs:
+            dur[s] += float(d) if d is not None else 0.0
+            cnt[s] += 1; shards_of[s].add(idx)
+        done += 1
+        if done % 300 == 0: print("scanned", done, "/", len(paths), flush=True)
+
+print("\n=== speakers by clip count ===", flush=True)
+for s, c in sorted(cnt.items(), key=lambda x: -x[1]):
+    ss = shards_of[s]
+    print(f"{s}: {c} clips (~{c*8/3600:.1f}h est), {len(ss)} shards [{min(ss)}..{max(ss)}]", flush=True)
+```
+
+Pick the **female (`f-…`) with the most hours** (needs ≥ ~15h). Optionally listen
+first: download one shard from `shards_of[spk]` and play a couple of its clips.
+
+## 3b. Extract only that speaker's shards (fast, targeted)
+
+Downloads **only the shards containing your speaker** (from `shards_of`),
+sequentially so it doesn't hit HF's 429 rate limit; deletes each after.
+
+```python
+import os, io, pathlib, numpy as np, soundfile as sf, librosa
+from huggingface_hub import hf_hub_download
+
+CHOSEN_SPK = "f-adt2-0002"      # <-- female with the most hours from 3a
+TARGET_HOURS = 15
 out = pathlib.Path("khm_tts"); (out/"wavs").mkdir(parents=True, exist_ok=True)
 rows = []; sec = 0.0; i = 0
-for si, shard in enumerate(shards):
-    p = hf_hub_download(REPO, shard, repo_type="dataset")
-    tbl = pq.read_table(p, columns=[SPK, AUD, TEXT]).to_pydict()
-    for spk, aud, txt in zip(tbl[SPK], tbl[AUD], tbl[TEXT]):
-        if str(spk) != CHOSEN_SPK: continue
-        b = aud["bytes"] if aud.get("bytes") else open(aud["path"], "rb").read()
+for si in sorted(shards_of[CHOSEN_SPK]):            # reuse shards_of from 3a
+    rel = paths[si].split(f"{REPO}/", 1)[-1]        # -> data/train-...parquet
+    p = hf_hub_download(REPO, rel, repo_type="dataset")
+    tbl = pq.read_table(p, columns=["speaker_id", "audio", "transcript"]).to_pydict()
+    for s, a, t in zip(tbl["speaker_id"], tbl["audio"], tbl["transcript"]):
+        if str(s) != CHOSEN_SPK: continue
+        b = a["bytes"] if a.get("bytes") else open(a["path"], "rb").read()
         y, sr = sf.read(io.BytesIO(b), dtype="float32")
         if getattr(y, "ndim", 1) > 1: y = y.mean(1)
         if sr != 22050: y = librosa.resample(np.asarray(y, dtype="float32"), orig_sr=sr, target_sr=22050)
         nm = f"{CHOSEN_SPK}_{i:06d}"; i += 1
         sf.write(out/"wavs"/f"{nm}.wav", y, 22050)
-        tt = str(txt).strip().replace("|", " ").replace("\n", " ")
+        tt = str(t).strip().replace("|", " ").replace("\n", " ")
         rows.append(f"{nm}|{tt}|{tt}"); sec += len(y)/22050
-    os.remove(p)                                   # delete shard -> disk stays small
-    print(f"shard {si+1}/{len(shards)} | {i} clips | {sec/3600:.2f}h", flush=True)
+    os.remove(p)
+    print(f"shard {si}: {i} clips, {sec/3600:.2f}h", flush=True)
     if sec >= TARGET_HOURS*3600: break
 (out/"metadata.csv").write_text("\n".join(rows), encoding="utf-8")
 print("DONE:", i, "clips,", round(sec/3600, 2), "h", flush=True)
