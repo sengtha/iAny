@@ -167,6 +167,12 @@ subprocess.run([sys.executable,"-m","pip","install","-q","coqui-tts","transforme
 ## 4. Train grapheme VITS (one cell — resumable)
 
 ```python
+# shim: coqui-tts imports isin_mps_friendly from transformers.pytorch_utils,
+# which some transformers versions lack. Define it (a torch.isin wrapper) first.
+import torch, transformers.pytorch_utils as _ptu
+if not hasattr(_ptu, "isin_mps_friendly"):
+    _ptu.isin_mps_friendly = lambda elements, test_elements: torch.isin(elements, test_elements)
+
 import glob, pathlib
 from trainer import Trainer, TrainerArgs
 from TTS.tts.configs.shared_configs import BaseDatasetConfig, CharactersConfig
