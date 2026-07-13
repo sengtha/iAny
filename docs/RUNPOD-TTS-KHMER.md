@@ -242,11 +242,41 @@ print("pushed to", REPO_OUT)
 
 ## 6. Synthesize / test (offline)
 
+`TTS.api` fails to load these checkpoints two ways: (1) strict `load_state_dict`
+trips on the discriminator weights, and (2) **coqui saves an incomplete
+`config.json`** — it drops the ASCII letters/digits from the character set, so the
+rebuilt vocab (144) mismatches the trained checkpoint (206). Load the model
+directly, restoring the true training vocab (**Khmer block + ASCII letters +
+digits**), and synthesize via `model.inference`:
+
 ```python
-from TTS.api import TTS
-tts = TTS(model_path="vits_khm/.../best_model.pth", config_path="vits_khm/.../config.json")
-tts.tts_to_file(text="សូមស្វាគមន៍មកកាន់ iAny", file_path="out.wav")
+import torch, glob, os, string, soundfile as sf, transformers.pytorch_utils as _ptu
+if not hasattr(_ptu, "isin_mps_friendly"):
+    _ptu.isin_mps_friendly = lambda e, t: torch.isin(e, t)
+from TTS.tts.configs.vits_config import VitsConfig
+from TTS.tts.models.vits import Vits
+
+mp = max(glob.glob("/workspace/vits_khm/**/best_model.pth", recursive=True), key=os.path.getmtime)
+cp = os.path.join(os.path.dirname(mp), "config.json")
+config = VitsConfig(); config.load_json(cp)
+# restore the real training vocab (config.json dropped ASCII) so sizes match
+config.characters.characters = "".join(chr(c) for c in range(0x1780, 0x1800)) + string.ascii_letters + string.digits
+model = Vits.init_from_config(config)
+model.load_checkpoint(config, mp, eval=True, strict=False)
+model.eval()
+
+ids = model.tokenizer.text_to_ids("សូមស្វាគមន៍មកកាន់ iAny")
+x = torch.tensor(ids).long().unsqueeze(0)
+x_len = torch.tensor([x.shape[1]]).long()
+with torch.no_grad():
+    out = model.inference(x, aux_input={"x_lengths": x_len})
+sf.write("out.wav", out["model_outputs"][0, 0].cpu().numpy(), config.audio.sample_rate)
+print("wrote out.wav")
 ```
+
+> **Carry this to iAny/ONNX export:** the real vocab is Khmer + ASCII letters +
+> digits (206 tokens), NOT what `config.json` says. Rebuild `config.characters`
+> as above before exporting, or the model loads with the wrong tokenizer.
 
 ## 7. On-device (phone / Pi) — later
 
