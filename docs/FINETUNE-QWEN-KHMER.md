@@ -200,21 +200,34 @@ else:
 merged = model.merge_and_unload()
 merged.save_pretrained("khm-ft"); tok.save_pretrained("khm-ft")
 
+# ---------- SAVE FIRST: push safetensors to HF before any GGUF risk ----------
+# (a failed GGUF convert must never lose the trained weights again)
+api = HfApi(token=HF_TOKEN)
+api.create_repo("sengtha/Qwen3-0.6B-khm-ft", exist_ok=True)
+api.upload_folder(folder_path="khm-ft", repo_id="sengtha/Qwen3-0.6B-khm-ft")
+print("SAFETENSORS SAVED -> sengtha/Qwen3-0.6B-khm-ft (training is now safe)")
+
 # ---------- convert to GGUF (force qwen2 pre-tokenizer for the trimmed vocab) ----------
-subprocess.run(["git","clone","--depth","1","https://github.com/ggml-org/llama.cpp"])
-subprocess.run([sys.executable,"-m","pip","install","-q","-r","llama.cpp/requirements.txt"])
-needle = 'raise NotImplementedError("BPE pre-tokenizer was not recognized - update get_vocab_base_pre()")'
+subprocess.run(["git","clone","--depth","1","https://github.com/ggml-org/llama.cpp"], check=True)
+subprocess.run([sys.executable,"-m","pip","install","-q","-r","llama.cpp/requirements.txt"], check=True)
+# robust patch: force get_vocab_base_pre() to return "qwen2" at the function top,
+# instead of matching a fragile NotImplementedError message that changes per version.
 for p in pathlib.Path("llama.cpp").rglob("*.py"):
     s = p.read_text()
-    if needle in s: p.write_text(s.replace(needle, 'return "qwen2"'))
+    if "def get_vocab_base_pre" in s:
+        out = []
+        for ln in s.splitlines():
+            out.append(ln)
+            if ln.strip().startswith("def get_vocab_base_pre"):
+                out.append(ln[:len(ln)-len(ln.lstrip())] + '    return "qwen2"')
+        p.write_text("\n".join(out)); print("patched", p)
 subprocess.run([sys.executable,"llama.cpp/convert_hf_to_gguf.py","khm-ft",
-                "--outfile","khm-ft-f16.gguf","--outtype","f16"])
+                "--outfile","khm-ft-f16.gguf","--outtype","f16"], check=True)
 subprocess.run("cd llama.cpp && cmake -B build -DLLAMA_CURL=OFF && "
-               "cmake --build build --config Release -j --target llama-quantize", shell=True)
-subprocess.run(["./llama.cpp/build/bin/llama-quantize","khm-ft-f16.gguf","model.gguf","Q8_0"])
+               "cmake --build build --config Release -j --target llama-quantize", shell=True, check=True)
+subprocess.run(["./llama.cpp/build/bin/llama-quantize","khm-ft-f16.gguf","model.gguf","Q8_0"], check=True)
 
-# ---------- upload the GGUF (token from secrets, no prompt) ----------
-api = HfApi(token=HF_TOKEN)
+# ---------- upload the GGUF ----------
 api.create_repo(OUT_REPO, exist_ok=True)
 api.upload_file(path_or_fileobj="model.gguf",
                 path_in_repo="Qwen3-0.6B-khm-ft-Q8_0.gguf", repo_id=OUT_REPO)
