@@ -9,20 +9,24 @@ export interface AskResult {
 
 /**
  * Build a grounded chat message. Passed as `messages`, so llama.rn applies the
- * model's own chat template (Qwen's ChatML, Gemma's turns, etc.). Context is
- * kept tight — the on-device n_ctx is small (256) on weak devices.
+ * model's own chat template (Qwen's ChatML, Gemma's turns, etc.). The generator
+ * runs n_ctx=2048, so we can afford a few fuller chunks (top-3, ~500 chars each)
+ * — starving the model of context is what makes answers one-liners.
  */
 function buildMessages(question: string, sources: ChunkHit[]): GenMessage[] {
   const context = sources
-    .slice(0, 2)
+    .slice(0, 3)
     .map((s, i) => {
-      const text = s.text.length > 300 ? `${s.text.slice(0, 300)}…` : s.text
+      const text = s.text.length > 500 ? `${s.text.slice(0, 500)}…` : s.text
       return `[${i + 1}] ${s.title}\n${text}`
     })
     .join('\n\n')
   const content = [
     "Answer the question using only the context below, from the user's notes.",
-    'Be brief. Answer in Khmer (ភាសាខ្មែរ).',
+    // Ask for a complete answer, not a one-liner — ft2 is SFT'd terse, so nudge
+    // it to include the relevant details it can find in the context.
+    'Give a complete answer in Khmer (ភាសាខ្មែរ), 2–4 sentences, including the' +
+      ' relevant details from the context. Do not just repeat the question.',
     '',
     `Context:\n${context || '(none)'}`,
     '',
@@ -42,7 +46,7 @@ export async function ask(
   embedder: Embedder | undefined,
   onToken: (token: string) => void,
 ): Promise<AskResult> {
-  const sources = await hybridSearch(question, embedder, 2)
-  const answer = await generator.generate(buildMessages(question, sources), onToken, 128)
+  const sources = await hybridSearch(question, embedder, 3)
+  const answer = await generator.generate(buildMessages(question, sources), onToken, 256)
   return { answer, sources }
 }
