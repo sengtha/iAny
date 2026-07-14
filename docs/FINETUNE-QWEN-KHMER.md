@@ -177,12 +177,25 @@ SFTTrainer(model=model, args=cpt_args, train_dataset=cpt_ds,
            processing_class=tok).train()
 
 # ---------- Stage B: SFT on your Q&A (iAny's exact prompt) ----------
+# Source: Kaggle attaches the dataset under /kaggle/input; on RunPod there's no
+# such mount, so pull data.json straight from HF.
 qa_files = glob.glob("/kaggle/input/**/*.json", recursive=True)
+if not qa_files:
+    from huggingface_hub import hf_hub_download
+    try:
+        qa_files = [hf_hub_download("sengtha/khmer-qa", "data.json", repo_type="dataset")]
+    except Exception as e:
+        print("no Q&A source (Kaggle mount or HF):", e)
 if qa_files:
     raw = json.load(open(qa_files[0]))
+    # IMPORTANT: this prompt must match the app's ask.ts EXACTLY, or the model
+    # learns a different answer style than it's asked for at inference. It asks
+    # for a COMPLETE answer (not "Be brief") so the richer dataset actually
+    # teaches fuller answers.
     def to_chat(ex):
         user = ("Answer the question using only the context below, from the user's notes.\n"
-                "Be brief. Answer in Khmer (ភាសាខ្មែរ).\n\n"
+                "Give a complete answer in Khmer (ភាសាខ្មែរ), 2–4 sentences, including the "
+                "relevant details from the context. Do not just repeat the question.\n\n"
                 f"Context:\n{ex['context']}\n\nQuestion: {ex['question']}\n/no_think")
         return {"messages": [{"role": "user", "content": user},
                              {"role": "assistant", "content": ex["answer"]}]}
