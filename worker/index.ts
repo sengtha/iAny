@@ -51,6 +51,9 @@ const ALLOWED_PREFIXES = [
   // Fine-tuned on iAny's Khmer corpus (CPT on FineWeb-2 + ParaCrawl) for better
   // Khmer — same 32k vocab so it still fits the S10. The current gen model.
   'sengtha/Qwen3-0.6B-khm-ft-Q8_0-GGUF/',
+  // On-device Khmer TTS: VITS voice (trained on DDD-Cambodia 727h) as ONNX +
+  // tts_meta.json (grapheme vocab). Runs via onnxruntime-react-native, offline.
+  'sengtha/khmer-tts-female-v1/',
   // Limit test: bigger base Qwen3 (1.7B, full vocab) to probe the S10 ceiling.
   'unsloth/Qwen3-1.7B-GGUF/',
 ]

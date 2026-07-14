@@ -48,6 +48,17 @@ export const EMBEDDING_DIMS = 256
 export const GEN_MODEL_REPO = 'sengtha/Qwen3-0.6B-khm-ft-Q8_0-GGUF'
 export const GEN_MODEL_FILES = ['Qwen3-0.6B-khm-ft-Q8_0.gguf']
 
+/**
+ * Native Khmer TTS: a VITS voice trained from scratch on the DDD-Cambodia 727h
+ * corpus (single female speaker), exported to ONNX. Runs on-device via
+ * onnxruntime-react-native, fully offline. `tts_meta.json` carries the grapheme
+ * vocab (Khmer + ASCII + digits) + `add_blank` + sample_rate so the app can
+ * tokenize exactly like the training tokenizer.
+ */
+export const TTS_MODEL_REPO = 'sengtha/khmer-tts-female-v1'
+export const TTS_ONNX_FILE = 'khmer_tts.onnx'
+export const TTS_META_FILE = 'tts_meta.json'
+
 /** iAny model mirror (Cloudflare worker pull-through cache). */
 export const MODEL_MIRROR = 'https://iany.sengtha.workers.dev/models'
 /** Read-only HF metadata proxy on the same worker (repo file lists), so the

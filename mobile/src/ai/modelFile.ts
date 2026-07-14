@@ -113,3 +113,39 @@ export async function ensureModelFile(
   await FileSystem.moveAsync({ from: tmp, to: finalDest })
   return finalDest
 }
+
+/**
+ * Download ONE specific file (e.g. an .onnx) through the mirror, cached on disk.
+ * Unlike ensureModelFile it doesn't guess/discover — the caller knows the name.
+ */
+export async function ensureFile(
+  repo: string,
+  file: string,
+  onProgress?: (fraction: number) => void,
+): Promise<string> {
+  await FileSystem.makeDirectoryAsync(MODEL_DIR, { intermediates: true }).catch(() => {})
+  const dest = MODEL_DIR + file.replace(/\//g, '_')
+  const info = await FileSystem.getInfoAsync(dest)
+  if (info.exists && info.size && info.size > 1_000_000) return dest
+
+  const tmp = `${dest}.part`
+  await FileSystem.deleteAsync(tmp, { idempotent: true })
+  const resumable = FileSystem.createDownloadResumable(resolveUrl(repo, file), tmp, {}, (p) => {
+    const total = p.totalBytesExpectedToWrite
+    if (total > 0) onProgress?.(p.totalBytesWritten / total)
+  })
+  const res = await resumable.downloadAsync()
+  if (!res || (res.status && res.status >= 400)) {
+    await FileSystem.deleteAsync(tmp, { idempotent: true })
+    throw new Error(`download failed (status ${res?.status ?? 'unknown'}) for ${file}`)
+  }
+  await FileSystem.moveAsync({ from: tmp, to: dest })
+  return dest
+}
+
+/** Fetch a small JSON file (e.g. tts_meta.json) through the mirror. */
+export async function fetchModelJson<T>(repo: string, file: string): Promise<T> {
+  const res = await fetch(resolveUrl(repo, file))
+  if (!res.ok) throw new Error(`fetch ${file} failed (${res.status})`)
+  return (await res.json()) as T
+}

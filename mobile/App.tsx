@@ -23,6 +23,7 @@ import type { ChunkHit } from './src/domain/types'
 import { embedder, type EmbedderProgress } from './src/ai/embedder'
 import { generator, type GenProgress } from './src/ai/generator'
 import { ask } from './src/ai/ask'
+import { tts, type TtsProgress } from './src/ai/tts'
 
 /**
  * Stage 2 smoke-test screen: on-device SQLite + FTS5 (Stage 1) plus opt-in
@@ -44,6 +45,19 @@ export default function App() {
   const [gen, setGen] = useState<GenProgress>({ status: generator.status })
   const [answer, setAnswer] = useState('')
   const [speed, setSpeed] = useState<string | null>(null)
+  const [ttsState, setTtsState] = useState<TtsProgress>({ status: tts.status })
+
+  const onSpeak = async () => {
+    const text = answer.replace(/^⚠️.*/s, '').trim()
+    if (!text) return
+    try {
+      if (!tts.ready) await tts.init(setTtsState)
+      setTtsState({ status: 'ready' })
+      await tts.speak(text)
+    } catch (e) {
+      setTtsState({ status: 'error', error: e instanceof Error ? e.message : String(e) })
+    }
+  }
 
   useEffect(() => {
     void (async () => {
@@ -275,6 +289,19 @@ export default function App() {
                 {answer || '…'}
               </Text>
               {speed && <Text style={styles.speed}>{speed}</Text>}
+              {answer.length > 0 && !answer.startsWith('⚠️') && (
+                <Pressable style={styles.speakBtn} onPress={onSpeak}>
+                  <Text style={styles.speakBtnText}>
+                    {ttsState.status === 'downloading'
+                      ? `🔊 downloading voice ${Math.round((ttsState.progress ?? 0) * 100)}%`
+                      : ttsState.status === 'loading'
+                        ? '🔊 loading voice…'
+                        : ttsState.status === 'error'
+                          ? `🔊 error: ${ttsState.error ?? ''}`
+                          : '🔊 Speak (Khmer)'}
+                  </Text>
+                </Pressable>
+              )}
             </View>
           )}
 
@@ -379,6 +406,15 @@ const styles = StyleSheet.create({
   answerLabel: { fontWeight: '700', marginBottom: 6, color: '#15803d' },
   answerText: { color: '#14532d', fontSize: 15, lineHeight: 22 },
   speed: { color: '#166534', fontSize: 12, marginTop: 10, fontWeight: '600' },
+  speakBtn: {
+    marginTop: 12,
+    alignSelf: 'flex-start',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    backgroundColor: '#16a34a',
+  },
+  speakBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   btnOutline: {
     borderWidth: 1,
     borderColor: '#2563eb',
