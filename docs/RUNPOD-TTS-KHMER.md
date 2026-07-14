@@ -360,6 +360,11 @@ English/number → Khmer normalization; serve the onnx through the Cloudflare mi
    from it. Then push with **§5** periodically. Aim for ~200k+ total steps.
 
 ```python
+# deps: coqui-tts + a transformers that has isin_mps_friendly (in case this is a
+# fresh kernel that hasn't run §3b's install). Safe to re-run — pip skips if present.
+import subprocess, sys
+subprocess.run([sys.executable,"-m","pip","install","-q","coqui-tts","transformers==4.46.3","huggingface_hub"])
+
 # shim (same as §4) — coqui needs isin_mps_friendly on some transformers builds
 import torch, transformers.pytorch_utils as _ptu
 if not hasattr(_ptu, "isin_mps_friendly"):
