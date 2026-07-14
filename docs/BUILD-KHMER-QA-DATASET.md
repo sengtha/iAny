@@ -10,39 +10,47 @@ word. The dataset is reusable: SFT the 0.6B for the S10 today, and bigger models
 
 ## Where to run it (RunPod)
 
-This needs a GPU + internet, and it's **separate from TTS training** — don't run
-it on the pod that's training the voice (they'd fight over VRAM). Two options:
-- **A new, cheaper pod** — a **24 GB GPU** (RTX A5000 / L4 / 3090) runs the 4-bit
-  generator fine and costs less than an A100. Recommended.
-- **Or wait** until TTS training is done and reuse that A100.
+This needs a GPU + internet, **separate from TTS training** (don't share VRAM).
+A **~32 GB GPU** (RTX PRO 4500 / A5000 / 4090) is ideal.
 
-Template: **RunPod PyTorch 2.x**, container disk 40 GB, Internet on. Open Jupyter.
+> **Disk matters.** A 14B model downloads ~28 GB of fp16 weights (4-bit saves
+> VRAM, NOT download size), so it will NOT fit a 30 GB container disk. Use
+> **Qwen2.5-7B** (~15 GB) unless you gave the pod ≥60 GB disk. On a 32 GB card 7B
+> runs in **bf16 (no quantization)** — faster than 4-bit and simpler.
 
-## The notebook
+Template: **RunPod PyTorch 2.x**, container disk **40 GB+**, Internet on.
+
+## Speed: batch it
+
+Generating one row at a time is slow (~7–18 h for 2.5k on a 14B). The builder
+below **batches** generations (24 at once) → ~**40–75 min** for 2.5k rows on a
+32 GB card, and runs **detached** so a phone disconnect can't kill it.
+
+## The builder (write to a file, run detached)
+
+In a Jupyter cell, `%%writefile /workspace/build_qa.py` with the code below, then
+launch it with `nohup` (next section).
 
 ```python
 import subprocess, sys
 subprocess.run([sys.executable,"-m","pip","install","-q",
-                "transformers>=4.44","accelerate","datasets","bitsandbytes","huggingface_hub"])
+                "transformers>=4.44","accelerate","datasets","huggingface_hub"])
 import torch, re, json, random
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from transformers import AutoModelForCausalLM, AutoTokenizer
 from datasets import load_dataset
 from huggingface_hub import login, HfApi
 
-login("hf_xxxxxxxx")                      # <-- your HF WRITE token (RunPod: no kaggle secrets)
-TARGET = 2500                             # rows to build (up from 1000)
+login("hf_xxxxxxxx")                      # <-- your HF WRITE token
+TARGET, BATCH = 2500, 24                   # BATCH: lower to 12 if you hit CUDA OOM
 
-# Generator: on a 24GB+ GPU you can afford a stronger model for better Khmer.
-# Qwen2.5-14B-Instruct (4-bit ~9GB) is ungated + strong. For even better Khmer,
-# try SeaLLMs/SeaLLMs-v3-7B-Chat (SEA-tuned) if you accept its license, or drop
-# to Qwen2.5-7B-Instruct on a 16GB card.
-GEN = "Qwen/Qwen2.5-14B-Instruct"
-tok = AutoTokenizer.from_pretrained(GEN)
-model = AutoModelForCausalLM.from_pretrained(GEN, device_map="auto",
-    quantization_config=BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_compute_dtype=torch.bfloat16))
+# 7B fits a 30GB disk and runs in bf16 (no quant) on a 32GB card — faster than
+# 4-bit. For better Khmer on a big-disk/48GB pod, use Qwen/Qwen2.5-14B-Instruct.
+GEN = "Qwen/Qwen2.5-7B-Instruct"
+tok = AutoTokenizer.from_pretrained(GEN); tok.padding_side = "left"   # decoder-only batch gen
+if tok.pad_token is None: tok.pad_token = tok.eos_token
+model = AutoModelForCausalLM.from_pretrained(GEN, torch_dtype=torch.bfloat16, device_map={"":0}).eval()
 
-# ---- Khmer source paragraphs (clean, factual). Wikipedia is convenient; mix in
-# your own notes as extra contexts for domain-relevant Q&A. ----
+# ---- Khmer source paragraphs (clean, factual). Mix in your own notes for domain Q&A. ----
 wiki = load_dataset("wikimedia/wikipedia", "20231101.km", split="train")
 paras = []
 for art in wiki:
@@ -50,78 +58,76 @@ for art in wiki:
         p = p.strip()
         if 200 <= len(p) <= 1200: paras.append(p)
     if len(paras) >= TARGET*3: break
-random.shuffle(paras)
-print("candidate paragraphs:", len(paras), flush=True)
+random.shuffle(paras); print("paras:", len(paras), flush=True)
 
 # ---- Task types: mix extractive + fuller answers so the SFT isn't only terse.
 # Each = (name, instruction, few-shot, grounding threshold). Answers are Khmer. ----
 TASKS = [
-  ("extract",
-   "បង្កើតសំណួរខ្លីមួយ ដែលចម្លើយស្ថិតនៅក្នុងអត្ថបទ ហើយផ្តល់ចម្លើយខ្លីត្រឹមត្រូវ (ពាក្យ ឬឃ្លា)។",
-   'អត្ថបទ៖ ភ្នំពេញ គឺជារាជធានីរបស់ប្រទេសកម្ពុជា។\n'
-   '{"question":"តើរាជធានីរបស់កម្ពុជាឈ្មោះអ្វី?","answer":"ភ្នំពេញ"}\n', 0.9),
-  ("explain",
-   "បង្កើតសំណួរ 'ហេតុអ្វី' ឬ 'យ៉ាងណា' មួយ ហើយឆ្លើយជា ១-៣ ប្រយោគ ដោយផ្អែកលើអត្ថបទតែប៉ុណ្ណោះ។",
-   'អត្ថបទ៖ ទន្លេសាបហូរបញ្ច្រាសនៅរដូវវស្សា ដោយសារទឹកទន្លេមេគង្គឡើងខ្ពស់ រុញទឹកចូលបឹង។\n'
-   '{"question":"ហេតុអ្វីទឹកទន្លេសាបហូរបញ្ច្រាសនៅរដូវវស្សា?","answer":"ដោយសារនៅរដូវវស្សា ទឹកទន្លេមេគង្គឡើងខ្ពស់ ហើយរុញទឹកឲ្យហូរបញ្ច្រាសចូលបឹងទន្លេសាប។"}\n', 0.45),
-  ("summarize",
-   "សង្ខេបខ្លឹមសារនៃអត្ថបទ ជា ១-២ ប្រយោគ។ សំណួរគឺ 'តើអត្ថបទនេះនិយាយអំពីអ្វី?'។",
-   'អត្ថបទ៖ អង្គរវត្ត ជាប្រាសាទដ៏ធំ សាងសង់នៅសតវត្សទី១២ ជានិមិត្តរូបនៃប្រទេសកម្ពុជា។\n'
-   '{"question":"តើអត្ថបទនេះនិយាយអំពីអ្វី?","answer":"អត្ថបទនិយាយអំពីប្រាសាទអង្គរវត្ត ដែលសាងសង់នៅសតវត្សទី១២ និងជានិមិត្តរូបរបស់កម្ពុជា។"}\n', 0.5),
+  ("extract","បង្កើតសំណួរខ្លីមួយ ដែលចម្លើយស្ថិតនៅក្នុងអត្ថបទ ហើយផ្តល់ចម្លើយខ្លីត្រឹមត្រូវ (ពាក្យ ឬឃ្លា)។",
+   'អត្ថបទ៖ ភ្នំពេញ គឺជារាជធានីរបស់ប្រទេសកម្ពុជា។\n{"question":"តើរាជធានីរបស់កម្ពុជាឈ្មោះអ្វី?","answer":"ភ្នំពេញ"}\n',0.9),
+  ("explain","បង្កើតសំណួរ 'ហេតុអ្វី' ឬ 'យ៉ាងណា' មួយ ហើយឆ្លើយជា ១-៣ ប្រយោគ ដោយផ្អែកលើអត្ថបទ។",
+   'អត្ថបទ៖ ទន្លេសាបហូរបញ្ច្រាសនៅរដូវវស្សា ដោយសារទឹកមេគង្គឡើងខ្ពស់ រុញទឹកចូលបឹង។\n{"question":"ហេតុអ្វីទន្លេសាបហូរបញ្ច្រាស?","answer":"ដោយសារនៅរដូវវស្សា ទឹកទន្លេមេគង្គឡើងខ្ពស់ ហើយរុញទឹកឲ្យហូរបញ្ច្រាសចូលបឹង។"}\n',0.45),
+  ("summarize","សង្ខេបខ្លឹមសារនៃអត្ថបទ ជា ១-២ ប្រយោគ។ សំណួរគឺ 'តើអត្ថបទនេះនិយាយអំពីអ្វី?'។",
+   'អត្ថបទ៖ អង្គរវត្ត ជាប្រាសាទដ៏ធំ សាងសង់នៅសតវត្សទី១២។\n{"question":"តើអត្ថបទនេះនិយាយអំពីអ្វី?","answer":"អត្ថបទនិយាយអំពីប្រាសាទអង្គរវត្ត ដែលសាងសង់នៅសតវត្សទី១២។"}\n',0.5),
 ]
-
-SYS = ("អ្នកជាជំនួយការបង្កើតទិន្នន័យ។ ប្រើតែព័ត៌មានក្នុងអត្ថបទ។ កុំបង្កើតព័ត៌មានថ្មី។ "
-       "ឆ្លើយជា JSON តែមួយបន្ទាត់ ដែលមាន key 'question' និង 'answer'។")
+SYS = "ប្រើតែព័ត៌មានក្នុងអត្ថបទ។ កុំបង្កើតព័ត៌មានថ្មី។ ឆ្លើយជា JSON តែមួយបន្ទាត់ ដែលមាន key 'question' និង 'answer'។"
 
 # grounding via char 5-gram overlap: extractive answers overlap ~fully; paraphrased
 # answers must still share most of their content with the context (blocks made-up facts).
 def shingles(s, n=5):
-    s = re.sub(r"\s+", "", s or "")
-    return {s[i:i+n] for i in range(max(0, len(s)-n+1))}
-def grounded(ans, ctx, thr):
-    a = shingles(ans)
-    return bool(a) and len(a & shingles(ctx)) / len(a) >= thr
-
-def gen_one(para, task):
-    name, instr, fewshot, thr = task
-    user = (f"{instr}\n\nឧទាហរណ៍៖\n{fewshot}\n"
-            f"ឥឡូវនេះ សម្រាប់អត្ថបទខាងក្រោម ឆ្លើយជា JSON តែមួយបន្ទាត់៖\nអត្ថបទ៖ {para}\n")
-    msgs = [{"role":"system","content":SYS},{"role":"user","content":user}]
-    enc = tok.apply_chat_template(msgs, add_generation_prompt=True, return_tensors="pt", return_dict=True)
-    enc = {k: v.to(model.device) for k, v in enc.items()}
-    with torch.no_grad():
-        out = model.generate(**enc, max_new_tokens=256, do_sample=True, temperature=0.7, top_p=0.9)
-    txt = tok.decode(out[0][enc["input_ids"].shape[1]:], skip_special_tokens=True)
+    s = re.sub(r"\s+", "", s or ""); return {s[i:i+n] for i in range(max(0, len(s)-n+1))}
+def grounded(a, c, thr):
+    sh = shingles(a); return bool(sh) and len(sh & shingles(c)) / len(sh) >= thr
+def prompt(para, task):
+    user = f"{task[1]}\n\nឧទាហរណ៍៖\n{task[2]}\nឥឡូវនេះ ឆ្លើយជា JSON តែមួយបន្ទាត់៖\nអត្ថបទ៖ {para}\n"
+    return tok.apply_chat_template([{"role":"system","content":SYS},{"role":"user","content":user}],
+                                   tokenize=False, add_generation_prompt=True)
+def parse(txt, para, task):
     m = re.search(r"\{.*\}", txt, re.S)
     if not m: return None
-    try:
-        j = json.loads(m.group(0))
-    except Exception:
-        return None
+    try: j = json.loads(m.group(0))
+    except Exception: return None
     q, a = str(j.get("question","")).strip(), str(j.get("answer","")).strip()
-    if len(q) < 5 or len(a) < 2: return None
-    if len(a) > len(para) + 80: return None          # answer shouldn't dwarf context
-    if not grounded(a, para, thr): return None       # anti-hallucination
-    return {"context": para, "question": q, "answer": a, "type": name}
+    if len(q) < 5 or len(a) < 2 or len(a) > len(para) + 80: return None
+    if not grounded(a, para, task[3]): return None
+    return {"context": para, "question": q, "answer": a, "type": task[0]}
 
-rows, i = [], 0
-for para in paras:
-    task = TASKS[i % len(TASKS)]; i += 1              # cycle tasks for balance
-    r = gen_one(para, task)
-    if r: rows.append(r)
-    if len(rows) and len(rows) % 50 == 0: print(len(rows), "rows", flush=True)
-    if len(rows) >= TARGET: break
+# ---- BATCHED generation: 24 prompts per forward pass = ~5-10x faster ----
+rows, idx = [], 0
+while len(rows) < TARGET and idx < len(paras):
+    batch = []
+    while len(batch) < BATCH and idx < len(paras):
+        batch.append((paras[idx], TASKS[idx % len(TASKS)])); idx += 1   # cycle tasks
+    enc = tok([prompt(p, t) for p, t in batch], return_tensors="pt", padding=True).to(model.device)
+    with torch.no_grad():
+        out = model.generate(**enc, max_new_tokens=256, do_sample=True, temperature=0.7,
+                             top_p=0.9, pad_token_id=tok.pad_token_id)
+    dec = tok.batch_decode(out[:, enc["input_ids"].shape[1]:], skip_special_tokens=True)
+    for (p, t), txt in zip(batch, dec):
+        r = parse(txt, p, t)
+        if r: rows.append(r)
+    print(len(rows), "rows /", idx, "seen", flush=True)
 
 from collections import Counter
 print("by type:", Counter(r["type"] for r in rows), flush=True)
-json.dump(rows, open("khmer_qa.json","w"), ensure_ascii=False, indent=1)
-
+json.dump(rows, open("/workspace/khmer_qa.json","w"), ensure_ascii=False, indent=1)
 api = HfApi()
 api.create_repo("sengtha/khmer-qa", repo_type="dataset", exist_ok=True)
-api.upload_file(path_or_fileobj="khmer_qa.json", path_in_repo="data.json",
+api.upload_file(path_or_fileobj="/workspace/khmer_qa.json", path_in_repo="data.json",
                 repo_id="sengtha/khmer-qa", repo_type="dataset")
-print("DONE ->", len(rows), "rows to sengtha/khmer-qa (data.json)")
+print("DONE ->", len(rows), "rows to sengtha/khmer-qa (data.json)", flush=True)
 ```
+
+## Run it detached
+
+```bash
+cd /workspace
+nohup python build_qa.py > qa.out 2>&1 &
+tail -f qa.out          # each line: "rows / seen"; Ctrl-C stops WATCHING only
+```
+
+~**40–75 min** for 2,500 rows on a 32 GB card. Reconnect anytime with
+`tail -f /workspace/qa.out`. If it OOMs, lower `BATCH` to 12 and relaunch.
 
 ## Then: re-run Stage B SFT
 
