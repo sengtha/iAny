@@ -152,9 +152,11 @@ for si in sorted(shards_of[CHOSEN_SPK]):            # reuse shards_of from 3a
         tt = str(t).strip().replace("|", " ").replace("\n", " ")
         rows.append(f"{nm}|{tt}|{tt}"); sec += len(y)/22050
     os.remove(p)
+    # write metadata.csv after EACH shard so an interrupt/kernel-restart doesn't
+    # strand the wavs without their transcripts (the two must stay in sync).
+    (out/"metadata.csv").write_text("\n".join(rows), encoding="utf-8")
     print(f"shard {si}: {i} clips, {sec/3600:.2f}h", flush=True)
     if sec >= TARGET_HOURS*3600: break
-(out/"metadata.csv").write_text("\n".join(rows), encoding="utf-8")
 print("DONE:", i, "clips,", round(sec/3600, 2), "h", flush=True)
 # coqui-tts needs a transformers that has isin_mps_friendly -> pin it, then
 # RESTART THE KERNEL before running §4 (transformers is already imported).
@@ -163,6 +165,38 @@ subprocess.run([sys.executable,"-m","pip","install","-q","coqui-tts","transforme
 
 > After this, **Kernel → Restart** before §4 (the data on disk survives). If the
 > §4 import still fails on `isin_mps_friendly`, try `transformers==4.44.2`.
+>
+> **Recover a lost `metadata.csv`** (wavs on disk but the CSV never got written,
+> e.g. an older interrupted run): don't re-extract — rebuild the CSV from the
+> existing wavs. The clip index is deterministic, so re-read only the
+> `transcript` column in the same shard order and map index→transcript:
+> ```python
+> import os, glob, pyarrow.parquet as pq
+> from huggingface_hub import HfFileSystem
+> from concurrent.futures import ThreadPoolExecutor
+> have = {int(os.path.basename(f)[len(CHOSEN_SPK)+1:-4])
+>         for f in glob.glob(f"khm_tts/wavs/{CHOSEN_SPK}_*.wav")}
+> fs = HfFileSystem(); paths = sorted(fs.glob(f"datasets/{REPO}/data/train-*.parquet"))
+> def scan(ip):
+>     idx, pth = ip
+>     with fs.open(pth) as f:
+>         t = pq.read_table(f, columns=["speaker_id","transcript"]).to_pydict()
+>     return idx, [str(x) for s,x in zip(t["speaker_id"],t["transcript"]) if str(s)==CHOSEN_SPK]
+> res = {}
+> with ThreadPoolExecutor(max_workers=16) as ex:
+>     for idx, ch in ex.map(scan, list(enumerate(paths))): res[idx] = ch
+> i, rows = 0, {}
+> for idx in sorted(res):
+>     for tt in res[idx]:
+>         if i in have:
+>             c = tt.strip().replace("|"," ").replace("\n"," ")
+>             rows[i] = f"{CHOSEN_SPK}_{i:06d}|{c}|{c}"
+>         i += 1
+> open("khm_tts/metadata.csv","w",encoding="utf-8").write("\n".join(rows[k] for k in sorted(rows)))
+> print("wrote", len(rows), "lines; wavs", len(have))   # the two must match
+> ```
+> If the two counts differ, the transcripts would be misaligned — do NOT train;
+> re-extract with §3b instead.
 
 ## 4. Train grapheme VITS (one cell — resumable)
 
