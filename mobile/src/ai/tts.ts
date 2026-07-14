@@ -47,6 +47,55 @@ function toBase64(bytes: Uint8Array): string {
   return out
 }
 
+/** Khmer number words. The voice was trained on Khmer audio, so it can't say
+ *  Arabic/Khmer digits — we spell numbers out in Khmer before synthesis. */
+const KH_UNITS = ['សូន្យ', 'មួយ', 'ពីរ', 'បី', 'បួន', 'ប្រាំ', 'ប្រាំមួយ', 'ប្រាំពីរ', 'ប្រាំបី', 'ប្រាំបួន']
+const KH_TENS = ['', 'ដប់', 'ម្ភៃ', 'សាមសិប', 'សែសិប', 'ហាសិប', 'ហុកសិប', 'ចិតសិប', 'ប៉ែតសិប', 'កៅសិប']
+const KH_SCALES: [number, string][] = [
+  [1000000, 'លាន'],
+  [100000, 'សែន'],
+  [10000, 'ម៉ឺន'],
+  [1000, 'ពាន់'],
+  [100, 'រយ'],
+]
+
+/** Non-negative integer -> Khmer words (handles the លាន/សែន/ម៉ឺន scale system). */
+function intToKhmer(n: number): string {
+  if (n === 0) return KH_UNITS[0]
+  if (n < 10) return KH_UNITS[n]
+  if (n < 20) return 'ដប់' + (n > 10 ? KH_UNITS[n - 10] : '')
+  if (n < 100) {
+    const t = Math.floor(n / 10)
+    const u = n % 10
+    return KH_TENS[t] + (u ? KH_UNITS[u] : '')
+  }
+  for (const [pv, word] of KH_SCALES) {
+    if (n >= pv) {
+      const hi = Math.floor(n / pv)
+      const lo = n % pv
+      return intToKhmer(hi) + word + (lo ? intToKhmer(lo) : '')
+    }
+  }
+  return ''
+}
+
+/** Replace digit runs (Arabic or Khmer, with , separators / . decimals) with
+ *  Khmer number words so the Khmer voice can pronounce them. Speech-only. */
+function normalizeNumbers(text: string): string {
+  // Khmer digits (U+17E0..17E9) -> ASCII so one regex handles both.
+  const ascii = text.replace(/[០-៩]/g, (d) => String(d.charCodeAt(0) - 0x17e0))
+  return ascii.replace(/\d+(?:,\d{3})*(?:\.\d+)?/g, (m) => {
+    const [intPart, frac] = m.replace(/,/g, '').split('.')
+    const n = parseInt(intPart, 10)
+    if (!Number.isFinite(n)) return m
+    let words = intToKhmer(n)
+    if (frac) {
+      words += ' ចុច ' + [...frac].map((d) => KH_UNITS[parseInt(d, 10)] ?? '').join(' ')
+    }
+    return ` ${words} `
+  })
+}
+
 class KhmerTts {
   private session: InferenceSession | null = null
   private meta: TtsMeta | null = null
@@ -90,7 +139,9 @@ class KhmerTts {
 
   /** Khmer text → grapheme token ids, matching the training tokenizer. */
   private textToIds(text: string): number[] {
-    const clean = text.toLowerCase().replace(/\s+/g, ' ').trim()
+    // spell numbers in Khmer first (the voice can't say raw digits), then the
+    // same normalization the training tokenizer used.
+    const clean = normalizeNumbers(text).toLowerCase().replace(/\s+/g, ' ').trim()
     const ids: number[] = []
     for (const ch of clean) {
       const id = this.idOf[ch]
