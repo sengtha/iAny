@@ -371,6 +371,9 @@ English/number → Khmer normalization; serve the onnx through the Cloudflare mi
 import subprocess, sys
 subprocess.run([sys.executable,"-m","pip","install","-q","coqui-tts","transformers==4.46.3","huggingface_hub"])
 subprocess.run([sys.executable,"-m","pip","install","-q","--force-reinstall","numpy==1.26.4","scipy==1.13.1"])
+# --force-reinstall can drop click; spacy/typer need it, and click 8.2 removed
+# split_arg_string that spacy imports -> pin 8.1.7.
+subprocess.run([sys.executable,"-m","pip","install","-q","click==8.1.7"])
 print("installed — now Kernel → Restart Kernel, then run Cell B")
 ```
 
