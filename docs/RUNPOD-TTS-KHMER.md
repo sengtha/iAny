@@ -486,6 +486,96 @@ step counter. `restore_path` is only for the *first* cell after pulling from HF.
 - **When it sounds good enough**, re-run **§7** (ONNX export) → it overwrites
   `khmer_tts.onnx` on HF. In the app, hit **↻ Redownload** to pull the new voice.
 
+## 9. Run detached — survive phone/Jupyter disconnects
+
+Training in a **notebook cell dies if the kernel is interrupted** — and driving
+from a phone, that happens by accident all the time (reloading the Jupyter tab,
+tapping the ⏹ button, the mobile browser dropping the websocket → sends a
+KeyboardInterrupt). The log will end with `! Run is kept in ...` (coqui's
+interrupt message), the GPU goes idle, and the pod burns money doing nothing.
+
+**Fix: run training as a detached `nohup` process in the terminal.** It ignores
+disconnects — close the tab, lock the phone, it keeps training. Checkpoints still
+land on disk exactly the same.
+
+**1. Write the training to a file** (a notebook cell — `%%writefile` saves it):
+
+```python
+%%writefile /workspace/train.py
+import os, glob, string, torch
+import transformers.pytorch_utils as _ptu
+if not hasattr(_ptu, "isin_mps_friendly"):
+    _ptu.isin_mps_friendly = lambda e, t: torch.isin(e, t)
+from trainer import Trainer, TrainerArgs
+from TTS.tts.configs.shared_configs import BaseDatasetConfig, CharactersConfig
+from TTS.tts.configs.vits_config import VitsConfig
+from TTS.tts.datasets import load_tts_samples
+from TTS.tts.models.vits import Vits, VitsAudioConfig
+from TTS.tts.utils.text.tokenizer import TTSTokenizer
+from TTS.utils.audio import AudioProcessor
+
+OUT = "vits_khm"
+dataset = BaseDatasetConfig(formatter="ljspeech", meta_file_train="metadata.csv", path="khm_tts")
+audio = VitsAudioConfig(sample_rate=22050, win_length=1024, hop_length=256, num_mels=80, mel_fmin=0, mel_fmax=None)
+KH = "".join(chr(c) for c in range(0x1780,0x1800)) + string.ascii_letters + string.digits
+chars = CharactersConfig(characters_class="TTS.tts.utils.text.characters.Graphemes",
+    characters=KH, punctuations="!,.?:;()\"'«»“”-–—%/​ ", pad="_", eos="~", bos="^", blank="@")
+config = VitsConfig(audio=audio, run_name="khm_female_vits_v2", batch_size=16, eval_batch_size=8,
+    batch_group_size=5, num_loader_workers=8, num_eval_loader_workers=4, run_eval=True,
+    test_delay_epochs=-1, epochs=1000, text_cleaner="basic_cleaners", use_phonemes=False,
+    compute_input_seq_cache=True, print_step=25, print_eval=False, mixed_precision=True,
+    output_path=OUT, datasets=[dataset], characters=chars, save_step=1000, save_n_checkpoints=2,
+    cudnn_benchmark=True, test_sentences=["សួស្តី តើអ្នកសុខសប្បាយជាទេ?","ថ្ងៃនេះអាកាសធាតុល្អណាស់។"])
+ap = AudioProcessor.init_from_config(config)
+tokenizer, config = TTSTokenizer.init_from_config(config)
+train_samples, eval_samples = load_tts_samples(dataset, eval_split=True, eval_split_size=0.01)
+model = Vits(config, ap, tokenizer, speaker_manager=None)
+
+# resume from the newest local run folder (continue_path keeps optimizer + step)
+runs = sorted(glob.glob(f"{OUT}/*/"), key=os.path.getmtime)
+cont = runs[-1] if runs else ""
+print("continue_path =", repr(cont), flush=True)
+trainer = Trainer(TrainerArgs(continue_path=cont), config, OUT, model=model,
+                  train_samples=train_samples, eval_samples=eval_samples)
+trainer.fit()
+```
+
+**2. Launch it detached** (in the **Terminal**, not a cell):
+
+```bash
+cd /workspace
+nohup python train.py > train.out 2>&1 &      # detached; survives disconnects
+echo "pid $!"
+tail -f train.out                             # watch; Ctrl-C stops WATCHING, not training
+```
+
+Closing the terminal or the phone tab no longer kills it. To check on it later,
+reconnect and `tail -f /workspace/train.out`, or `nvidia-smi` (GPU busy = alive).
+To stop it deliberately: `pkill -f train.py`.
+
+**3. Auto-push to HF every 30 min** (so a *reclaimed pod* is also covered — this
+is the one thing nohup can't protect against). Run `login("hf_...")` once in a
+cell first so the token is cached, then in the Terminal:
+
+```bash
+cat > /workspace/push_loop.sh <<'EOF'
+while true; do
+  sleep 1800
+  python - <<'PY'
+import glob, os
+from huggingface_hub import HfApi
+b = sorted(glob.glob("vits_khm/**/best_model.pth", recursive=True), key=os.path.getmtime)
+if b: HfApi().upload_file(path_or_fileobj=b[-1], path_in_repo="best_model.pth",
+                          repo_id="sengtha/khmer-tts-female-v2"); print("pushed", b[-1], flush=True)
+PY
+done
+EOF
+nohup bash /workspace/push_loop.sh > /workspace/push.out 2>&1 &
+```
+
+Now: nohup protects against phone disconnects, the push loop protects against pod
+reclaim. You can walk away and let it run to ~200k.
+
 ## Notes / how to get the best voice
 
 - **Listen early.** VITS is intelligible after ~10–20k steps; naturalness keeps
