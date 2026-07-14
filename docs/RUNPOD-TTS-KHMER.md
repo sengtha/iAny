@@ -88,7 +88,7 @@ columns (no audio) in parallel.
 
 ```python
 import subprocess, sys
-subprocess.run([sys.executable,"-m","pip","install","-q","pyarrow","soundfile","librosa"])
+subprocess.run([sys.executable,"-m","pip","install","-q","huggingface_hub","pyarrow","soundfile","librosa"])
 import pyarrow.parquet as pq
 from huggingface_hub import HfFileSystem, login
 from collections import defaultdict
