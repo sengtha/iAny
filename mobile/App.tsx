@@ -47,8 +47,10 @@ export default function App() {
   const [speed, setSpeed] = useState<string | null>(null)
   const [ttsState, setTtsState] = useState<TtsProgress>({ status: tts.status })
 
-  const onSpeak = async () => {
-    const text = answer.replace(/^⚠️.*/s, '').trim()
+  const onSpeak = async (raw: string) => {
+    // VITS synthesizes the whole clip at once — cap long paragraphs so on-device
+    // synthesis stays quick. Drop any error banner text.
+    const text = raw.replace(/^⚠️.*/s, '').trim().slice(0, 400)
     if (!text) return
     try {
       if (!tts.ready) await tts.init(setTtsState)
@@ -290,7 +292,7 @@ export default function App() {
               </Text>
               {speed && <Text style={styles.speed}>{speed}</Text>}
               {answer.length > 0 && !answer.startsWith('⚠️') && (
-                <Pressable style={styles.speakBtn} onPress={onSpeak}>
+                <Pressable style={styles.speakBtn} onPress={() => onSpeak(answer)}>
                   <Text style={styles.speakBtnText}>
                     {ttsState.status === 'downloading'
                       ? `🔊 downloading voice ${Math.round((ttsState.progress ?? 0) * 100)}%`
@@ -314,7 +316,12 @@ export default function App() {
                 <View key={r.chunk_id} style={styles.card}>
                   <Text style={styles.cardTitle}>{r.title}</Text>
                   <Text style={styles.cardText}>{r.text}</Text>
-                  <Text style={styles.score}>score {r.score.toFixed(4)}</Text>
+                  <View style={styles.cardFooter}>
+                    <Text style={styles.score}>score {r.score.toFixed(4)}</Text>
+                    <Pressable style={styles.speakChip} onPress={() => onSpeak(r.text)}>
+                      <Text style={styles.speakChipText}>🔊 Read</Text>
+                    </Pressable>
+                  </View>
                 </View>
               ))}
             </View>
@@ -415,6 +422,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#16a34a',
   },
   speakBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  cardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 },
+  speakChip: {
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    backgroundColor: '#dcfce7',
+    borderWidth: 1,
+    borderColor: '#86efac',
+  },
+  speakChipText: { color: '#166534', fontWeight: '700', fontSize: 13 },
   btnOutline: {
     borderWidth: 1,
     borderColor: '#2563eb',
