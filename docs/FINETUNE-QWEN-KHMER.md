@@ -247,17 +247,25 @@ faster (phone inference is memory-bandwidth-bound — fewer bytes/token = quicke
 for a small quality cost that's usually worth it on a 0.6B. This requantizes the
 existing Q8 gguf (no re-convert, no safetensors needed) and uploads it into the
 **same repo**, so the app picks it up automatically (it prefers Q4_K_M, falls
-back to Q8). Runs on a free Kaggle CPU in a few minutes.
+back to Q8). CPU-only — runs on a free Kaggle CPU, **or on the pod that's already
+training TTS** (it won't touch the GPU training). On RunPod the image usually
+lacks `cmake`/`git`, so apt-install them first (apt only — this does NOT churn
+pip/numpy, so the TTS environment stays intact). Takes a few minutes.
 
 ```python
-import subprocess, sys
+import subprocess, shutil
 from huggingface_hub import hf_hub_download, HfApi, login
 login("hf_xxxxxxxx")                                   # <-- HF write token
 REPO = "sengtha/Qwen3-0.6B-khm-ft2-Q8_0-GGUF"
+if not shutil.which("cmake") or not shutil.which("git"):   # RunPod: install build tools
+    subprocess.run("apt-get update -qq && apt-get install -y -qq cmake build-essential git",
+                   shell=True, check=True)
 src  = hf_hub_download(REPO, "Qwen3-0.6B-khm-ft2-Q8_0.gguf")
-subprocess.run(["git","clone","--depth","1","https://github.com/ggml-org/llama.cpp"], check=True)
+subprocess.run("test -d llama.cpp || git clone --depth 1 https://github.com/ggml-org/llama.cpp",
+               shell=True, check=True)
+# -j 4 (not all cores) so a co-running TTS training keeps CPU for its data loaders.
 subprocess.run("cd llama.cpp && cmake -B build -DLLAMA_CURL=OFF && "
-               "cmake --build build --config Release -j --target llama-quantize", shell=True, check=True)
+               "cmake --build build --config Release -j 4 --target llama-quantize", shell=True, check=True)
 # --allow-requantize: quantize down from the Q8 we already have (from f16 is
 # marginally better, but Q8->Q4 is fine for the S10 and far quicker).
 subprocess.run(["./llama.cpp/build/bin/llama-quantize","--allow-requantize",
