@@ -356,20 +356,30 @@ English/number → Khmer normalization; serve the onnx through the Cloudflare mi
    empty, so re-map the speaker's shards).
 3. **§3b** re-extract, but **raise `TARGET_HOURS = 50`** (was 15). Keep the same
    `CHOSEN_SPK = "f-adt2-0002"`. Then **Restart Kernel** (as the note says).
-4. Run the cell below **instead of §4** — it downloads v1 from HF and resumes
-   from it. Then push with **§5** periodically. Aim for ~200k+ total steps.
+4. Run the **install cell** below, **restart the kernel**, then run the
+   **train cell** — it downloads v1 from HF and resumes. Push with **§5**
+   periodically. Aim for ~200k+ total steps.
+
+**Cell A — install (run once, then RESTART THE KERNEL):**
 
 ```python
-# deps: coqui-tts + a transformers that has isin_mps_friendly (in case this is a
-# fresh kernel that hasn't run §3b's install). Safe to re-run — pip skips if present.
-# Pin numpy+scipy LAST as a matched pair: coqui/librosa churn numpy and can
-# leave a broken ABI ("numpy fails sanity checks / No module named 'numpy.rec'"),
-# and the image's scipy is built for numpy 2.x so it must be pinned to match.
-# If this cell ran fresh, RESTART THE KERNEL after it before importing TTS below.
+# coqui/librosa churn numpy and can leave a broken ABI ("numpy fails sanity
+# checks / No module named 'numpy.rec'"); the image's scipy is built for numpy
+# 2.x, so pin numpy+scipy LAST as a matched pair. Installing numpy does NOT fix
+# an already-loaded broken numpy in the running kernel — that's why you MUST
+# restart the kernel after this cell before Cell B.
 import subprocess, sys
 subprocess.run([sys.executable,"-m","pip","install","-q","coqui-tts","transformers==4.46.3","huggingface_hub"])
 subprocess.run([sys.executable,"-m","pip","install","-q","--force-reinstall","numpy==1.26.4","scipy==1.13.1"])
+print("installed — now Kernel → Restart Kernel, then run Cell B")
+```
 
+> **Now: Kernel → Restart Kernel and Clear Outputs** (the `[1] [2] …` numbers
+> must disappear — merely re-running a cell does NOT reload numpy). Then Cell B.
+
+**Cell B — resume training (run after the restart):**
+
+```python
 # shim (same as §4) — coqui needs isin_mps_friendly on some transformers builds
 import torch, transformers.pytorch_utils as _ptu
 if not hasattr(_ptu, "isin_mps_friendly"):
