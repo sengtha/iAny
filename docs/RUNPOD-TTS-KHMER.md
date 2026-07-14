@@ -335,6 +335,100 @@ as above before export/inference or the tokenizer is wrong.
 `add_blank` interleave) → run onnx → float PCM → WAV → play; 🔊 speak button;
 English/number → Khmer normalization; serve the onnx through the Cloudflare mirror.
 
+## 8. Continue training (more data + more steps) — resume from HF
+
+> **"When I stop RunPod, everything is deleted — how do I continue?"**
+> Nothing you care about lives on the pod. The trained state — `best_model.pth`
+> (998 MB, **includes the optimizer + scaler states**, so it resumes exactly
+> where it left off) + `config.json` — is already on Hugging Face at
+> `sengtha/khmer-tts-female-v1`. **HF is the durable disk; RunPod is just
+> disposable compute.** So "continue training" = pull the checkpoint from HF →
+> train more → push it back to HF. The pod being wiped is expected and fine.
+>
+> Why do this at all: v1 was trained on only ~15h of the 221h available and
+> stopped at ~95k steps. That's why *some words come out wrong* — it hasn't
+> heard enough Khmer yet. The fix is not a setting, it's more data + more steps.
+
+**One fresh pod, top to bottom:**
+
+1. **§1** launch the A100 pod (150 GB disk).
+2. **§3a** run the profiler → gives you `shards_of` + `paths` again (the pod is
+   empty, so re-map the speaker's shards).
+3. **§3b** re-extract, but **raise `TARGET_HOURS = 50`** (was 15). Keep the same
+   `CHOSEN_SPK = "f-adt2-0002"`. Then **Restart Kernel** (as the note says).
+4. Run the cell below **instead of §4** — it downloads v1 from HF and resumes
+   from it. Then push with **§5** periodically. Aim for ~200k+ total steps.
+
+```python
+# shim (same as §4) — coqui needs isin_mps_friendly on some transformers builds
+import torch, transformers.pytorch_utils as _ptu
+if not hasattr(_ptu, "isin_mps_friendly"):
+    _ptu.isin_mps_friendly = lambda e, t: torch.isin(e, t)
+
+import glob, string
+from huggingface_hub import hf_hub_download, login
+from trainer import Trainer, TrainerArgs
+from TTS.tts.configs.shared_configs import BaseDatasetConfig, CharactersConfig
+from TTS.tts.configs.vits_config import VitsConfig
+from TTS.tts.datasets import load_tts_samples
+from TTS.tts.models.vits import Vits, VitsAudioConfig
+from TTS.tts.utils.text.tokenizer import TTSTokenizer
+from TTS.utils.audio import AudioProcessor
+
+login("hf_xxxxxxxx")                         # <-- your HF token
+REPO = "sengtha/khmer-tts-female-v1"
+# the persistent checkpoint from the last session (survives pod deletion)
+restore = hf_hub_download(REPO, "best_model.pth")
+
+OUT = "vits_khm"
+dataset = BaseDatasetConfig(formatter="ljspeech", meta_file_train="metadata.csv", path="khm_tts")
+audio = VitsAudioConfig(sample_rate=22050, win_length=1024, hop_length=256,
+                        num_mels=80, mel_fmin=0, mel_fmax=None)
+
+# IMPORTANT: character set must be IDENTICAL to v1 (Khmer block + ASCII + digits)
+# or the embedding table won't match the checkpoint and restore fails.
+KH = "".join(chr(c) for c in range(0x1780, 0x1800)) + string.ascii_letters + string.digits
+chars = CharactersConfig(
+    characters_class="TTS.tts.utils.text.characters.Graphemes",
+    characters=KH, punctuations="!,.?:;()\"'«»“”-–—%/​ ",
+    pad="_", eos="~", bos="^", blank="@",
+)
+
+config = VitsConfig(
+    audio=audio, run_name="khm_female_vits_v2",
+    batch_size=16, eval_batch_size=8, batch_group_size=5,
+    num_loader_workers=8, num_eval_loader_workers=4,
+    run_eval=True, test_delay_epochs=-1, epochs=1000,
+    text_cleaner="basic_cleaners", use_phonemes=False,
+    compute_input_seq_cache=True, print_step=25, print_eval=False,
+    mixed_precision=True, output_path=OUT, datasets=[dataset],
+    characters=chars, save_step=1000, save_n_checkpoints=2, cudnn_benchmark=True,
+    test_sentences=["សួស្តី តើអ្នកសុខសប្បាយជាទេ?", "ថ្ងៃនេះអាកាសធាតុល្អណាស់។"],
+)
+
+ap = AudioProcessor.init_from_config(config)
+tokenizer, config = TTSTokenizer.init_from_config(config)
+train_samples, eval_samples = load_tts_samples(dataset, eval_split=True, eval_split_size=0.01)
+model = Vits(config, ap, tokenizer, speaker_manager=None)
+
+# restore_path loads model + optimizer + scaler from the HF checkpoint, then
+# keeps training on the (now larger) dataset. Unlike continue_path it doesn't
+# need the original run folder — just the .pth file we pulled from HF.
+trainer = Trainer(TrainerArgs(restore_path=restore), config, OUT, model=model,
+                  train_samples=train_samples, eval_samples=eval_samples)
+trainer.fit()
+```
+
+**Within the same pod session**, if you stop and re-start the cell, it now finds
+a local `checkpoint_*.pth` — switch back to §4's `continue_path` logic to keep the
+step counter. `restore_path` is only for the *first* cell after pulling from HF.
+
+- **Push often (§5).** Every hour or so, or before you stop the pod. If the pod
+  dies mid-run, you lose only the steps since the last push — the checkpoint on
+  HF is always a safe restart point.
+- **When it sounds good enough**, re-run **§7** (ONNX export) → it overwrites
+  `khmer_tts.onnx` on HF. In the app, hit **↻ Redownload** to pull the new voice.
+
 ## Notes / how to get the best voice
 
 - **Listen early.** VITS is intelligible after ~10–20k steps; naturalness keeps
@@ -345,8 +439,11 @@ English/number → Khmer normalization; serve the onnx through the Cloudflare mi
   the dataset's real metadata (Cell 1 prints columns).
 - **Grapheme, not phonemes** is the key Khmer decision — `use_phonemes=False`
   lets the model learn Khmer pronunciation from audio instead of via weak eSpeak.
-- **Resume:** re-run Cell 4; `continue_path` picks up the newest checkpoint.
-  Push to HF (Cell 5) before stopping the pod so nothing is lost.
+- **Resume within a session:** re-run Cell 4; `continue_path` picks up the
+  newest local checkpoint. Push to HF (Cell 5) before stopping the pod.
+- **Resume in a NEW pod (after RunPod wiped the old one):** see **§8** — pull
+  `best_model.pth` from HF and `restore_path` from it. HF is the durable store;
+  nothing is lost when the pod is deleted.
 - **Untested end-to-end here** (I can't run RunPod from this env) — expect a
   couple of small fixes at first run, like we did on Kaggle. Paste errors and
   I'll fix fast.
