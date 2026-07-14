@@ -48,7 +48,15 @@ export const EMBEDDING_DIMS = 256
 // khm-ft2 = the CPT model + Q&A SFT (Stage B on sengtha/khmer-qa) — it answers
 // correctly (picks the right span) instead of grabbing a random context word.
 export const GEN_MODEL_REPO = 'sengtha/Qwen3-0.6B-khm-ft2-Q8_0-GGUF'
-export const GEN_MODEL_FILES = ['Qwen3-0.6B-khm-ft2-Q8_0.gguf']
+// Prefer Q4_K_M (~half the size of Q8, and faster on a phone CPU — inference is
+// memory-bandwidth-bound, so fewer bytes/token = quicker; small quality cost on
+// a 0.6B). Falls back to Q8 automatically: if the Q4 file isn't in the repo yet
+// the HEAD probe misses and discoverFile picks the Q8 that's there. Upload a
+// Q4_K_M gguf into the same repo to switch the S10 over — no app change needed.
+export const GEN_MODEL_FILES = [
+  'Qwen3-0.6B-khm-ft2-Q4_K_M.gguf',
+  'Qwen3-0.6B-khm-ft2-Q8_0.gguf',
+]
 
 /**
  * Native Khmer TTS: a VITS voice trained from scratch on the DDD-Cambodia 727h

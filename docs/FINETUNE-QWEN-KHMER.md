@@ -240,6 +240,38 @@ The batch run uploads `sengtha/Qwen3-0.6B-khm-ft-Q8_0-GGUF` at the end (it
 survives the session wipe because it's on HF). Send me that repo name → I point
 iAny at it → rebuild → your smarter Khmer model on the S10.
 
+## Make a Q4_K_M for the S10 (smaller + faster)
+
+Q8_0 is ~600 MB and slow on a 2019 phone. A **Q4_K_M** is ~half the size and
+faster (phone inference is memory-bandwidth-bound — fewer bytes/token = quicker),
+for a small quality cost that's usually worth it on a 0.6B. This requantizes the
+existing Q8 gguf (no re-convert, no safetensors needed) and uploads it into the
+**same repo**, so the app picks it up automatically (it prefers Q4_K_M, falls
+back to Q8). Runs on a free Kaggle CPU in a few minutes.
+
+```python
+import subprocess, sys
+from huggingface_hub import hf_hub_download, HfApi, login
+login("hf_xxxxxxxx")                                   # <-- HF write token
+REPO = "sengtha/Qwen3-0.6B-khm-ft2-Q8_0-GGUF"
+src  = hf_hub_download(REPO, "Qwen3-0.6B-khm-ft2-Q8_0.gguf")
+subprocess.run(["git","clone","--depth","1","https://github.com/ggml-org/llama.cpp"], check=True)
+subprocess.run("cd llama.cpp && cmake -B build -DLLAMA_CURL=OFF && "
+               "cmake --build build --config Release -j --target llama-quantize", shell=True, check=True)
+# --allow-requantize: quantize down from the Q8 we already have (from f16 is
+# marginally better, but Q8->Q4 is fine for the S10 and far quicker).
+subprocess.run(["./llama.cpp/build/bin/llama-quantize","--allow-requantize",
+                src, "Qwen3-0.6B-khm-ft2-Q4_K_M.gguf", "Q4_K_M"], check=True)
+HfApi().upload_file(path_or_fileobj="Qwen3-0.6B-khm-ft2-Q4_K_M.gguf",
+                    path_in_repo="Qwen3-0.6B-khm-ft2-Q4_K_M.gguf", repo_id=REPO)
+print("uploaded Q4_K_M -> hit ↻ Redownload in the app to A/B it vs Q8")
+```
+
+After it uploads, open the app and tap **↻ Redownload** — it'll pull the Q4 and
+you can compare speed/quality against Q8. (For the *best* Q4 quality, quantize
+from f16 instead: re-run the §convert step with `--outtype f16`, then quantize
+that f16 to `Q4_K_M`.)
+
 ## How to make it smarter (the levers, in order)
 
 1. **More raw Khmer for CPT.** #1 factor. Default is CC-100; add **ParaCrawl
