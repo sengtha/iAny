@@ -49,8 +49,10 @@ const ALLOWED_PREFIXES = [
   // buffer, Khmer-trained, non-Gemma). Converted from alphaedge-ai's model.
   'sengtha/Qwen3-0.6B-khm-32768-Q8_0-GGUF/',
   // Fine-tuned on iAny's Khmer corpus (CPT on FineWeb-2 + ParaCrawl) for better
-  // Khmer — same 32k vocab so it still fits the S10. The current gen model.
+  // Khmer — same 32k vocab so it still fits the S10.
   'sengtha/Qwen3-0.6B-khm-ft-Q8_0-GGUF/',
+  // + Q&A SFT (Stage B) on sengtha/khmer-qa -> answers correctly. Current model.
+  'sengtha/Qwen3-0.6B-khm-ft2-Q8_0-GGUF/',
   // On-device Khmer TTS: VITS voice (trained on DDD-Cambodia 727h) as ONNX +
   // tts_meta.json (grapheme vocab). Runs via onnxruntime-react-native, offline.
   'sengtha/khmer-tts-female-v1/',

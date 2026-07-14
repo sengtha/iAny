@@ -149,3 +149,10 @@ export async function fetchModelJson<T>(repo: string, file: string): Promise<T> 
   if (!res.ok) throw new Error(`fetch ${file} failed (${res.status})`)
   return (await res.json()) as T
 }
+
+/** Delete every cached model file so the next load re-downloads fresh. Used by
+ *  the "Redownload models" action (e.g. after a model is updated on the server). */
+export async function clearModelCache(): Promise<void> {
+  await FileSystem.deleteAsync(MODEL_DIR, { idempotent: true })
+  await FileSystem.makeDirectoryAsync(MODEL_DIR, { intermediates: true }).catch(() => {})
+}

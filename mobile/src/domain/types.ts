@@ -45,8 +45,10 @@ export const EMBEDDING_DIMS = 256
 // fine-tuned on iAny's Khmer corpus (CPT on FineWeb-2 + ParaCrawl) for better
 // Khmer. Same 32k vocab -> still ~600MB, loads + runs at ~26 tok/s on the S10.
 // To A/B against the base, swap REPO back to '...-khm-32768-Q8_0-GGUF'.
-export const GEN_MODEL_REPO = 'sengtha/Qwen3-0.6B-khm-ft-Q8_0-GGUF'
-export const GEN_MODEL_FILES = ['Qwen3-0.6B-khm-ft-Q8_0.gguf']
+// khm-ft2 = the CPT model + Q&A SFT (Stage B on sengtha/khmer-qa) — it answers
+// correctly (picks the right span) instead of grabbing a random context word.
+export const GEN_MODEL_REPO = 'sengtha/Qwen3-0.6B-khm-ft2-Q8_0-GGUF'
+export const GEN_MODEL_FILES = ['Qwen3-0.6B-khm-ft2-Q8_0.gguf']
 
 /**
  * Native Khmer TTS: a VITS voice trained from scratch on the DDD-Cambodia 727h

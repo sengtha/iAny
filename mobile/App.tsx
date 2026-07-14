@@ -24,6 +24,7 @@ import { embedder, type EmbedderProgress } from './src/ai/embedder'
 import { generator, type GenProgress } from './src/ai/generator'
 import { ask } from './src/ai/ask'
 import { tts, type TtsProgress } from './src/ai/tts'
+import { clearModelCache } from './src/ai/modelFile'
 
 /**
  * Stage 2 smoke-test screen: on-device SQLite + FTS5 (Stage 1) plus opt-in
@@ -46,6 +47,25 @@ export default function App() {
   const [answer, setAnswer] = useState('')
   const [speed, setSpeed] = useState<string | null>(null)
   const [ttsState, setTtsState] = useState<TtsProgress>({ status: tts.status })
+
+  const onRedownload = async () => {
+    setBusy(true)
+    try {
+      await generator.release().catch(() => {})
+      await embedder.release().catch(() => {})
+      await tts.reset().catch(() => {})
+      await clearModelCache()
+      setGen({ status: 'off' })
+      setEmb({ status: 'off' })
+      setTtsState({ status: 'off' })
+      setAnswer('')
+      setError(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const onSpeak = async (raw: string) => {
     // VITS synthesizes the whole clip at once — cap long paragraphs so on-device
@@ -190,7 +210,12 @@ export default function App() {
       <SafeAreaView style={styles.root}>
         <StatusBar style="auto" />
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-          <Text style={styles.h1}>iAny · native (Stage 3)</Text>
+          <View style={styles.headerRow}>
+            <Text style={styles.h1}>iAny · native (Stage 3)</Text>
+            <Pressable onPress={onRedownload} disabled={busy} hitSlop={8}>
+              <Text style={styles.redl}>↻ Redownload</Text>
+            </Pressable>
+          </View>
           <Text style={styles.hint}>
             On-device search + AI answers, fully offline. Enable BOTH for grounded Khmer
             replies — semantic search finds your notes, AI answers writes them up.
@@ -432,6 +457,8 @@ const styles = StyleSheet.create({
     borderColor: '#86efac',
   },
   speakChipText: { color: '#166534', fontWeight: '700', fontSize: 13 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  redl: { color: '#2563eb', fontWeight: '700', fontSize: 13 },
   btnOutline: {
     borderWidth: 1,
     borderColor: '#2563eb',

@@ -105,18 +105,55 @@ class KhmerTts {
     return ids
   }
 
-  /** Synthesize the text and play it. No-op for empty/all-unknown input. */
-  async speak(text: string): Promise<void> {
-    if (!this.session || !this.meta) throw new Error('TTS not ready')
-    const ids = this.textToIds(text)
-    if (ids.length === 0) return
+  /** Split into sentence-length chunks. The voice was TRAINED on ~8s sentence
+   *  clips, so synthesizing a whole paragraph at once sounds unnatural (out of
+   *  distribution); per-sentence synthesis matches training and adds real pauses. */
+  private splitSentences(text: string): string[] {
+    return text
+      .split(/(?<=[។!?.\n])/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0)
+  }
+
+  private async synth(ids: number[]): Promise<Float32Array> {
     const x = new Tensor('int32', Int32Array.from(ids), [1, ids.length])
     const xLen = new Tensor('int32', Int32Array.from([ids.length]), [1])
-    const out = await this.session.run({ x, x_lengths: xLen })
+    const out = await this.session!.run({ x, x_lengths: xLen })
     const y = out.y ?? out[Object.keys(out)[0]]
-    const pcm = y.data as Float32Array // [1, 1, T] flattened -> T samples
+    return y.data as Float32Array // [1,1,T] flattened -> T
+  }
+
+  /**
+   * Synthesize the text sentence-by-sentence (natural pacing) and play it as one
+   * clip. No-op for empty/all-unknown input.
+   */
+  async speak(text: string): Promise<void> {
+    if (!this.session || !this.meta) throw new Error('TTS not ready')
+    const gap = Math.floor(this.meta.sample_rate * 0.12) // 120ms between sentences
+    const chunks: Float32Array[] = []
+    for (const s of this.splitSentences(text)) {
+      const ids = this.textToIds(s)
+      if (ids.length === 0) continue
+      chunks.push(await this.synth(ids), new Float32Array(gap))
+    }
+    if (chunks.length === 0) return
+    const total = chunks.reduce((n, c) => n + c.length, 0)
+    const pcm = new Float32Array(total)
+    let o = 0
+    for (const c of chunks) {
+      pcm.set(c, o)
+      o += c.length
+    }
     const path = await this.writeWav(pcm, this.meta.sample_rate)
     await this.play(path)
+  }
+
+  /** Release the session so a redownload re-initializes from a fresh file. */
+  async reset(): Promise<void> {
+    await this.stop()
+    this.session = null
+    this.meta = null
+    this.status = 'off'
   }
 
   async stop(): Promise<void> {
