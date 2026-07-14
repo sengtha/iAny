@@ -283,27 +283,57 @@ print("wrote out.wav")
 **Status:** trained voice is on HF (`sengtha/khmer-tts-female-v1`:
 `best_model.pth` + `config.json`). ONNX export is **pending** — see blocker.
 
-### ⚠️ Blocker: coqui `model.export_onnx()` hangs
-It hangs indefinitely tracing VITS's **stochastic duration predictor** — on both
-CPU and GPU, torch 2.2 and current, dynamo and legacy exporters. Not a slowness
-issue; the trace never returns. So coqui's built-in export is a dead end here.
+### ✅ Working export (coqui `export_onnx` hangs — bypass it)
+`model.export_onnx()` hangs forever tracing the stochastic duration predictor —
+the culprit is **`do_constant_folding=True`** (it runs the stochastic model
+repeatedly). Fix: **skip coqui's exporter**, wrap the model, and export with
+`do_constant_folding=False`. CPU-friendly (~5 min), verified with an onnxruntime
+sanity run → `khmer_tts.onnx` (109 MB) + `tts_meta.json` on HF.
 
-### Plan (tested next step, not live trial-and-error)
-1. **sherpa-onnx export** — the standard coqui-VITS→mobile path. sherpa-onnx has
-   its own exporter (`scripts/coqui/`) that wraps the generator with explicit
-   `(x, x_lengths, noise_scale, length_scale, noise_scale_w)` inputs and exports
-   cleanly, sidestepping the SDP hang. Produces `model.onnx` + `tokens.txt`.
-   Ref: coqui-ai/TTS Discussion #3194; k2-fsa/sherpa-onnx.
-2. **On-device runtime:** sherpa-onnx (Android/RN/Pi) runs the model + handles
-   the grapheme tokenizer via `tokens.txt` — no JS tokenizer port needed. Or
-   plain `onnxruntime` + a JS port of the vocab in `tts_meta.json` (the
-   Khmer+ASCII+digits set, with `add_blank` interleaving).
-3. **Remember the vocab fix:** the saved `config.json` has only 144 Khmer tokens;
-   the model is **206** (Khmer + ASCII letters + digits). Rebuild
-   `config.characters.characters` (see §6) before any export.
-4. **iAny integration:** TTS module (normalize text → tokens → onnx → PCM →
-   play), 🔊 speak button on answers, English/number → Khmer normalization,
-   serve the onnx through the Cloudflare mirror.
+```python
+import torch, os, string, json, numpy as np, transformers.pytorch_utils as _ptu
+if not hasattr(_ptu, "isin_mps_friendly"):
+    _ptu.isin_mps_friendly = lambda e, t: torch.isin(e, t)
+from TTS.tts.configs.vits_config import VitsConfig
+from TTS.tts.models.vits import Vits
+from huggingface_hub import hf_hub_download, HfApi, login
+login("hf_xxxx")
+
+REPO = "sengtha/khmer-tts-female-v1"
+mp = hf_hub_download(REPO, "best_model.pth"); cp = hf_hub_download(REPO, "config.json")
+config = VitsConfig(); config.load_json(cp)
+config.characters.characters = "".join(chr(c) for c in range(0x1780,0x1800)) + string.ascii_letters + string.digits
+model = Vits.init_from_config(config); model.load_checkpoint(config, mp, eval=True, strict=False); model.eval()
+
+class OnnxVits(torch.nn.Module):
+    def __init__(self, m): super().__init__(); self.m = m
+    def forward(self, x, x_lengths):
+        return self.m.inference(x, aux_input={"x_lengths": x_lengths,
+            "d_vectors": None, "speaker_ids": None, "language_ids": None})["model_outputs"]
+
+wrap = OnnxVits(model).eval()
+torch.onnx.export(wrap, (torch.randint(1,50,(1,24)), torch.tensor([24])), "khmer_tts.onnx",
+    opset_version=13, input_names=["x","x_lengths"], output_names=["y"],
+    dynamic_axes={"x":{0:"N",1:"L"}, "x_lengths":{0:"N"}, "y":{0:"N",2:"T"}},
+    do_constant_folding=False, dynamo=False)      # <-- the fix
+
+meta = {"vocab": model.tokenizer.characters.vocab, "add_blank": getattr(config,"add_blank",True),
+        "sample_rate": config.audio.sample_rate, "pad": config.characters.pad, "bos": config.characters.bos,
+        "eos": config.characters.eos, "blank": config.characters.blank, "input_names": ["x","x_lengths"]}
+json.dump(meta, open("tts_meta.json","w"), ensure_ascii=False, indent=1)
+api = HfApi()
+api.upload_file(path_or_fileobj="khmer_tts.onnx", path_in_repo="khmer_tts.onnx", repo_id=REPO)
+api.upload_file(path_or_fileobj="tts_meta.json", path_in_repo="tts_meta.json", repo_id=REPO)
+```
+
+**Vocab fix reminder:** the saved `config.json` keeps only 144 Khmer tokens; the
+model is **206** (Khmer + ASCII + digits) — rebuild `config.characters.characters`
+as above before export/inference or the tokenizer is wrong.
+
+### iAny integration (next)
+`onnxruntime-react-native` + a JS port of the tokenizer (vocab from `tts_meta.json`,
+`add_blank` interleave) → run onnx → float PCM → WAV → play; 🔊 speak button;
+English/number → Khmer normalization; serve the onnx through the Cloudflare mirror.
 
 ## Notes / how to get the best voice
 
