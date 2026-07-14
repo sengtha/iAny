@@ -531,11 +531,22 @@ tokenizer, config = TTSTokenizer.init_from_config(config)
 train_samples, eval_samples = load_tts_samples(dataset, eval_split=True, eval_split_size=0.01)
 model = Vits(config, ap, tokenizer, speaker_manager=None)
 
-# resume from the newest local run folder (continue_path keeps optimizer + step)
-runs = sorted(glob.glob(f"{OUT}/*/"), key=os.path.getmtime)
-cont = runs[-1] if runs else ""
-print("continue_path =", repr(cont), flush=True)
-trainer = Trainer(TrainerArgs(continue_path=cont), config, OUT, model=model,
+# resume from the newest LOCAL checkpoint that actually loads (an interrupt can
+# leave the latest .pth truncated/corrupt — continue_path would blindly pick it
+# and crash). Test-load candidates newest-first; fall back to HF v2 if all bad.
+from huggingface_hub import hf_hub_download
+def valid(p):
+    try:
+        torch.load(p, map_location="cpu", weights_only=False); return True
+    except Exception:
+        return False
+ckpts = sorted(glob.glob(f"{OUT}/**/*.pth", recursive=True), key=os.path.getmtime, reverse=True)
+good = next((p for p in ckpts if valid(p)), None)
+if good is None:
+    print("no valid local checkpoint — pulling v2 from HF", flush=True)
+    good = hf_hub_download("sengtha/khmer-tts-female-v2", "best_model.pth")
+print("restoring from", good, flush=True)
+trainer = Trainer(TrainerArgs(restore_path=good), config, OUT, model=model,
                   train_samples=train_samples, eval_samples=eval_samples)
 trainer.fit()
 ```
