@@ -53,6 +53,7 @@ class KhmerTts {
   private idOf: Record<string, number> = {}
   private blankId = 0
   private sound: Audio.Sound | null = null
+  private speakId = 0
   status: TtsStatus = 'off'
 
   get ready(): boolean {
@@ -124,28 +125,27 @@ class KhmerTts {
   }
 
   /**
-   * Synthesize the text sentence-by-sentence (natural pacing) and play it as one
-   * clip. No-op for empty/all-unknown input.
+   * Speak the FULL text, streaming: play sentence 1 as soon as it's synthesized,
+   * and synthesize the next sentence while the current one plays. Fast to start,
+   * reads everything, natural pacing. A new speak()/stop() cancels this one.
    */
   async speak(text: string): Promise<void> {
     if (!this.session || !this.meta) throw new Error('TTS not ready')
-    const gap = Math.floor(this.meta.sample_rate * 0.12) // 120ms between sentences
-    const chunks: Float32Array[] = []
-    for (const s of this.splitSentences(text)) {
-      const ids = this.textToIds(s)
-      if (ids.length === 0) continue
-      chunks.push(await this.synth(ids), new Float32Array(gap))
+    const myId = ++this.speakId
+    await this.stop()
+    const sentences = this.splitSentences(text)
+      .map((s) => this.textToIds(s))
+      .filter((ids) => ids.length > 0)
+    if (sentences.length === 0) return
+
+    let pcm = await this.synth(sentences[0])
+    for (let i = 0; i < sentences.length; i++) {
+      if (myId !== this.speakId) return // superseded
+      const next = i + 1 < sentences.length ? this.synth(sentences[i + 1]) : null
+      await this.playAndWait(pcm, myId)
+      if (myId !== this.speakId || !next) return
+      pcm = await next
     }
-    if (chunks.length === 0) return
-    const total = chunks.reduce((n, c) => n + c.length, 0)
-    const pcm = new Float32Array(total)
-    let o = 0
-    for (const c of chunks) {
-      pcm.set(c, o)
-      o += c.length
-    }
-    const path = await this.writeWav(pcm, this.meta.sample_rate)
-    await this.play(path)
   }
 
   /** Release the session so a redownload re-initializes from a fresh file. */
@@ -163,6 +163,31 @@ class KhmerTts {
       this.sound = null
     }
   }
+
+  /** Play a PCM chunk and resolve when it finishes (or is superseded). */
+  private async playAndWait(pcm: Float32Array, myId: number): Promise<void> {
+    const uri = await this.writeWav(pcm, this.meta!.sample_rate)
+    if (myId !== this.speakId) return
+    await this.stop()
+    await new Promise<void>((resolve) => {
+      Audio.Sound.createAsync({ uri }, { shouldPlay: true })
+        .then(({ sound }) => {
+          if (myId !== this.speakId) {
+            sound.unloadAsync().catch(() => {})
+            resolve()
+            return
+          }
+          this.sound = sound
+          sound.setOnPlaybackStatusUpdate((st) => {
+            if (st.isLoaded && st.didJustFinish) resolve()
+            else if (!st.isLoaded && (st as { error?: unknown }).error) resolve()
+          })
+        })
+        .catch(() => resolve())
+    })
+  }
+
+  private wavIndex = 0
 
   private async writeWav(pcm: Float32Array, sr: number): Promise<string> {
     const n = pcm.length
@@ -190,17 +215,13 @@ class KhmerTts {
       dv.setInt16(o, s < 0 ? s * 0x8000 : s * 0x7fff, true)
       o += 2
     }
-    const path = `${FileSystem.cacheDirectory}tts.wav`
+    // rotate filenames so a just-finished clip's file isn't overwritten while
+    // the player may still hold it.
+    const path = `${FileSystem.cacheDirectory}tts_${this.wavIndex++ % 3}.wav`
     await FileSystem.writeAsStringAsync(path, toBase64(new Uint8Array(buf)), {
       encoding: FileSystem.EncodingType.Base64,
     })
     return path
-  }
-
-  private async play(uri: string): Promise<void> {
-    await this.stop()
-    const { sound } = await Audio.Sound.createAsync({ uri }, { shouldPlay: true })
-    this.sound = sound
   }
 }
 

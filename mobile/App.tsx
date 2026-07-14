@@ -68,9 +68,9 @@ export default function App() {
   }
 
   const onSpeak = async (raw: string) => {
-    // VITS synthesizes the whole clip at once — cap long paragraphs so on-device
-    // synthesis stays quick. Drop any error banner text.
-    const text = raw.replace(/^⚠️.*/s, '').trim().slice(0, 400)
+    // Streaming per-sentence synthesis reads the full text; just drop any error
+    // banner and bound pathological lengths.
+    const text = raw.replace(/^⚠️.*/s, '').trim().slice(0, 2000)
     if (!text) return
     try {
       if (!tts.ready) await tts.init(setTtsState)
