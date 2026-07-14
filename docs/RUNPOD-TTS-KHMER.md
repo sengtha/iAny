@@ -362,12 +362,13 @@ English/number → Khmer normalization; serve the onnx through the Cloudflare mi
 ```python
 # deps: coqui-tts + a transformers that has isin_mps_friendly (in case this is a
 # fresh kernel that hasn't run §3b's install). Safe to re-run — pip skips if present.
-# Pin numpy==1.26.4 LAST: coqui/librosa churn numpy and can leave a broken ABI
-# ("numpy fails sanity checks / No module named 'numpy.rec'"). If this cell ran
-# fresh, RESTART THE KERNEL after it before importing TTS below.
+# Pin numpy+scipy LAST as a matched pair: coqui/librosa churn numpy and can
+# leave a broken ABI ("numpy fails sanity checks / No module named 'numpy.rec'"),
+# and the image's scipy is built for numpy 2.x so it must be pinned to match.
+# If this cell ran fresh, RESTART THE KERNEL after it before importing TTS below.
 import subprocess, sys
 subprocess.run([sys.executable,"-m","pip","install","-q","coqui-tts","transformers==4.46.3","huggingface_hub"])
-subprocess.run([sys.executable,"-m","pip","install","-q","--force-reinstall","numpy==1.26.4"])
+subprocess.run([sys.executable,"-m","pip","install","-q","--force-reinstall","numpy==1.26.4","scipy==1.13.1"])
 
 # shim (same as §4) — coqui needs isin_mps_friendly on some transformers builds
 import torch, transformers.pytorch_utils as _ptu
