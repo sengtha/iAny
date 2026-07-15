@@ -86,6 +86,19 @@ a `fetchFeed`. Each shell just wires those:
   headline + body, status, and ▶/⏸/⏭/⏹. **Attribution is not optional** — the
   outlet name is spoken first and always visible.
 
+## Outlet posting page
+
+`public/outlet.html` is a self-contained page (served at **`/outlet.html`**) so a
+verified outlet can post news without curl:
+- Paste the outlet **token** (optionally remembered in localStorage).
+- Title + body + optional sponsor, with a **live Latin-letter counter** that warns
+  before the server rejects (the Khmer-script rule), and a 1500-char body limit.
+- Posts to `/radio/news` (same origin). Shows the outlet-responsibility + 7-day
+  notice in Khmer + English.
+
+Share that URL with each onboarded outlet. It's static (no build step, no app
+install) and works on a phone.
+
 ## MVP scope (build order)
 
 1. D1 + `POST /news` (token auth + Latin validator) + `GET /feed` + cron cleanup.

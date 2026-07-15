@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="km">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>iAny Radio · Outlet posting</title>
+    <style>
+      :root { color-scheme: light dark; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; font-family: system-ui, "Noto Sans Khmer", sans-serif;
+        background: #f1f5f9; color: #0f172a; line-height: 1.5;
+      }
+      .wrap { max-width: 640px; margin: 0 auto; padding: 20px 16px 60px; }
+      h1 { font-size: 20px; margin: 0 0 2px; }
+      .sub { color: #64748b; font-size: 13px; margin: 0 0 20px; }
+      label { display: block; font-weight: 600; font-size: 14px; margin: 14px 0 4px; }
+      .hint { font-weight: 400; color: #64748b; font-size: 12px; }
+      input, textarea {
+        width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px;
+        font: inherit; background: #fff; color: #0f172a;
+      }
+      textarea { resize: vertical; min-height: 120px; }
+      .row { display: flex; justify-content: space-between; align-items: baseline; }
+      .count { font-size: 12px; color: #64748b; }
+      .count.bad { color: #dc2626; font-weight: 600; }
+      button {
+        margin-top: 18px; width: 100%; padding: 13px; border: 0; border-radius: 10px;
+        background: #4f46e5; color: #fff; font-size: 16px; font-weight: 700; cursor: pointer;
+      }
+      button:disabled { opacity: .5; cursor: not-allowed; }
+      .msg { margin-top: 16px; padding: 12px; border-radius: 8px; font-size: 14px; display: none; }
+      .msg.ok { display: block; background: #dcfce7; color: #166534; }
+      .msg.err { display: block; background: #fee2e2; color: #991b1b; }
+      .remember { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #475569; margin-top: 6px; }
+      .remember input { width: auto; }
+      .rule { margin-top: 22px; padding: 12px; background: #fef9c3; border-radius: 8px; font-size: 13px; color: #713f12; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>📻 iAny Radio</h1>
+      <p class="sub">សម្រាប់សារព័ត៌មានដែលបានផ្ទៀងផ្ទាត់ · For verified outlets</p>
+
+      <label for="token">លេខសម្ងាត់ (Outlet token)</label>
+      <input id="token" type="password" autocomplete="off" placeholder="Bearer token" />
+      <div class="remember"><input id="remember" type="checkbox" /><label for="remember" style="margin:0;font-weight:400">ចងចាំ (remember on this device)</label></div>
+
+      <label for="title">ចំណងជើង · Title</label>
+      <input id="title" maxlength="200" placeholder="ចំណងជើងព័ត៌មាន" />
+
+      <label for="body">
+        ខ្លឹមសារ · Body
+        <span class="hint">សរសេរពាក្យបរទេសជាអក្សរខ្មែរ (write foreign words in Khmer script)</span>
+      </label>
+      <textarea id="body" maxlength="1500" placeholder="ខ្លឹមសារព័ត៌មាន…"></textarea>
+      <div class="row"><span id="latin" class="count"></span><span id="bcount" class="count">0 / 1500</span></div>
+
+      <label for="sponsor">អ្នកឧបត្ថម្ភ · Sponsor <span class="hint">optional</span></label>
+      <input id="sponsor" maxlength="200" placeholder="ឧបត្ថម្ភដោយ…" />
+
+      <button id="post">ផ្សាយ · Post</button>
+      <div id="msg" class="msg"></div>
+
+      <div class="rule">
+        ព័ត៌មានត្រូវបានអានដោយសំឡេង AI ព្រមទាំងឈ្មោះសារព័ត៌មានរបស់អ្នក។ ការទទួលខុសត្រូវលើខ្លឹមសារ
+        ជាកម្មសិទ្ធិរបស់សារព័ត៌មាន។ ព័ត៌មានលុបចោលដោយស្វ័យប្រវត្តិក្រោយ ៧ ថ្ងៃ។<br />
+        <span class="hint">The app reads each item aloud with your outlet name attributed. You are
+        responsible for the content. Items auto-delete after 7 days.</span>
+      </div>
+    </div>
+
+    <script>
+      // Kept in sync with @iany/core RADIO_LIMITS (server enforces authoritatively).
+      var MAX_BODY = 1500, MAX_LATIN = 8
+      var $ = function (id) { return document.getElementById(id) }
+
+      if (localStorage.getItem('iany_outlet_token')) {
+        $('token').value = localStorage.getItem('iany_outlet_token')
+        $('remember').checked = true
+      }
+
+      function latinCount(s) { return (s.match(/[A-Za-z]/g) || []).length }
+
+      function update() {
+        var body = $('body').value
+        $('bcount').textContent = body.length + ' / ' + MAX_BODY
+        var lc = latinCount(body)
+        var el = $('latin')
+        if (lc > MAX_LATIN) {
+          el.textContent = 'អក្សរឡាតាំង ' + lc + ' (>' + MAX_LATIN + ') — សូមប្រើអក្សរខ្មែរ'
+          el.className = 'count bad'
+        } else {
+          el.textContent = lc ? ('Latin: ' + lc) : ''
+          el.className = 'count'
+        }
+      }
+      $('body').addEventListener('input', update)
+      update()
+
+      function show(kind, text) {
+        var m = $('msg'); m.className = 'msg ' + kind; m.textContent = text
+      }
+
+      $('post').addEventListener('click', async function () {
+        var token = $('token').value.trim()
+        var title = $('title').value.trim()
+        var body = $('body').value.trim()
+        var sponsor = $('sponsor').value.trim()
+        if (!token) return show('err', 'Enter your outlet token.')
+        if (!title || !body) return show('err', 'ចំណងជើង និងខ្លឹមសារ ត្រូវការ (title and body required).')
+        if (latinCount(body) > MAX_LATIN)
+          return show('err', 'សូមសរសេរពាក្យបរទេសជាអក្សរខ្មែរ (write foreign words in Khmer script).')
+
+        if ($('remember').checked) localStorage.setItem('iany_outlet_token', token)
+        else localStorage.removeItem('iany_outlet_token')
+
+        $('post').disabled = true
+        show('ok', 'កំពុងផ្សាយ… (posting)')
+        try {
+          var res = await fetch('/radio/news', {
+            method: 'POST',
+            headers: { 'authorization': 'Bearer ' + token, 'content-type': 'application/json' },
+            body: JSON.stringify({ title: title, body: body, sponsor: sponsor || undefined }),
+          })
+          var data = await res.json().catch(function () { return {} })
+          if (res.ok) {
+            show('ok', '✓ ផ្សាយរួចរាល់ (posted). It will air on iAny Radio shortly.')
+            $('title').value = ''; $('body').value = ''; $('sponsor').value = ''
+            update()
+          } else {
+            show('err', (data && data.error) ? data.error : ('Error ' + res.status))
+          }
+        } catch (e) {
+          show('err', 'Network error: ' + (e && e.message ? e.message : e))
+        } finally {
+          $('post').disabled = false
+        }
+      })
+    </script>
+  </body>
+</html>
