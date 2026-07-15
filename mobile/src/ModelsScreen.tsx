@@ -185,19 +185,18 @@ function Btn({
 
 const styles = StyleSheet.create({
   card: {
+    flex: 1,
     borderWidth: 1,
     borderColor: '#c7d2fe',
     backgroundColor: '#f8fafc',
     borderRadius: 12,
     padding: 14,
-    marginBottom: 14,
-    maxHeight: 460,
   },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   title: { fontSize: 17, fontWeight: '700', color: '#3730a3' },
   close: { fontSize: 16, color: '#6366f1', fontWeight: '600' },
   hint: { fontSize: 12, color: '#64748b', marginTop: 4, marginBottom: 8 },
-  list: { flexGrow: 0 },
+  list: { flex: 1 },
   row: { paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#e2e8f0' },
   rowHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   label: { fontSize: 14, fontWeight: '600', color: '#1e293b' },

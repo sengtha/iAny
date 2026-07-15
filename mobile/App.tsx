@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   FlatList,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -217,27 +218,16 @@ export default function App() {
         <StatusBar style="auto" />
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           <View style={styles.headerRow}>
-            <Text style={styles.h1}>iAny · native (Stage 3)</Text>
+            <View style={styles.brand}>
+              <Text style={styles.h1}>iAny</Text>
+              <Text style={styles.h1sub}>offline Khmer AI</Text>
+            </View>
             <View style={styles.headerBtns}>
-              <Pressable onPress={() => setShowRadio((v) => !v)} hitSlop={8}>
-                <Text style={styles.redl}>📻 Radio</Text>
-              </Pressable>
-              <Pressable onPress={() => setShowModels((v) => !v)} hitSlop={8}>
-                <Text style={styles.redl}>⚙ Models</Text>
-              </Pressable>
-              <Pressable onPress={() => setShowPacks((v) => !v)} hitSlop={8}>
-                <Text style={styles.redl}>📦 Packs</Text>
-              </Pressable>
-              <Pressable onPress={onRedownload} disabled={busy} hitSlop={8}>
-                <Text style={styles.redl}>↻ All</Text>
-              </Pressable>
+              <NavChip icon="📻" label="Radio" onPress={() => setShowRadio(true)} />
+              <NavChip icon="⚙" label="Models" onPress={() => setShowModels(true)} />
+              <NavChip icon="📦" label="Packs" onPress={() => setShowPacks(true)} />
             </View>
           </View>
-          {showModels ? <ModelsScreen onClose={() => setShowModels(false)} /> : null}
-          {showPacks ? (
-            <PacksScreen onClose={() => setShowPacks(false)} onChanged={refresh} />
-          ) : null}
-          {showRadio ? <RadioScreen onClose={() => setShowRadio(false)} /> : null}
           <Text style={styles.hint}>
             On-device search + AI answers, fully offline. Enable BOTH for grounded Khmer
             replies — semantic search finds your notes, AI answers writes them up.
@@ -395,9 +385,61 @@ export default function App() {
               )}
             />
           </View>
+
+          <Pressable style={styles.resetLink} onPress={onRedownload} disabled={busy}>
+            <Text style={styles.resetLinkText}>↻ Reset all models &amp; cache</Text>
+          </Pressable>
         </ScrollView>
+
+        <Modal
+          visible={showModels}
+          animationType="slide"
+          onRequestClose={() => setShowModels(false)}
+        >
+          <SafeAreaView style={styles.sheet}>
+            <ModelsScreen onClose={() => setShowModels(false)} />
+          </SafeAreaView>
+        </Modal>
+        <Modal
+          visible={showPacks}
+          animationType="slide"
+          onRequestClose={() => setShowPacks(false)}
+        >
+          <SafeAreaView style={styles.sheet}>
+            <PacksScreen onClose={() => setShowPacks(false)} onChanged={refresh} />
+          </SafeAreaView>
+        </Modal>
+        <Modal
+          visible={showRadio}
+          animationType="slide"
+          onRequestClose={() => setShowRadio(false)}
+        >
+          <SafeAreaView style={styles.sheet}>
+            <RadioScreen onClose={() => setShowRadio(false)} />
+          </SafeAreaView>
+        </Modal>
       </SafeAreaView>
     </SafeAreaProvider>
+  )
+}
+
+/** Compact header nav chip — icon + label, fixed size so the row never
+ *  overflows the screen edge. */
+function NavChip({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: string
+  label: string
+  onPress: () => void
+}) {
+  return (
+    <Pressable style={styles.navChip} onPress={onPress} hitSlop={6}>
+      <Text style={styles.navChipText}>
+        {icon} {label}
+      </Text>
+    </Pressable>
   )
 }
 
@@ -405,7 +447,10 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#fff' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
   body: { padding: 16, gap: 8 },
-  h1: { fontSize: 22, fontWeight: '700' },
+  sheet: { flex: 1, backgroundColor: '#fff', padding: 12 },
+  brand: { flexShrink: 1, paddingRight: 8 },
+  h1: { fontSize: 24, fontWeight: '800', color: '#0f172a', letterSpacing: -0.5 },
+  h1sub: { fontSize: 11, color: '#94a3b8', fontWeight: '600', marginTop: 1 },
   hint: { color: '#666', marginBottom: 8 },
   label: { fontWeight: '600', marginTop: 12 },
   input: {
@@ -479,9 +524,31 @@ const styles = StyleSheet.create({
     borderColor: '#86efac',
   },
   speakChipText: { color: '#166534', fontWeight: '700', fontSize: 13 },
-  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  headerBtns: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'flex-end' },
-  redl: { color: '#2563eb', fontWeight: '700', fontSize: 13 },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  headerBtns: {
+    flexDirection: 'row',
+    flexShrink: 0,
+    flexWrap: 'wrap',
+    gap: 6,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  navChip: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  navChipText: { color: '#1d4ed8', fontWeight: '700', fontSize: 12.5 },
+  resetLink: { marginTop: 20, marginBottom: 4, alignItems: 'center', paddingVertical: 8 },
+  resetLinkText: { color: '#94a3b8', fontWeight: '600', fontSize: 13 },
   btnOutline: {
     borderWidth: 1,
     borderColor: '#2563eb',

@@ -77,12 +77,12 @@ export function RadioScreen({ onClose }: { onClose: () => void }) {
 
 const styles = StyleSheet.create({
   card: {
+    flex: 1,
     borderWidth: 1,
     borderColor: '#c7d2fe',
     backgroundColor: '#eef2ff',
     borderRadius: 12,
     padding: 14,
-    marginBottom: 14,
     gap: 8,
   },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

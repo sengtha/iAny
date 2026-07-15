@@ -129,12 +129,12 @@ export function PacksScreen({ onClose, onChanged }: { onClose: () => void; onCha
 
 const styles = StyleSheet.create({
   card: {
+    flex: 1,
     borderWidth: 1,
     borderColor: '#bbf7d0',
     backgroundColor: '#f0fdf4',
     borderRadius: 12,
     padding: 14,
-    marginBottom: 14,
   },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   title: { fontSize: 17, fontWeight: '700', color: '#166534' },
