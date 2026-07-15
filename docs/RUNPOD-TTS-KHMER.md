@@ -398,18 +398,24 @@ for name in mul.input:
 ### Fix the speaking rate on an already-exported onnx (no retrain, no re-export)
 `length_scale` is a single constant in the graph, so you can retune it in seconds
 without touching the checkpoint. This downloads the live onnx, rewrites that one
-value, and re-uploads to the same repo/filename. In the app afterwards:
-**Models → Khmer voice → Remove, then Redownload** (filename is unchanged, so the
-cache must be cleared to pick up the new file).
+value, and uploads it under a **new filename** (`khmer_tts_ls115.onnx`).
+
+**Why a new filename, not overwrite:** the app caches the voice by filename in
+its private files dir. Overwriting `khmer_tts.onnx` in place keeps serving the
+stale cached copy until the user manually deletes it (Models → Khmer voice →
+Remove) — and they can't always reach that row. A new name makes a fresh build
+auto-download the corrected voice with zero manual steps. The app's
+`TTS_ONNX_FILE` (mobile/src/domain/types.ts) points at this name — bump both
+together whenever the onnx changes.
 
 ```python
 import onnx, numpy as np
 from onnx import numpy_helper
 from huggingface_hub import hf_hub_download, HfApi, login
-REPO, RATE = "sengtha/khmer-tts-female-v2", 1.15
+REPO, SRC, DST, RATE = "sengtha/khmer-tts-female-v2", "khmer_tts.onnx", "khmer_tts_ls115.onnx", 1.15
 login()  # HF token with write access
 
-m = onnx.load(hf_hub_download(REPO, "khmer_tts.onnx")); g = m.graph
+m = onnx.load(hf_hub_download(REPO, SRC)); g = m.graph
 prod = {o:n for n in g.node for o in n.output}
 mul  = prod[next(n for n in g.node if n.op_type=="Ceil").input[0]]  # length_scale mul
 for name in mul.input:
@@ -418,8 +424,8 @@ for name in mul.input:
         if old.size == 1:
             a.t.CopyFrom(numpy_helper.from_array(np.array(RATE, dtype=old.dtype)))
             print("length_scale", float(old), "->", RATE)
-onnx.checker.check_model(m); onnx.save(m, "khmer_tts.onnx")
-HfApi().upload_file(path_or_fileobj="khmer_tts.onnx", path_in_repo="khmer_tts.onnx", repo_id=REPO)
+onnx.checker.check_model(m); onnx.save(m, DST)
+HfApi().upload_file(path_or_fileobj=DST, path_in_repo=DST, repo_id=REPO)
 ```
 
 ### iAny integration (next)

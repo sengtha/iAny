@@ -7,7 +7,7 @@ import { ensureFile, errStr, fetchModelJson } from './modelFile'
 
 /**
  * On-device Khmer text-to-speech via onnxruntime-react-native running our VITS
- * voice (khmer_tts.onnx). Fully offline once downloaded.
+ * voice (khmer_tts_ls115.onnx). Fully offline once downloaded.
  *
  * The model takes grapheme token ids (int32) → a float32 waveform. We replicate
  * the coqui training tokenizer in JS from tts_meta.json: lowercase + collapse
