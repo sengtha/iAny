@@ -113,8 +113,12 @@ class KhmerTts {
   }
 
   private async synth(ids: number[]): Promise<Float32Array> {
-    const x = new Tensor('int32', Int32Array.from(ids), [1, ids.length])
-    const xLen = new Tensor('int32', Int32Array.from([ids.length]), [1])
+    // The VITS onnx was exported with int64 inputs (torch's default dtype), and
+    // onnxruntime-react-native enforces the declared type — passing int32 throws
+    // ORT_INVALID_ARGUMENT ("expected tensor(int64)"). Build int64 tensors via
+    // BigInt64Array (Hermes supports BigInt).
+    const x = new Tensor('int64', BigInt64Array.from(ids, (v) => BigInt(v)), [1, ids.length])
+    const xLen = new Tensor('int64', BigInt64Array.from([BigInt(ids.length)]), [1])
     const out = await this.session!.run({ x, x_lengths: xLen })
     const y = out.y ?? out[Object.keys(out)[0]]
     return y.data as Float32Array // [1,1,T] flattened -> T
