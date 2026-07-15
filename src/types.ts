@@ -42,9 +42,21 @@ export interface GenModelSpec {
 }
 
 /** Answering model tiers, smallest first (crash recovery steps down this
- *  list). All are Gemma family so Khmer/multilingual quality holds across
- *  tiers, and all exist as ONNX community builds usable by Transformers.js. */
+ *  list). The iAny Khmer model leads — it's the default: purpose-built,
+ *  Khmer-first, and runs on any phone. The rest are general Gemma/Qwen ONNX
+ *  builds usable by Transformers.js for users who want a bigger model. */
 export const GEN_MODELS: GenModelSpec[] = [
+  {
+    // iAny's own Khmer fine-tune (Gemma 3 270M, continued-pretrained on
+    // Khmer then RAG-SFT). q8-only export. THE DEFAULT — small + Khmer-first.
+    choice: 'khmer',
+    id: 'sengtha/iany-khmer-tiny-v1-ONNX',
+    name: 'iAny Khmer 270M',
+    cpuOk: true,
+    minBytes: 80 * 1e6,
+    dtype: 'q8',
+    khmerRag: true,
+  },
   {
     choice: 'tiny',
     id: 'onnx-community/gemma-3-270m-it-ONNX',
@@ -80,17 +92,6 @@ export const GEN_MODELS: GenModelSpec[] = [
     name: 'Gemma 4 E4B',
     cpuOk: false,
     minBytes: 1500 * 1e6,
-  },
-  {
-    // iAny's own Khmer fine-tune (Gemma 3 270M, continued-pretrained on
-    // Khmer then RAG-SFT). q8-only export; opt-in Khmer tier.
-    choice: 'khmer',
-    id: 'sengtha/iany-khmer-tiny-v1-ONNX',
-    name: 'iAny Khmer 270M',
-    cpuOk: true,
-    minBytes: 80 * 1e6,
-    dtype: 'q8',
-    khmerRag: true,
   },
 ]
 

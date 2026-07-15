@@ -36,10 +36,9 @@ export function getLastGenDevice(): 'webgpu' | 'wasm' | null {
 export function getGenModelChoice(): GenModelChoice {
   const saved = localStorage.getItem(GEN_MODEL_KEY)
   if (saved && GEN_MODELS.some((m) => m.choice === saved)) return saved as GenModelChoice
-  // 'max' is opt-in only — the default tops out at 'full'.
-  const deviceMemory = (navigator as { deviceMemory?: number }).deviceMemory
-  if (deviceMemory !== undefined) return deviceMemory >= 8 ? 'full' : 'compact'
-  return navigator.maxTouchPoints > 1 ? 'compact' : 'full'
+  // Default to the small iAny Khmer model: purpose-built, Khmer-first, and runs
+  // on any phone ("start small"). Users can pick a bigger general model below.
+  return 'khmer'
 }
 
 export function getGenModelId(): string {

@@ -268,6 +268,43 @@ button:focus-visible {
   white-space: nowrap;
 }
 
+/* Model rows: let the name + badge wrap instead of truncating. */
+.card.doc.model strong {
+  white-space: normal;
+  overflow: visible;
+}
+
+/* Group label above the answering-model list. */
+.model-group {
+  margin: 16px 0 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fg);
+}
+
+/* Small status badges next to a model name. */
+.badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.badge.inuse {
+  color: #16a34a;
+}
+.badge.reco {
+  color: var(--accent);
+  background: var(--accent-weak);
+}
+.badge.ready {
+  color: #16a34a;
+  font-size: 1.05rem;
+  padding: 0;
+}
+
 .card.doc p {
   margin: 0;
 }

@@ -352,47 +352,60 @@ export function SettingsView() {
 
       <section className="card">
         <h2>{t('settingsModels')}</h2>
+
+        {/* Semantic search (the embedder) — always used for retrieval. */}
         <ModelCard
           label={t('settingsEmbedder')}
           model={status.embedder}
           onDownload={() => void ai.preload('embedder').catch(() => {})}
         />
-        <ModelCard
-          label={
-            {
-              tiny: t('settingsGeneratorTiny'),
-              small: t('settingsGeneratorSmall'),
-              compact: t('settingsGeneratorCompact'),
-              full: t('settingsGenerator'),
-              max: t('settingsGeneratorMax'),
-              khmer: t('settingsGeneratorKhmer'),
-            }[getGenModelChoice()]
-          }
-          model={status.generator}
-          onDownload={() => void ai.preload('generator').catch(() => {})}
-        />
+
+        {/* Answering model — pick one. iAny Khmer is the small default. */}
+        <p className="hint model-group">{t('settingsGenChoiceLabel')}</p>
+        {GEN_MODELS.map((m) => {
+          const active = getGenModelChoice() === m.choice
+          const g = status.generator
+          const note = {
+            khmer: t('settingsGenKhmer'),
+            tiny: t('settingsGenTiny'),
+            small: t('settingsGenSmall'),
+            compact: t('settingsGenCompact'),
+            full: t('settingsGenFull'),
+            max: t('settingsGenMax'),
+          }[m.choice]
+          return (
+            <div key={m.choice} className="card doc model">
+              <div>
+                <strong>
+                  {m.name}
+                  {active ? (
+                    <span className="badge inuse"> ● {t('settingsInUse')}</span>
+                  ) : m.choice === 'khmer' ? (
+                    <span className="badge reco"> {t('settingsRecommended')}</span>
+                  ) : null}
+                </strong>
+                <p className="hint">{note}</p>
+                {active && g.status === 'loading' && <progress value={g.progress} max={1} />}
+              </div>
+              {active ? (
+                g.status === 'idle' || g.status === 'error' ? (
+                  <button
+                    className="primary"
+                    onClick={() => void ai.preload('generator').catch(() => {})}
+                  >
+                    {g.status === 'error' ? t('settingsRetry') : t('settingsDownload')}
+                  </button>
+                ) : g.status === 'ready' || g.status === 'cached' ? (
+                  <span className="badge ready">✓</span>
+                ) : null
+              ) : (
+                <button onClick={() => setGenModelChoice(m.choice)}>{t('settingsUse')}</button>
+              )}
+            </div>
+          )
+        })}
         {getCrashSuspect() !== null && <p className="error">{t('genCrashWarning')}</p>}
-        <p className="hint">{t('settingsGenChoiceLabel')}</p>
-        <div className="row gen-choices">
-          {GEN_MODELS.map((m) => (
-            <button
-              key={m.choice}
-              className={getGenModelChoice() === m.choice ? 'primary' : ''}
-              onClick={() => getGenModelChoice() !== m.choice && setGenModelChoice(m.choice)}
-            >
-              {
-                {
-                  tiny: t('settingsGenTiny'),
-                  small: t('settingsGenSmall'),
-                  compact: t('settingsGenCompact'),
-                  full: t('settingsGenFull'),
-                  max: t('settingsGenMax'),
-                  khmer: t('settingsGenKhmer'),
-                }[m.choice]
-              }
-            </button>
-          ))}
-        </div>
+
         <details className="advanced">
           <summary>{t('settingsAdvanced')}</summary>
           <ModelShare />
