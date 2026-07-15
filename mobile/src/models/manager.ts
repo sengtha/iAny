@@ -81,6 +81,15 @@ export const MODELS: ManagedModel[] = [
     selectable: true,
   },
   {
+    id: 'gen-bonsai-1.7b',
+    kind: 'generation',
+    label: 'Bonsai 1.7B · ternary (experimental)',
+    note: 'Qwen3 1.7B ternary (~0.4GB) — bigger brain, tiny size. General (not Khmer-tuned); needs the llama.rn 0.12.6 rebuild. A/B its Khmer vs ft3.',
+    repo: 'prism-ml/Ternary-Bonsai-1.7B-gguf',
+    files: ['Ternary-Bonsai-1.7B-Q2_0.gguf', 'Ternary-Bonsai-1.7B-Q2_0_g64.gguf'],
+    selectable: true,
+  },
+  {
     id: 'embed',
     kind: 'embedding',
     label: 'Semantic search',

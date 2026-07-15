@@ -61,6 +61,9 @@ const ALLOWED_PREFIXES = [
   // ft3: retrained on the richer khmer-qa (fuller answers). Q8 + Q4. Pre-listed
   // so it's servable the moment training finishes — pick it in the Models screen.
   'sengtha/Qwen3-0.6B-khm-ft3-Q8_0-GGUF/',
+  // Experimental: Bonsai 1.7B — ternary (Q2_0) build of Qwen3 1.7B, ~0.4GB, runs
+  // on llama.cpp's Q2_0 CPU kernels (llama.rn >= 0.12.6). A/B its Khmer vs ft3.
+  'prism-ml/Ternary-Bonsai-1.7B-gguf/',
   // On-device Khmer TTS: VITS voice (trained on DDD-Cambodia 727h) as ONNX +
   // tts_meta.json (grapheme vocab). Runs via onnxruntime-react-native, offline.
   'sengtha/khmer-tts-female-v1/',
