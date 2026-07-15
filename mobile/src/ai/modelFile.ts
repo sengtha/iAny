@@ -156,3 +156,61 @@ export async function clearModelCache(): Promise<void> {
   await FileSystem.deleteAsync(MODEL_DIR, { idempotent: true })
   await FileSystem.makeDirectoryAsync(MODEL_DIR, { intermediates: true }).catch(() => {})
 }
+
+/* ------------------------------------------------------------------ *
+ * Model management: list, locate, delete, share, import. Powers the   *
+ * Models screen (choose / download / redownload / share / import).    *
+ * ------------------------------------------------------------------ */
+
+export interface CachedModelFile {
+  name: string
+  size: number
+  uri: string
+}
+
+/** ensureFile() stores under a slash-flattened name; ensureModelFile() stores
+ *  the raw filename. Try both so any candidate resolves to its on-disk file. */
+function candidateNames(file: string): string[] {
+  return [file, file.replace(/\//g, '_')]
+}
+
+/** List every complete model file on disk (skips .part downloads). */
+export async function listCachedModels(): Promise<CachedModelFile[]> {
+  const dir = await FileSystem.getInfoAsync(MODEL_DIR)
+  if (!dir.exists) return []
+  const names = await FileSystem.readDirectoryAsync(MODEL_DIR).catch(() => [] as string[])
+  const out: CachedModelFile[] = []
+  for (const name of names) {
+    if (name.endsWith('.part')) continue
+    const uri = MODEL_DIR + name
+    const info = await FileSystem.getInfoAsync(uri)
+    if (info.exists && !info.isDirectory) out.push({ name, size: info.size ?? 0, uri })
+  }
+  return out
+}
+
+/** The on-disk file for one of these candidate filenames, or null if missing. */
+export async function findCachedFile(candidates: string[]): Promise<CachedModelFile | null> {
+  const cached = await listCachedModels()
+  const wanted = new Set(candidates.flatMap(candidateNames))
+  return cached.find((f) => wanted.has(f.name)) ?? null
+}
+
+/** Delete the on-disk copies of these candidate filenames (a per-model "remove"). */
+export async function deleteCachedFiles(candidates: string[]): Promise<void> {
+  const wanted = new Set(candidates.flatMap(candidateNames))
+  for (const name of wanted) {
+    await FileSystem.deleteAsync(MODEL_DIR + name, { idempotent: true })
+    await FileSystem.deleteAsync(MODEL_DIR + name + '.part', { idempotent: true })
+  }
+}
+
+/** Copy a received file (e.g. shared over Bluetooth/Nearby, picked by the user)
+ *  into the model cache so the app can use it without downloading. */
+export async function importModelFile(srcUri: string, destName: string): Promise<string> {
+  await FileSystem.makeDirectoryAsync(MODEL_DIR, { intermediates: true }).catch(() => {})
+  const dest = MODEL_DIR + destName
+  await FileSystem.deleteAsync(dest, { idempotent: true })
+  await FileSystem.copyAsync({ from: srcUri, to: dest })
+  return dest
+}

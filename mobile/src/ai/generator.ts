@@ -1,6 +1,6 @@
 import * as FileSystem from 'expo-file-system'
 import { initLlama } from 'llama.rn'
-import { GEN_MODEL_FILES, GEN_MODEL_REPO } from '../domain/types'
+import { getActiveGenModel } from '../models/manager'
 import { ensureModelFile, errStr } from './modelFile'
 
 /** Inferred to avoid depending on llama.rn's exported type names. */
@@ -57,7 +57,9 @@ class LlamaGenerator {
   private async _init(onProgress?: (p: GenProgress) => void): Promise<void> {
     this.status = 'downloading'
     onProgress?.({ status: 'downloading', progress: 0 })
-    const path = await ensureModelFile(GEN_MODEL_REPO, GEN_MODEL_FILES, (progress) =>
+    // Which LLM (Q4/Q8) is active is chosen in the Models screen; defaults to Q4.
+    const active = await getActiveGenModel()
+    const path = await ensureModelFile(active.repo, active.files, (progress) =>
       onProgress?.({ status: 'downloading', progress }),
     )
     this.status = 'loading'

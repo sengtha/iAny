@@ -26,6 +26,7 @@ import { ask } from './src/ai/ask'
 import { tts, type TtsProgress } from './src/ai/tts'
 import { clearModelCache } from './src/ai/modelFile'
 import { RadioScreen } from './src/RadioScreen'
+import { ModelsScreen } from './src/ModelsScreen'
 
 /**
  * Stage 2 smoke-test screen: on-device SQLite + FTS5 (Stage 1) plus opt-in
@@ -49,6 +50,7 @@ export default function App() {
   const [speed, setSpeed] = useState<string | null>(null)
   const [ttsState, setTtsState] = useState<TtsProgress>({ status: tts.status })
   const [showRadio, setShowRadio] = useState(false)
+  const [showModels, setShowModels] = useState(false)
 
   const onRedownload = async () => {
     setBusy(true)
@@ -218,11 +220,15 @@ export default function App() {
               <Pressable onPress={() => setShowRadio((v) => !v)} hitSlop={8}>
                 <Text style={styles.redl}>📻 Radio</Text>
               </Pressable>
+              <Pressable onPress={() => setShowModels((v) => !v)} hitSlop={8}>
+                <Text style={styles.redl}>⚙ Models</Text>
+              </Pressable>
               <Pressable onPress={onRedownload} disabled={busy} hitSlop={8}>
-                <Text style={styles.redl}>↻ Redownload</Text>
+                <Text style={styles.redl}>↻ All</Text>
               </Pressable>
             </View>
           </View>
+          {showModels ? <ModelsScreen onClose={() => setShowModels(false)} /> : null}
           {showRadio ? <RadioScreen onClose={() => setShowRadio(false)} /> : null}
           <Text style={styles.hint}>
             On-device search + AI answers, fully offline. Enable BOTH for grounded Khmer
