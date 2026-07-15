@@ -65,7 +65,9 @@ export const GEN_MODEL_FILES = [
  * vocab (Khmer + ASCII + digits) + `add_blank` + sample_rate so the app can
  * tokenize exactly like the training tokenizer.
  */
-export const TTS_MODEL_REPO = 'sengtha/khmer-tts-female-v1'
+// v2: continued training (~200k steps, more data) + length_scale 1.15 (slower,
+// clearer). Same ONNX interface as v1, so no app code changes beyond the repo.
+export const TTS_MODEL_REPO = 'sengtha/khmer-tts-female-v2'
 export const TTS_ONNX_FILE = 'khmer_tts.onnx'
 export const TTS_META_FILE = 'tts_meta.json'
 
