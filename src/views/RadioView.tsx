@@ -3,9 +3,10 @@ import { radio } from '../radio'
 import { webTts } from '../ai/webtts'
 
 /**
- * 📻 iAny Radio — reads the verified-outlet news feed aloud with the browser's
- * Khmer voice, attributing each item to its outlet. Thin view over the shared
- * core RadioPlayer.
+ * 📻 iAny Radio — an immersive, full-screen player that reads the verified-outlet
+ * news feed aloud with the browser's Khmer voice, always attributing the outlet.
+ * Thin view over the shared core RadioPlayer; the visuals (spinning disc,
+ * equalizer, transport) are pure CSS so they cost nothing on-device.
  */
 export function RadioView() {
   useSyncExternalStore(
@@ -14,6 +15,7 @@ export function RadioView() {
   )
   const { state, current, error } = radio
   const active = state === 'playing' || state === 'waiting' || state === 'loading'
+  const playing = state === 'playing'
 
   const status =
     state === 'loading'
@@ -25,79 +27,98 @@ export function RadioView() {
           : state === 'paused'
             ? 'Paused'
             : state === 'idle'
-              ? 'Press play to listen to the news.'
+              ? 'Press play to listen to the news'
               : 'On air'
 
   return (
-    <section style={S.wrap}>
-      <h2 style={S.h2}>📻 iAny Radio</h2>
-      <p style={S.sub}>Verified Khmer news, read aloud on your device.</p>
+    <div className="radio-screen">
+      <div className="radio-bg" aria-hidden />
 
-      {current ? (
-        <div style={S.card}>
-          <div style={S.outlet}>{current.outletName}</div>
-          <div style={S.headline}>{current.title}</div>
-          <div style={S.body}>{current.body}</div>
-          {current.sponsor ? <div style={S.sponsor}>Sponsored · {current.sponsor}</div> : null}
+      <header className="radio-top">
+        <div className="radio-word">
+          <span aria-hidden>📻</span> iAny Radio
         </div>
-      ) : null}
+        <span className={playing ? 'radio-live on' : 'radio-live'}>
+          <i />
+          {playing ? 'ON AIR' : active ? 'TUNING' : 'OFF AIR'}
+        </span>
+      </header>
 
-      <p style={S.status}>{status}</p>
+      <div className="radio-stage">
+        <div className={playing ? 'radio-disc spin' : 'radio-disc'}>
+          <div className="radio-disc-face">
+            {current ? initials(current.outletName) : <span aria-hidden>📻</span>}
+          </div>
+        </div>
+        <div className={playing ? 'radio-eq on' : 'radio-eq'} aria-hidden>
+          <span />
+          <span />
+          <span />
+          <span />
+          <span />
+        </div>
+      </div>
 
-      <div style={S.controls}>
-        {active ? (
-          <button style={{ ...S.btn, ...S.primary }} onClick={() => radio.pause()}>
-            ⏸ Pause
-          </button>
+      <div className="radio-meta">
+        {current ? (
+          <>
+            <div className="radio-outlet">
+              ព័ត៌មានពី · {current.outletName}
+            </div>
+            <h2 className="radio-headline">{current.title}</h2>
+            <p className="radio-body">{current.body}</p>
+            {current.sponsor ? (
+              <div className="radio-sponsor">Sponsored · {current.sponsor}</div>
+            ) : null}
+          </>
         ) : (
-          <button style={{ ...S.btn, ...S.primary }} onClick={() => void radio.start()}>
-            ▶ Listen
-          </button>
+          <p className="radio-idle">
+            Verified Khmer news, read aloud on your device.
+          </p>
         )}
-        <button style={S.btn} onClick={() => radio.skip()}>
-          ⏭ Next
+      </div>
+
+      <div className="radio-status">{status}</div>
+
+      <div className="radio-transport">
+        <button
+          className="radio-ctl"
+          onClick={() => radio.stop()}
+          disabled={state === 'idle'}
+          aria-label="Stop"
+        >
+          ⏹
         </button>
-        <button style={S.btn} onClick={() => radio.stop()}>
-          ⏹ Stop
+        <button
+          className="radio-play"
+          onClick={() => (active ? radio.pause() : void radio.start())}
+          aria-label={active ? 'Pause' : 'Play'}
+        >
+          {active ? '⏸' : '▶'}
+        </button>
+        <button className="radio-ctl" onClick={() => radio.skip()} aria-label="Next">
+          ⏭
         </button>
       </div>
 
       {state !== 'idle' && !webTts.hasKhmerVoice() ? (
-        <p style={S.warn}>
+        <p className="radio-warn">
           This browser has no Khmer voice installed, so pronunciation may be off. Android Chrome
-          usually has one; the trained iAny voice will replace this later.
+          usually has one.
         </p>
       ) : null}
-    </section>
+    </div>
   )
 }
 
-const S: Record<string, React.CSSProperties> = {
-  wrap: { padding: '8px 4px' },
-  h2: { margin: '0 0 2px' },
-  sub: { margin: '0 0 14px', color: 'var(--muted, #64748b)', fontSize: 14 },
-  card: {
-    border: '1px solid #c7d2fe',
-    background: '#eef2ff',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
-  },
-  outlet: { fontSize: 12, fontWeight: 700, color: '#4f46e5' },
-  headline: { fontSize: 16, fontWeight: 600, color: '#1e1b4b', margin: '2px 0' },
-  body: { fontSize: 14, color: '#334155' },
-  sponsor: { fontSize: 12, color: '#64748b', fontStyle: 'italic', marginTop: 4 },
-  status: { color: '#475569', fontSize: 13, margin: '0 0 10px' },
-  controls: { display: 'flex', gap: 8 },
-  btn: {
-    padding: '9px 14px',
-    borderRadius: 8,
-    border: '1px solid #c7d2fe',
-    background: '#fff',
-    color: '#3730a3',
-    fontWeight: 600,
-    cursor: 'pointer',
-  },
-  primary: { background: '#4f46e5', borderColor: '#4f46e5', color: '#fff' },
-  warn: { marginTop: 12, color: '#92400e', background: '#fef3c7', padding: 10, borderRadius: 8, fontSize: 13 },
+/** Two-letter monogram for the disc face (Latin initials, else first glyph). */
+function initials(name: string): string {
+  const latin = name.match(/[A-Za-z]+/g)
+  if (latin && latin.length) {
+    return latin
+      .slice(0, 2)
+      .map((w) => w[0]!.toUpperCase())
+      .join('')
+  }
+  return Array.from(name.trim())[0] ?? '📻'
 }
