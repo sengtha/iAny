@@ -102,7 +102,12 @@ export function ModelsScreen({ onClose }: { onClose: () => void }) {
         {total > 0 ? `  ·  ${formatBytes(total)} on device` : ''}
       </Text>
 
-      <ScrollView style={styles.list}>
+      <ScrollView
+        style={styles.list}
+        contentContainerStyle={styles.listContent}
+        nestedScrollEnabled
+        showsVerticalScrollIndicator
+      >
         {MODELS.map((m) => {
           const st = states[m.id]
           const isActive = m.kind === 'generation' && activeGen === m.id
@@ -197,6 +202,7 @@ const styles = StyleSheet.create({
   close: { fontSize: 16, color: '#6366f1', fontWeight: '600' },
   hint: { fontSize: 12, color: '#64748b', marginTop: 4, marginBottom: 8 },
   list: { flex: 1 },
+  listContent: { paddingBottom: 16 },
   row: { paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#e2e8f0' },
   rowHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   label: { fontSize: 14, fontWeight: '600', color: '#1e293b' },
