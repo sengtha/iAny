@@ -1,8 +1,9 @@
 import { RadioPlayer, type RadioFeed } from '@iany/core'
-import { webTts } from './ai/webtts'
+import { radioVoice } from './ai/radioVoice'
 
 /**
- * PWA radio = core's shared RadioPlayer wired to the browser voice + a fetch of
+ * PWA radio = core's shared RadioPlayer wired to radioVoice (the trained iAny
+ * Khmer ONNX voice when downloaded, else the browser voice) + a fetch of
  * /radio/feed (same origin as the app / Worker). Same player as mobile.
  */
 const fetchFeed = async (since: string): Promise<RadioFeed> => {
@@ -11,4 +12,4 @@ const fetchFeed = async (since: string): Promise<RadioFeed> => {
   return (await res.json()) as RadioFeed
 }
 
-export const radio = new RadioPlayer({ tts: webTts, fetchFeed })
+export const radio = new RadioPlayer({ tts: radioVoice, fetchFeed })

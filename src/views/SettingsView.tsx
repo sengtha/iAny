@@ -14,6 +14,7 @@ import {
   storeCode,
 } from '../lib/backup'
 import { runDiagnostics, type DiagnosticResult } from '../lib/diagnostics'
+import { khmerTts, type VoiceProgress } from '../ai/khmertts'
 import {
   deleteModelCache,
   exportModelBundle,
@@ -310,6 +311,55 @@ function Diagnostics() {
   )
 }
 
+/** The trained iAny Khmer voice (ONNX) — download once, then the Radio reads
+ *  news with it. ~115 MB, cached for offline use. */
+function VoiceCard() {
+  const { t } = useI18n()
+  const [voice, setVoice] = useState<VoiceProgress>({ status: khmerTts.status })
+  const [cached, setCached] = useState(false)
+
+  useEffect(() => {
+    void khmerTts.isDownloaded().then(setCached)
+  }, [])
+
+  const download = () => {
+    void khmerTts
+      .init(setVoice)
+      .then(() => setCached(true))
+      .catch(() => {})
+  }
+
+  const ready = voice.status === 'ready' || khmerTts.ready
+  const busy = voice.status === 'downloading' || voice.status === 'loading'
+  const statusText =
+    voice.status === 'downloading'
+      ? `${t('settingsModelLoading')} ${Math.round((voice.progress ?? 0) * 100)}%`
+      : voice.status === 'loading'
+        ? t('modelPreparing')
+        : ready
+          ? t('settingsModelReady')
+          : cached
+            ? t('settingsModelCached')
+            : voice.status === 'error'
+              ? (voice.error ?? t('settingsModelError'))
+              : t('settingsVoiceNote')
+
+  return (
+    <div className="card doc model">
+      <div>
+        <strong>{t('settingsVoice')}</strong>
+        <p className="hint">{statusText}</p>
+        {voice.status === 'downloading' && <progress value={voice.progress} max={1} />}
+      </div>
+      {!ready && !cached && !busy && (
+        <button className="primary" onClick={download}>
+          {t('settingsDownload')}
+        </button>
+      )}
+    </div>
+  )
+}
+
 export function SettingsView() {
   const { t, lang, setLang } = useI18n()
   const status = useModelStatus()
@@ -405,6 +455,10 @@ export function SettingsView() {
           )
         })}
         {getCrashSuspect() !== null && <p className="error">{t('genCrashWarning')}</p>}
+
+        {/* Khmer voice (ONNX) — reads the Radio news aloud. */}
+        <p className="hint model-group">{t('settingsVoiceLabel')}</p>
+        <VoiceCard />
 
         <details className="advanced">
           <summary>{t('settingsAdvanced')}</summary>

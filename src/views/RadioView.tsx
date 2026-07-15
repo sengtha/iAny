@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import { radio } from '../radio'
-import { webTts } from '../ai/webtts'
+import { radioVoice } from '../ai/radioVoice'
 
 /**
  * 📻 iAny Radio — an immersive, full-screen player that reads the verified-outlet
@@ -101,10 +101,9 @@ export function RadioView() {
         </button>
       </div>
 
-      {state !== 'idle' && !webTts.hasKhmerVoice() ? (
+      {state !== 'idle' && !radioVoice.usingKhmerVoice() ? (
         <p className="radio-warn">
-          This browser has no Khmer voice installed, so pronunciation may be off. Android Chrome
-          usually has one.
+          Using the browser voice. Download the Khmer voice in Settings for correct pronunciation.
         </p>
       ) : null}
     </div>
