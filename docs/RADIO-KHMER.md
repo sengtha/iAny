@@ -64,6 +64,15 @@ CREATE INDEX idx_news_expires ON news (expires_at);
   `created_at`) for the next poll. Public, read-only, cacheable a few seconds.
 - **Cron** (`wrangler.jsonc` triggers, daily): `DELETE FROM news WHERE expires_at < ?`.
 
+**Outlet self-service** (same `Bearer <outlet token>`; each is scoped to the
+outlet that owns the row, so one outlet can never touch another's news):
+- `GET /radio/my/news` — list this outlet's own posts (newest first, with previews).
+- `POST /radio/my/news/:id` — edit one of its own posts (re-validated; TTL unchanged).
+- `DELETE /radio/my/news/:id` — delete one of its own posts.
+
+These back the **My posts** section of `outlet.html`, so a provider can fix or
+remove an article it posted without needing the admin.
+
 Auth is a hash compare (store `SHA-256(token)`), so a leaked DB can't post. Rotate
 a token by replacing the hash.
 

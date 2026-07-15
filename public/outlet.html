@@ -10,10 +10,11 @@
       * { box-sizing: border-box; }
       body {
         margin: 0; font-family: system-ui, "Noto Sans Khmer", sans-serif;
-        background: #f1f5f9; color: #0f172a; line-height: 1.5;
+        background: #eef2ff; color: #0f172a; line-height: 1.5;
       }
-      .wrap { max-width: 640px; margin: 0 auto; padding: 20px 16px 60px; }
+      .wrap { max-width: 640px; margin: 0 auto; padding: 20px 16px 80px; }
       h1 { font-size: 20px; margin: 0 0 2px; }
+      h2 { font-size: 15px; margin: 26px 0 10px; color: #3730a3; }
       .sub { color: #64748b; font-size: 13px; margin: 0 0 20px; }
       label { display: block; font-weight: 600; font-size: 14px; margin: 14px 0 4px; }
       .hint { font-weight: 400; color: #64748b; font-size: 12px; }
@@ -30,12 +31,37 @@
         background: #4f46e5; color: #fff; font-size: 16px; font-weight: 700; cursor: pointer;
       }
       button:disabled { opacity: .5; cursor: not-allowed; }
+      button.ghost {
+        margin-top: 8px; background: #fff; color: #3730a3; border: 1px solid #c7d2fe;
+      }
       .msg { margin-top: 16px; padding: 12px; border-radius: 8px; font-size: 14px; display: none; }
       .msg.ok { display: block; background: #dcfce7; color: #166534; }
       .msg.err { display: block; background: #fee2e2; color: #991b1b; }
       .remember { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #475569; margin-top: 6px; }
       .remember input { width: auto; }
       .rule { margin-top: 22px; padding: 12px; background: #fef9c3; border-radius: 8px; font-size: 13px; color: #713f12; }
+      .editing { border: 2px solid #4f46e5 !important; }
+      .edit-banner {
+        display: none; margin-top: 10px; padding: 8px 12px; border-radius: 8px;
+        background: #eef2ff; color: #3730a3; font-size: 13px; font-weight: 600;
+      }
+      .edit-banner.show { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+      .edit-banner button { margin: 0; width: auto; padding: 6px 10px; font-size: 13px; }
+      /* My posts */
+      .post {
+        background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+        padding: 12px 14px; margin-bottom: 10px;
+      }
+      .post .p-title { font-weight: 600; }
+      .post .p-meta { font-size: 12px; color: #64748b; margin: 2px 0 0; }
+      .post .p-body { font-size: 13px; color: #475569; margin: 6px 0 0; }
+      .post .p-actions { display: flex; gap: 8px; margin-top: 10px; }
+      .post .p-actions button {
+        margin: 0; width: auto; padding: 6px 12px; font-size: 13px; font-weight: 600;
+      }
+      .post .p-actions .edit { background: #fff; color: #3730a3; border: 1px solid #c7d2fe; }
+      .post .p-actions .del { background: #fff; color: #dc2626; border: 1px solid #fecaca; }
+      .empty { color: #64748b; font-size: 13px; padding: 6px 2px; }
     </style>
   </head>
   <body>
@@ -46,6 +72,11 @@
       <label for="token">លេខសម្ងាត់ (Outlet token)</label>
       <input id="token" type="password" autocomplete="off" placeholder="Bearer token" />
       <div class="remember"><input id="remember" type="checkbox" /><label for="remember" style="margin:0;font-weight:400">ចងចាំ (remember on this device)</label></div>
+
+      <div id="editBanner" class="edit-banner">
+        <span>✎ កំពុងកែសម្រួល · Editing a post</span>
+        <button id="cancelEdit" class="ghost" style="border:1px solid #c7d2fe">Cancel</button>
+      </div>
 
       <label for="title">ចំណងជើង · Title</label>
       <input id="title" maxlength="200" placeholder="ចំណងជើងព័ត៌មាន" />
@@ -63,6 +94,9 @@
       <button id="post">ផ្សាយ · Post</button>
       <div id="msg" class="msg"></div>
 
+      <h2>ព័ត៌មានរបស់អ្នក · My posts</h2>
+      <div id="mine"><p class="empty">Enter your token to see and manage your posts.</p></div>
+
       <div class="rule">
         ព័ត៌មានត្រូវបានអានដោយសំឡេង AI ព្រមទាំងឈ្មោះសារព័ត៌មានរបស់អ្នក។ ការទទួលខុសត្រូវលើខ្លឹមសារ
         ជាកម្មសិទ្ធិរបស់សារព័ត៌មាន។ ព័ត៌មានលុបចោលដោយស្វ័យប្រវត្តិក្រោយ ៧ ថ្ងៃ។<br />
@@ -75,32 +109,107 @@
       // Kept in sync with @iany/core RADIO_LIMITS (server enforces authoritatively).
       var MAX_BODY = 1500, MAX_LATIN = 8
       var $ = function (id) { return document.getElementById(id) }
+      var editingId = null
 
       if (localStorage.getItem('iany_outlet_token')) {
         $('token').value = localStorage.getItem('iany_outlet_token')
         $('remember').checked = true
+        loadMine()
       }
+      $('token').addEventListener('change', loadMine)
 
+      function el(tag, props, kids) {
+        var n = document.createElement(tag)
+        if (props) for (var k in props) {
+          if (k === 'class') n.className = props[k]
+          else if (k === 'text') n.textContent = props[k]
+          else n.setAttribute(k, props[k])
+        }
+        ;(kids || []).forEach(function (c) { if (c) n.appendChild(c) })
+        return n
+      }
+      function fmtDate(s) { try { return new Date(s).toLocaleString() } catch (e) { return s } }
+      function daysLeft(s) { return Math.max(0, Math.ceil((new Date(s).getTime() - Date.now()) / 86400000)) }
       function latinCount(s) { return (s.match(/[A-Za-z]/g) || []).length }
 
       function update() {
         var body = $('body').value
         $('bcount').textContent = body.length + ' / ' + MAX_BODY
         var lc = latinCount(body)
-        var el = $('latin')
+        var el2 = $('latin')
         if (lc > MAX_LATIN) {
-          el.textContent = 'អក្សរឡាតាំង ' + lc + ' (>' + MAX_LATIN + ') — សូមប្រើអក្សរខ្មែរ'
-          el.className = 'count bad'
+          el2.textContent = 'អក្សរឡាតាំង ' + lc + ' (>' + MAX_LATIN + ') — សូមប្រើអក្សរខ្មែរ'
+          el2.className = 'count bad'
         } else {
-          el.textContent = lc ? ('Latin: ' + lc) : ''
-          el.className = 'count'
+          el2.textContent = lc ? ('Latin: ' + lc) : ''
+          el2.className = 'count'
         }
       }
       $('body').addEventListener('input', update)
       update()
 
-      function show(kind, text) {
-        var m = $('msg'); m.className = 'msg ' + kind; m.textContent = text
+      function show(kind, text) { var m = $('msg'); m.className = 'msg ' + kind; m.textContent = text }
+
+      function enterEdit(post) {
+        editingId = post.id
+        $('title').value = post.title || ''
+        $('body').value = post.body || ''
+        $('sponsor').value = post.sponsor || ''
+        update()
+        $('post').textContent = 'រក្សាទុក · Save changes'
+        $('editBanner').className = 'edit-banner show'
+        $('title').classList.add('editing'); $('body').classList.add('editing')
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      }
+      function exitEdit() {
+        editingId = null
+        $('post').textContent = 'ផ្សាយ · Post'
+        $('editBanner').className = 'edit-banner'
+        $('title').classList.remove('editing'); $('body').classList.remove('editing')
+        $('title').value = ''; $('body').value = ''; $('sponsor').value = ''
+        update()
+      }
+      $('cancelEdit').addEventListener('click', exitEdit)
+
+      async function loadMine() {
+        var token = $('token').value.trim()
+        var box = $('mine')
+        if (!token) { box.innerHTML = '<p class="empty">Enter your token to see and manage your posts.</p>'; return }
+        box.innerHTML = '<p class="empty">Loading…</p>'
+        try {
+          var res = await fetch('/radio/my/news', { headers: { authorization: 'Bearer ' + token } })
+          var data = await res.json().catch(function () { return {} })
+          if (!res.ok) { box.innerHTML = ''; box.appendChild(el('p', { class: 'empty', text: (data && data.error) || ('Error ' + res.status) })); return }
+          box.innerHTML = ''
+          if (!data.news || !data.news.length) { box.appendChild(el('p', { class: 'empty', text: 'No posts yet.' })); return }
+          data.news.forEach(function (n) { box.appendChild(postCard(n)) })
+        } catch (e) {
+          box.innerHTML = ''; box.appendChild(el('p', { class: 'empty', text: 'Network error.' }))
+        }
+      }
+
+      function postCard(n) {
+        var meta = el('p', { class: 'p-meta', text: fmtDate(n.createdAt) + ' · expires in ' + daysLeft(n.expiresAt) + 'd' })
+        var edit = el('button', { class: 'edit', text: '✎ Edit' })
+        edit.onclick = function () { enterEdit(n) }
+        var del = el('button', { class: 'del', text: '🗑 Delete' })
+        del.onclick = function () { deletePost(n.id, n.title) }
+        return el('div', { class: 'post' }, [
+          el('div', { class: 'p-title', text: n.title }),
+          meta,
+          n.bodyPreview ? el('p', { class: 'p-body', text: n.bodyPreview + (n.bodyPreview.length >= 200 ? '…' : '') }) : null,
+          el('div', { class: 'p-actions' }, [edit, del]),
+        ])
+      }
+
+      async function deletePost(id, title) {
+        var token = $('token').value.trim()
+        if (!confirm('លុបព័ត៌មាននេះ? · Delete this post?\n\n' + title)) return
+        try {
+          var res = await fetch('/radio/my/news/' + id, { method: 'DELETE', headers: { authorization: 'Bearer ' + token } })
+          if (res.ok) { if (editingId === id) exitEdit(); loadMine() }
+          else { var d = await res.json().catch(function () { return {} }); alert('Failed: ' + ((d && d.error) || res.status)) }
+        } catch (e) { alert('Network error.') }
       }
 
       $('post').addEventListener('click', async function () {
@@ -116,19 +225,21 @@
         if ($('remember').checked) localStorage.setItem('iany_outlet_token', token)
         else localStorage.removeItem('iany_outlet_token')
 
+        var editing = editingId
+        var url = editing ? ('/radio/my/news/' + editing) : '/radio/news'
         $('post').disabled = true
-        show('ok', 'កំពុងផ្សាយ… (posting)')
+        show('ok', editing ? 'កំពុងរក្សាទុក… (saving)' : 'កំពុងផ្សាយ… (posting)')
         try {
-          var res = await fetch('/radio/news', {
+          var res = await fetch(url, {
             method: 'POST',
             headers: { 'authorization': 'Bearer ' + token, 'content-type': 'application/json' },
             body: JSON.stringify({ title: title, body: body, sponsor: sponsor || undefined }),
           })
           var data = await res.json().catch(function () { return {} })
           if (res.ok) {
-            show('ok', '✓ ផ្សាយរួចរាល់ (posted). It will air on iAny Radio shortly.')
-            $('title').value = ''; $('body').value = ''; $('sponsor').value = ''
-            update()
+            show('ok', editing ? '✓ រក្សាទុករួចរាល់ (saved).' : '✓ ផ្សាយរួចរាល់ (posted). It will air shortly.')
+            exitEdit()
+            loadMine()
           } else {
             show('err', (data && data.error) ? data.error : ('Error ' + res.status))
           }

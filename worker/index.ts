@@ -165,7 +165,23 @@ async function serveRadio(url: URL, request: Request, env: Env): Promise<Respons
   }
   if (path === 'feed' && request.method === 'GET') return radioFeed(url, env)
   if (path === 'news' && request.method === 'POST') return radioPostNews(request, env)
+  if (path === 'my' || path.startsWith('my/')) return serveRadioMine(path, request, env)
   if (path === 'admin' || path.startsWith('admin/')) return serveRadioAdmin(path, request, env)
+  return json({ error: 'not found' }, 404)
+}
+
+// Outlet self-service (Bearer = the outlet's own token): list / edit / delete
+// its OWN news. Backs the "My posts" section of public/outlet.html.
+async function serveRadioMine(path: string, request: Request, env: Env): Promise<Response> {
+  const outlet = await authOutlet(request, env)
+  if (!outlet) return json({ error: 'invalid token' }, 401)
+  if (!outlet.verified || !outlet.active) return json({ error: 'outlet not enabled' }, 403)
+  const seg = path.split('/') // ['my', 'news', id?]
+  const id = seg[2]
+  const m = request.method
+  if (seg[1] === 'news' && !id && m === 'GET') return radioMineList(outlet.id, env)
+  if (seg[1] === 'news' && id && m === 'POST') return radioMineEdit(outlet, id, request, env)
+  if (seg[1] === 'news' && id && m === 'DELETE') return radioMineDelete(outlet.id, id, env)
   return json({ error: 'not found' }, 404)
 }
 
@@ -208,43 +224,111 @@ async function radioFeed(url: URL, env: Env): Promise<Response> {
   })
 }
 
-// Outlet-authenticated post. Enforces length limits + the Khmer-script rule.
-async function radioPostNews(request: Request, env: Env): Promise<Response> {
-  const token = bearer(request)
-  if (!token) return json({ error: 'missing token' }, 401)
-  const hash = await sha256hex(token)
-  const outlet = await env.DB.prepare(
-    'SELECT id, name, verified, active FROM outlets WHERE token_hash = ?',
-  ).bind(hash).first<{ id: string; name: string; verified: number; active: number }>()
-  if (!outlet) return json({ error: 'invalid token' }, 401)
-  if (!outlet.verified || !outlet.active) return json({ error: 'outlet not enabled' }, 403)
+interface Outlet {
+  id: string
+  name: string
+  verified: number
+  active: number
+}
 
-  let body: NewsSubmission
-  try {
-    body = (await request.json()) as NewsSubmission
-  } catch {
-    return json({ error: 'bad json' }, 400)
-  }
+// Resolve the outlet from its Bearer token (hash compare), or null.
+async function authOutlet(request: Request, env: Env): Promise<Outlet | null> {
+  const token = bearer(request)
+  if (!token) return null
+  const hash = await sha256hex(token)
+  return env.DB.prepare(
+    'SELECT id, name, verified, active FROM outlets WHERE token_hash = ?',
+  ).bind(hash).first<Outlet>()
+}
+
+// Shared title/body/sponsor validation (length limits + the Khmer-script rule).
+// Returns the cleaned fields, or an error Response to short-circuit with.
+function validateNews(
+  body: NewsSubmission,
+): { title: string; text: string; sponsor: string } | { error: Response } {
   const title = (body.title ?? '').trim()
   const text = (body.body ?? '').trim()
   const sponsor = (body.sponsor ?? '').trim()
-  if (!title || !text) return json({ error: 'title and body required' }, 400)
+  if (!title || !text) return { error: json({ error: 'title and body required' }, 400) }
   if (title.length > RADIO_LIMITS.titleMax || text.length > RADIO_LIMITS.bodyMax ||
       sponsor.length > RADIO_LIMITS.sponsorMax) {
-    return json({ error: 'too long' }, 400)
+    return { error: json({ error: 'too long' }, 400) }
   }
   if (!withinLatinBudget(text)) {
-    return json({ error: 'សូមសរសេរពាក្យបរទេសជាអក្សរខ្មែរ (write foreign words in Khmer script)' }, 422)
+    return {
+      error: json(
+        { error: 'សូមសរសេរពាក្យបរទេសជាអក្សរខ្មែរ (write foreign words in Khmer script)' },
+        422,
+      ),
+    }
   }
+  return { title, text, sponsor }
+}
+
+async function readJson(request: Request): Promise<NewsSubmission | null> {
+  try {
+    return (await request.json()) as NewsSubmission
+  } catch {
+    return null
+  }
+}
+
+// Outlet-authenticated post. Enforces length limits + the Khmer-script rule.
+async function radioPostNews(request: Request, env: Env): Promise<Response> {
+  const outlet = await authOutlet(request, env)
+  if (!outlet) return json({ error: 'invalid token' }, 401)
+  if (!outlet.verified || !outlet.active) return json({ error: 'outlet not enabled' }, 403)
+
+  const body = await readJson(request)
+  if (!body) return json({ error: 'bad json' }, 400)
+  const v = validateNews(body)
+  if ('error' in v) return v.error
+
   const id = crypto.randomUUID()
   const createdAt = new Date()
   const expiresAt = new Date(createdAt.getTime() + RADIO_LIMITS.ttlDays * 86400_000)
   await env.DB.prepare(
     `INSERT INTO news (id, outlet_id, outlet_name, title, body, sponsor, lang, created_at, expires_at)
      VALUES (?,?,?,?,?,?,?,?,?)`,
-  ).bind(id, outlet.id, outlet.name, title, text, sponsor || null,
+  ).bind(id, outlet.id, outlet.name, v.title, v.text, v.sponsor || null,
     body.lang === 'en' ? 'en' : 'km', createdAt.toISOString(), expiresAt.toISOString()).run()
   return json({ id, expiresAt: expiresAt.toISOString() })
+}
+
+// List this outlet's OWN news (newest first, incl. near-expiry, with previews).
+async function radioMineList(outletId: string, env: Env): Promise<Response> {
+  const { results } = await env.DB.prepare(
+    `SELECT id, title, substr(body, 1, 200) AS bodyPreview, body, sponsor,
+            created_at AS createdAt, expires_at AS expiresAt
+       FROM news WHERE outlet_id = ? ORDER BY created_at DESC LIMIT 100`,
+  ).bind(outletId).all()
+  return json({ news: results ?? [] })
+}
+
+// Edit one of this outlet's OWN articles (re-validated). TTL is unchanged.
+async function radioMineEdit(
+  outlet: Outlet,
+  id: string,
+  request: Request,
+  env: Env,
+): Promise<Response> {
+  const body = await readJson(request)
+  if (!body) return json({ error: 'bad json' }, 400)
+  const v = validateNews(body)
+  if ('error' in v) return v.error
+  const r = await env.DB.prepare(
+    'UPDATE news SET title = ?, body = ?, sponsor = ?, lang = ? WHERE id = ? AND outlet_id = ?',
+  ).bind(v.title, v.text, v.sponsor || null, body.lang === 'en' ? 'en' : 'km', id, outlet.id).run()
+  if (!r.meta.changes) return json({ error: 'not found' }, 404)
+  return json({ id, updated: true })
+}
+
+// Delete one of this outlet's OWN articles (scoped to the owner).
+async function radioMineDelete(outletId: string, id: string, env: Env): Promise<Response> {
+  const r = await env.DB.prepare('DELETE FROM news WHERE id = ? AND outlet_id = ?')
+    .bind(id, outletId).run()
+  if (!r.meta.changes) return json({ error: 'not found' }, 404)
+  return json({ id, deleted: true })
 }
 
 // Admin-only: create a verified outlet, return its token ONCE (only the hash is stored).
