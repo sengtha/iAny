@@ -414,7 +414,7 @@ export default function App() {
           animationType="slide"
           onRequestClose={() => setShowRadio(false)}
         >
-          <SafeAreaView style={styles.sheet}>
+          <SafeAreaView style={styles.sheetRadio}>
             <RadioScreen onClose={() => setShowRadio(false)} />
           </SafeAreaView>
         </Modal>
@@ -448,6 +448,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
   body: { padding: 16, gap: 8 },
   sheet: { flex: 1, backgroundColor: '#fff', padding: 12 },
+  sheetRadio: { flex: 1, backgroundColor: '#1e1b4b' },
   brand: { flexShrink: 1, paddingRight: 8 },
   h1: { fontSize: 24, fontWeight: '800', color: '#0f172a', letterSpacing: -0.5 },
   h1sub: { fontSize: 11, color: '#94a3b8', fontWeight: '600', marginTop: 1 },
