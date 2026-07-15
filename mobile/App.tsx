@@ -25,6 +25,7 @@ import { generator, type GenProgress } from './src/ai/generator'
 import { ask } from './src/ai/ask'
 import { tts, type TtsProgress } from './src/ai/tts'
 import { clearModelCache } from './src/ai/modelFile'
+import { RadioScreen } from './src/RadioScreen'
 
 /**
  * Stage 2 smoke-test screen: on-device SQLite + FTS5 (Stage 1) plus opt-in
@@ -47,6 +48,7 @@ export default function App() {
   const [answer, setAnswer] = useState('')
   const [speed, setSpeed] = useState<string | null>(null)
   const [ttsState, setTtsState] = useState<TtsProgress>({ status: tts.status })
+  const [showRadio, setShowRadio] = useState(false)
 
   const onRedownload = async () => {
     setBusy(true)
@@ -212,10 +214,16 @@ export default function App() {
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           <View style={styles.headerRow}>
             <Text style={styles.h1}>iAny · native (Stage 3)</Text>
-            <Pressable onPress={onRedownload} disabled={busy} hitSlop={8}>
-              <Text style={styles.redl}>↻ Redownload</Text>
-            </Pressable>
+            <View style={styles.headerBtns}>
+              <Pressable onPress={() => setShowRadio((v) => !v)} hitSlop={8}>
+                <Text style={styles.redl}>📻 Radio</Text>
+              </Pressable>
+              <Pressable onPress={onRedownload} disabled={busy} hitSlop={8}>
+                <Text style={styles.redl}>↻ Redownload</Text>
+              </Pressable>
+            </View>
           </View>
+          {showRadio ? <RadioScreen onClose={() => setShowRadio(false)} /> : null}
           <Text style={styles.hint}>
             On-device search + AI answers, fully offline. Enable BOTH for grounded Khmer
             replies — semantic search finds your notes, AI answers writes them up.
@@ -458,6 +466,7 @@ const styles = StyleSheet.create({
   },
   speakChipText: { color: '#166534', fontWeight: '700', fontSize: 13 },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  headerBtns: { flexDirection: 'row', gap: 14, alignItems: 'center' },
   redl: { color: '#2563eb', fontWeight: '700', fontSize: 13 },
   btnOutline: {
     borderWidth: 1,

@@ -74,6 +74,8 @@ export const MODEL_MIRROR = 'https://iany.sengtha.workers.dev/models'
 /** Read-only HF metadata proxy on the same worker (repo file lists), so the
  *  app can discover the exact GGUF filename instead of guessing. */
 export const MODEL_API_MIRROR = 'https://iany.sengtha.workers.dev/hf-api'
+/** iAny Radio API (same worker): GET /feed, outlets POST /news. */
+export const RADIO_API = 'https://iany.sengtha.workers.dev/radio'
 
 // CHUNK_MAX_CHARS, CHUNK_OVERLAP_SENTENCES, DocumentRow, ChunkHit, ChatMessage
 // now come from @iany/core (re-exported at the top) — the single source of truth
