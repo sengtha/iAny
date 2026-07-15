@@ -1,8 +1,17 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const root = path.dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
+  resolve: {
+    // The shared brain (@iany/core) is consumed as TS source by both this PWA
+    // and the mobile app — one place for types, chunking, prompt, pack format.
+    alias: { '@iany/core': path.resolve(root, 'packages/core/src/index.ts') },
+  },
   define: {
     // Shown in Settings so a device's running version is verifiable.
     __BUILD_ID__: JSON.stringify(
