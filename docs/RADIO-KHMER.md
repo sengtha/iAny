@@ -69,15 +69,22 @@ a token by replacing the hash.
 
 ## Client — a 📻 Radio screen (both shells, over core)
 
-- **Queue player:** `GET /feed` → for each item build the spoken text
-  `"ព័ត៌មានពី {outletName}។ {title}។ {body}"` (+ labeled sponsor) → feed the
-  existing **streaming TTS** (sentence-by-sentence, prefetch next) → on empty,
-  poll `/feed?since=cursor` and append.
-- **Controls:** play/pause, skip, and the current headline + outlet shown on
-  screen. Background audio (expo-av background mode / WebAudio) so it plays with
-  the screen off.
-- **Attribution is not optional** — the outlet name is always the first thing
-  spoken and is always visible.
+The queue/polling/pause logic is **one shared implementation** in
+`@iany/core` (`RadioPlayer`), with platform I/O injected — a `RadioTts` voice and
+a `fetchFeed`. Each shell just wires those:
+
+- **Voice (`RadioTts`):**
+  - **Mobile** — the trained iAny ONNX voice (`ai/tts.ts`), sentence-streaming.
+  - **PWA** — the browser's SpeechSynthesis, preferring a `km` voice
+    (`ai/webtts.ts`). Works today where a Khmer voice exists; the ONNX voice can
+    replace it later behind the same interface (via onnxruntime-web).
+- **Spoken text** — `attributedText(item)` (core): `"ព័ត៌មានពី {outletName}។
+  {title}។ {body}"` + labeled sponsor. Numbers read in Khmer (`normalizeNumbers`).
+- **Queue** — fetch `/feed`, play oldest-first; on empty, poll `/feed?since=cursor`
+  and append. Pause/skip/stop are instant (per-item cancel).
+- **UI** — `RadioScreen.tsx` (mobile) / `RadioView.tsx` (PWA): current outlet +
+  headline + body, status, and ▶/⏸/⏭/⏹. **Attribution is not optional** — the
+  outlet name is spoken first and always visible.
 
 ## MVP scope (build order)
 
