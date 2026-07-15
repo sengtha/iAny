@@ -1,24 +1,22 @@
 export const en = {
-  appTagline: 'Feed AI from anything. 100% on your device.',
+  appTagline: 'Offline AI · Khmer & English',
   navChat: 'Chat',
   navLibrary: 'Library',
   navPacks: 'Packs',
   navRadio: 'Radio',
   navSettings: 'Settings',
 
-  chatPlaceholder: 'Ask anything about what you fed me…',
+  chatPlaceholder: 'Ask a question…',
   chatEmptyTitle: 'Ask your knowledge base',
-  chatEmptyBody:
-    'Everything runs offline on this device. Feed documents in the Library tab, then ask questions here — in English or Khmer.',
+  chatEmptyBody: 'Add documents in Library, then ask here — English or Khmer.',
   chatSend: 'Send',
   chatSources: 'Sources',
   chatSearchOnlyNote:
-    'The Full answering model needs WebGPU, which this browser does not have. Pick a smaller answering model in Settings to get AI answers here, or use search mode.',
+    'The Full model needs WebGPU. Pick a smaller model in Settings, or use search only.',
   chatThinking: 'Thinking…',
   chatLoadModel: 'Load the AI model',
-  chatLoadModelHint:
-    'One-time download (0.7–1.5 GB depending on the model chosen in Settings), then it works fully offline. Interrupted downloads continue where they stopped.',
-  chatNoResults: 'Nothing relevant found yet. Try feeding more material in the Library.',
+  chatLoadModelHint: 'One-time download (~0.7–1.5 GB), then fully offline. Resumes if interrupted.',
+  chatNoResults: 'Nothing found yet. Add more in Library.',
 
   libraryTitle: 'Feed iAny',
   libraryBody: 'The more you feed it, the smarter it gets. Paste text or add files — Khmer or English.',
