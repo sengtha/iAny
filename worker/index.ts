@@ -12,6 +12,11 @@
 interface Env {
   MODELS: R2Bucket
   ASSETS: Fetcher
+  /** iAny Radio news store (Cloudflare D1). */
+  DB: D1Database
+  /** Secret for creating/enabling outlets (POST /radio/admin/*). Set via
+   *  `wrangler secret put RADIO_ADMIN_TOKEN`. */
+  RADIO_ADMIN_TOKEN?: string
 }
 
 const HF = 'https://huggingface.co'
@@ -101,6 +106,9 @@ export default {
     if (url.pathname.startsWith('/hf-api/')) {
       return serveHfApi(url)
     }
+    if (url.pathname.startsWith('/radio/')) {
+      return serveRadio(url, request, env)
+    }
     // Static assets: cross-origin isolation headers come from public/_headers
     // (asset requests bypass this worker via run_worker_first). That
     // isolation lets onnxruntime-web use multiple WASM threads — 2-4x faster
@@ -108,6 +116,130 @@ export default {
     // matching CORP header (see fileHeaders / serveBackup).
     return env.ASSETS.fetch(request)
   },
+
+  // Daily cron (see wrangler.jsonc triggers): purge news past its 7-day TTL.
+  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(
+      env.DB.prepare('DELETE FROM news WHERE expires_at < ?')
+        .bind(new Date().toISOString())
+        .run()
+        .then(() => undefined),
+    )
+  },
+}
+
+/* ------------------------------------------------------------------ *
+ * iAny Radio — verified outlets POST news; the app pulls /feed and    *
+ * reads it with the on-device Khmer TTS. See docs/RADIO-KHMER.md.     *
+ * Shared contracts/validation come from @iany/core (radio.ts).        *
+ * ------------------------------------------------------------------ */
+
+import { RADIO_LIMITS, withinLatinBudget, type NewsSubmission } from '../packages/core/src/radio'
+
+const JSON_HEADERS = { 'content-type': 'application/json', 'access-control-allow-origin': '*' }
+const json = (data: unknown, status = 200) =>
+  new Response(JSON.stringify(data), { status, headers: JSON_HEADERS })
+
+async function sha256hex(s: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s))
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+function bearer(request: Request): string | null {
+  const h = request.headers.get('authorization') ?? ''
+  return h.startsWith('Bearer ') ? h.slice(7).trim() : null
+}
+
+async function serveRadio(url: URL, request: Request, env: Env): Promise<Response> {
+  const path = url.pathname.slice('/radio/'.length)
+  if (request.method === 'OPTIONS') {
+    return new Response(null, {
+      headers: { ...JSON_HEADERS, 'access-control-allow-methods': 'GET,POST,OPTIONS',
+        'access-control-allow-headers': 'authorization,content-type' },
+    })
+  }
+  if (path === 'feed' && request.method === 'GET') return radioFeed(url, env)
+  if (path === 'news' && request.method === 'POST') return radioPostNews(request, env)
+  if (path === 'admin/outlet' && request.method === 'POST') return radioCreateOutlet(request, env)
+  return json({ error: 'not found' }, 404)
+}
+
+// Public, read-only: active items newer than ?since, newest first.
+async function radioFeed(url: URL, env: Env): Promise<Response> {
+  const since = url.searchParams.get('since') ?? '1970-01-01T00:00:00.000Z'
+  const now = new Date().toISOString()
+  const { results } = await env.DB.prepare(
+    `SELECT id, outlet_id AS outletId, outlet_name AS outletName, title, body, sponsor,
+            lang, created_at AS createdAt, expires_at AS expiresAt
+       FROM news WHERE expires_at > ? AND created_at > ?
+       ORDER BY created_at DESC LIMIT 50`,
+  ).bind(now, since).all()
+  const items = results ?? []
+  const cursor = items.length ? (items[0] as { createdAt: string }).createdAt : since
+  return new Response(JSON.stringify({ items, cursor }), {
+    headers: { ...JSON_HEADERS, 'cache-control': 'public, max-age=10' },
+  })
+}
+
+// Outlet-authenticated post. Enforces length limits + the Khmer-script rule.
+async function radioPostNews(request: Request, env: Env): Promise<Response> {
+  const token = bearer(request)
+  if (!token) return json({ error: 'missing token' }, 401)
+  const hash = await sha256hex(token)
+  const outlet = await env.DB.prepare(
+    'SELECT id, name, verified, active FROM outlets WHERE token_hash = ?',
+  ).bind(hash).first<{ id: string; name: string; verified: number; active: number }>()
+  if (!outlet) return json({ error: 'invalid token' }, 401)
+  if (!outlet.verified || !outlet.active) return json({ error: 'outlet not enabled' }, 403)
+
+  let body: NewsSubmission
+  try {
+    body = (await request.json()) as NewsSubmission
+  } catch {
+    return json({ error: 'bad json' }, 400)
+  }
+  const title = (body.title ?? '').trim()
+  const text = (body.body ?? '').trim()
+  const sponsor = (body.sponsor ?? '').trim()
+  if (!title || !text) return json({ error: 'title and body required' }, 400)
+  if (title.length > RADIO_LIMITS.titleMax || text.length > RADIO_LIMITS.bodyMax ||
+      sponsor.length > RADIO_LIMITS.sponsorMax) {
+    return json({ error: 'too long' }, 400)
+  }
+  if (!withinLatinBudget(text)) {
+    return json({ error: 'សូមសរសេរពាក្យបរទេសជាអក្សរខ្មែរ (write foreign words in Khmer script)' }, 422)
+  }
+  const id = crypto.randomUUID()
+  const createdAt = new Date()
+  const expiresAt = new Date(createdAt.getTime() + RADIO_LIMITS.ttlDays * 86400_000)
+  await env.DB.prepare(
+    `INSERT INTO news (id, outlet_id, outlet_name, title, body, sponsor, lang, created_at, expires_at)
+     VALUES (?,?,?,?,?,?,?,?,?)`,
+  ).bind(id, outlet.id, outlet.name, title, text, sponsor || null,
+    body.lang === 'en' ? 'en' : 'km', createdAt.toISOString(), expiresAt.toISOString()).run()
+  return json({ id, expiresAt: expiresAt.toISOString() })
+}
+
+// Admin-only: create a verified outlet, return its token ONCE (only the hash is stored).
+async function radioCreateOutlet(request: Request, env: Env): Promise<Response> {
+  if (!env.RADIO_ADMIN_TOKEN || bearer(request) !== env.RADIO_ADMIN_TOKEN) {
+    return json({ error: 'unauthorized' }, 401)
+  }
+  let payload: { name?: string }
+  try {
+    payload = (await request.json()) as { name?: string }
+  } catch {
+    return json({ error: 'bad json' }, 400)
+  }
+  const name = (payload.name ?? '').trim()
+  if (!name) return json({ error: 'name required' }, 400)
+  const id = crypto.randomUUID()
+  const token = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '')
+  await env.DB.prepare(
+    'INSERT INTO outlets (id, name, token_hash, verified, active, created_at) VALUES (?,?,?,1,1,?)',
+  ).bind(id, name, await sha256hex(token), new Date().toISOString()).run()
+  // token is shown once; store the hash only.
+  return json({ id, name, token })
 }
 
 // Read-only proxy for Hugging Face model metadata (file lists), so clients in

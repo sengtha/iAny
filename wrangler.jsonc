@@ -9,14 +9,27 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    // Model mirror and API requests must reach the worker; everything
+    // Model mirror, API, and Radio requests must reach the worker; everything
     // else is served directly as static assets.
-    "run_worker_first": ["/models/*", "/api/*"]
+    "run_worker_first": ["/models/*", "/api/*", "/hf-api/*", "/radio/*"]
   },
   "r2_buckets": [
     {
       "binding": "MODELS",
       "bucket_name": "iany-models"
     }
-  ]
+  ],
+  // iAny Radio news store. Apply the schema once:
+  //   npx wrangler d1 execute iany-radio --remote --file worker/schema.sql
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "iany-radio",
+      "database_id": "3fd21875-1ed5-438c-b249-83baa9f2ab2c"
+    }
+  ],
+  // Daily purge of news past its 7-day TTL (worker `scheduled` handler).
+  "triggers": {
+    "crons": ["0 3 * * *"]
+  }
 }
