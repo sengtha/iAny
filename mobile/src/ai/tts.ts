@@ -1,6 +1,7 @@
 import * as FileSystem from 'expo-file-system'
 import { Audio } from 'expo-av'
 import { InferenceSession, Tensor } from 'onnxruntime-react-native'
+import { normalizeNumbers, splitSentences } from '@iany/core'
 import { TTS_META_FILE, TTS_MODEL_REPO, TTS_ONNX_FILE } from '../domain/types'
 import { ensureFile, errStr, fetchModelJson } from './modelFile'
 
@@ -47,54 +48,8 @@ function toBase64(bytes: Uint8Array): string {
   return out
 }
 
-/** Khmer number words. The voice was trained on Khmer audio, so it can't say
- *  Arabic/Khmer digits — we spell numbers out in Khmer before synthesis. */
-const KH_UNITS = ['សូន្យ', 'មួយ', 'ពីរ', 'បី', 'បួន', 'ប្រាំ', 'ប្រាំមួយ', 'ប្រាំពីរ', 'ប្រាំបី', 'ប្រាំបួន']
-const KH_TENS = ['', 'ដប់', 'ម្ភៃ', 'សាមសិប', 'សែសិប', 'ហាសិប', 'ហុកសិប', 'ចិតសិប', 'ប៉ែតសិប', 'កៅសិប']
-const KH_SCALES: [number, string][] = [
-  [1000000, 'លាន'],
-  [100000, 'សែន'],
-  [10000, 'ម៉ឺន'],
-  [1000, 'ពាន់'],
-  [100, 'រយ'],
-]
-
-/** Non-negative integer -> Khmer words (handles the លាន/សែន/ម៉ឺន scale system). */
-function intToKhmer(n: number): string {
-  if (n === 0) return KH_UNITS[0]
-  if (n < 10) return KH_UNITS[n]
-  if (n < 20) return 'ដប់' + (n > 10 ? KH_UNITS[n - 10] : '')
-  if (n < 100) {
-    const t = Math.floor(n / 10)
-    const u = n % 10
-    return KH_TENS[t] + (u ? KH_UNITS[u] : '')
-  }
-  for (const [pv, word] of KH_SCALES) {
-    if (n >= pv) {
-      const hi = Math.floor(n / pv)
-      const lo = n % pv
-      return intToKhmer(hi) + word + (lo ? intToKhmer(lo) : '')
-    }
-  }
-  return ''
-}
-
-/** Replace digit runs (Arabic or Khmer, with , separators / . decimals) with
- *  Khmer number words so the Khmer voice can pronounce them. Speech-only. */
-function normalizeNumbers(text: string): string {
-  // Khmer digits (U+17E0..17E9) -> ASCII so one regex handles both.
-  const ascii = text.replace(/[០-៩]/g, (d) => String(d.charCodeAt(0) - 0x17e0))
-  return ascii.replace(/\d+(?:,\d{3})*(?:\.\d+)?/g, (m) => {
-    const [intPart, frac] = m.replace(/,/g, '').split('.')
-    const n = parseInt(intPart, 10)
-    if (!Number.isFinite(n)) return m
-    let words = intToKhmer(n)
-    if (frac) {
-      words += ' ចុច ' + [...frac].map((d) => KH_UNITS[parseInt(d, 10)] ?? '').join(' ')
-    }
-    return ` ${words} `
-  })
-}
+// Khmer number normalization + sentence splitting now live in @iany/core
+// (shared with the PWA), imported above.
 
 class KhmerTts {
   private session: InferenceSession | null = null
@@ -157,16 +112,6 @@ class KhmerTts {
     return ids
   }
 
-  /** Split into sentence-length chunks. The voice was TRAINED on ~8s sentence
-   *  clips, so synthesizing a whole paragraph at once sounds unnatural (out of
-   *  distribution); per-sentence synthesis matches training and adds real pauses. */
-  private splitSentences(text: string): string[] {
-    return text
-      .split(/(?<=[។!?.\n])/)
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0)
-  }
-
   private async synth(ids: number[]): Promise<Float32Array> {
     const x = new Tensor('int32', Int32Array.from(ids), [1, ids.length])
     const xLen = new Tensor('int32', Int32Array.from([ids.length]), [1])
@@ -184,7 +129,7 @@ class KhmerTts {
     if (!this.session || !this.meta) throw new Error('TTS not ready')
     const myId = ++this.speakId
     await this.stop()
-    const sentences = this.splitSentences(text)
+    const sentences = splitSentences(text)
       .map((s) => this.textToIds(s))
       .filter((ids) => ids.length > 0)
     if (sentences.length === 0) return
