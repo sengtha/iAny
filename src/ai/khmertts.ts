@@ -1,23 +1,14 @@
-import type * as Ort from 'onnxruntime-web'
 import { normalizeNumbers, splitSentences, type RadioTts } from '@iany/core'
 
-// Lazy-loaded so onnxruntime-web (~400 KB) only enters the bundle when the user
-// actually downloads / uses the voice — not on every page load.
-let ort: typeof import('onnxruntime-web') | null = null
-async function loadOrt(): Promise<typeof import('onnxruntime-web')> {
-  if (!ort) ort = await import('onnxruntime-web')
-  return ort
-}
-
 /**
- * The trained iAny Khmer voice (VITS → ONNX) running in the browser via
- * onnxruntime-web — the SAME model the mobile app uses, so the PWA reads Khmer
- * news with the real voice instead of the browser's (often missing) km voice.
+ * The trained iAny Khmer voice (VITS → ONNX) in the browser — the SAME model
+ * the mobile app uses, so the PWA reads Khmer news with the real voice instead
+ * of the browser's (often missing) km voice.
  *
  * The 114 MB onnx is fetched once through the same-origin model mirror and kept
- * in the Cache API, so it works offline afterwards. Tokenization mirrors the
- * coqui training tokenizer (grapheme → id from tts_meta.json, add_blank
- * interleave); output float PCM is played through Web Audio.
+ * in the Cache API (offline afterwards). Inference runs in a Web Worker so a
+ * long news body never freezes the UI; the main thread only tokenizes and plays
+ * the returned float PCM through Web Audio.
  */
 
 const TTS_BASE = '/models/sengtha/khmer-tts-female-v2/resolve/main'
@@ -40,17 +31,22 @@ export interface VoiceProgress {
 }
 
 class KhmerOnnxTts implements RadioTts {
-  private session: Ort.InferenceSession | null = null
+  private worker: Worker | null = null
   private meta: TtsMeta | null = null
   private idOf: Record<string, number> = {}
   private blankId = 0
   private ctx: AudioContext | null = null
   private source: AudioBufferSourceNode | null = null
   private speakId = 0
+  private synthSeq = 0
+  private pending = new Map<
+    number,
+    { resolve: (pcm: Float32Array) => void; reject: (e: Error) => void }
+  >()
   status: VoiceStatus = 'off'
 
   get ready(): boolean {
-    return this.status === 'ready' && this.session !== null
+    return this.status === 'ready' && this.worker !== null
   }
 
   /** Is the onnx already cached (so the radio can use it without a download)? */
@@ -63,13 +59,10 @@ class KhmerOnnxTts implements RadioTts {
     }
   }
 
-  /** Download (once) + load the ONNX voice. Safe to call repeatedly. */
+  /** Download (once) + load the ONNX voice into the worker. */
   async init(onProgress?: (p: VoiceProgress) => void): Promise<void> {
     if (this.ready) return
     try {
-      const rt = await loadOrt()
-      rt.env.wasm.wasmPaths = `${location.origin}/ort/`
-      rt.env.wasm.numThreads = 1
       this.status = 'downloading'
       onProgress?.({ status: 'downloading', progress: 0 })
       this.meta = (await (await fetch(TTS_META)).json()) as TtsMeta
@@ -81,7 +74,7 @@ class KhmerOnnxTts implements RadioTts {
       const bytes = await this.loadOnnx((f) => onProgress?.({ status: 'downloading', progress: f }))
       this.status = 'loading'
       onProgress?.({ status: 'loading' })
-      this.session = await rt.InferenceSession.create(bytes, { executionProviders: ['wasm'] })
+      await this.startWorker(bytes)
       this.status = 'ready'
       onProgress?.({ status: 'ready' })
     } catch (e) {
@@ -117,6 +110,36 @@ class KhmerOnnxTts implements RadioTts {
     return new Uint8Array(await res!.arrayBuffer())
   }
 
+  /** Spin up the inference worker and hand it the model bytes (zero-copy). */
+  private startWorker(bytes: Uint8Array): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const w = new Worker(new URL('./khmertts.worker.ts', import.meta.url), { type: 'module' })
+      w.onmessage = (e: MessageEvent) => {
+        const m = e.data as
+          | { type: 'ready' }
+          | { type: 'pcm'; id: number; pcm: Float32Array }
+          | { type: 'error'; id?: number; error: string }
+        if (m.type === 'ready') {
+          this.worker = w
+          resolve()
+        } else if (m.type === 'pcm') {
+          this.pending.get(m.id)?.resolve(m.pcm)
+          this.pending.delete(m.id)
+        } else if (m.type === 'error') {
+          if (m.id != null && this.pending.has(m.id)) {
+            this.pending.get(m.id)!.reject(new Error(m.error))
+            this.pending.delete(m.id)
+          } else {
+            reject(new Error(m.error))
+          }
+        }
+      }
+      w.onerror = (ev) => reject(new Error(ev.message || 'voice worker failed to start'))
+      const buf = bytes.buffer as ArrayBuffer
+      w.postMessage({ type: 'init', bytes: buf }, [buf])
+    })
+  }
+
   /** Khmer text → grapheme token ids, matching the training tokenizer. */
   private textToIds(text: string): number[] {
     const clean = normalizeNumbers(text).toLowerCase().replace(/\s+/g, ' ').trim()
@@ -133,19 +156,18 @@ class KhmerOnnxTts implements RadioTts {
     return ids
   }
 
-  private async synth(ids: number[]): Promise<Float32Array> {
-    // The onnx declares int64 inputs — feed BigInt64Array (as on mobile).
-    const rt = ort! // set during init() before any synth
-    const x = new rt.Tensor('int64', BigInt64Array.from(ids, (v) => BigInt(v)), [1, ids.length])
-    const xl = new rt.Tensor('int64', BigInt64Array.from([BigInt(ids.length)]), [1])
-    const out = await this.session!.run({ x, x_lengths: xl })
-    const y = out.y ?? out[Object.keys(out)[0]]
-    return y.data as Float32Array
+  /** Ask the worker to synthesize one sentence's ids → float PCM. */
+  private synth(ids: number[]): Promise<Float32Array> {
+    return new Promise((resolve, reject) => {
+      const id = ++this.synthSeq
+      this.pending.set(id, { resolve, reject })
+      this.worker!.postMessage({ type: 'synth', id, ids })
+    })
   }
 
-  /** Speak the full text, streaming sentence-by-sentence. */
+  /** Speak the full text, streaming sentence-by-sentence (synth next while playing). */
   async speak(text: string): Promise<void> {
-    if (!this.session || !this.meta) throw new Error('voice not ready')
+    if (!this.worker || !this.meta) throw new Error('voice not ready')
     this.stop()
     const myId = ++this.speakId
     if (!this.ctx) this.ctx = new AudioContext()
