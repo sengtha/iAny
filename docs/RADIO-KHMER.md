@@ -67,6 +67,19 @@ CREATE INDEX idx_news_expires ON news (expires_at);
 Auth is a hash compare (store `SHA-256(token)`), so a leaked DB can't post. Rotate
 a token by replacing the hash.
 
+### Admin endpoints (all require `Authorization: Bearer <RADIO_ADMIN_TOKEN>`)
+The control panel is **`public/admin.html`** (served at `/admin.html`); these back it.
+- `POST /radio/admin/outlet` `{name}` — issue an outlet + its API key. Token returned **once** (only the hash is stored).
+- `GET /radio/admin/outlets` — list outlets with live-news counts.
+- `POST /radio/admin/outlet/:id/active` `{active}` — enable / disable (the kill switch).
+- `POST /radio/admin/outlet/:id/rotate` — reissue the API key; old token dies immediately. New token returned once.
+- `DELETE /radio/admin/outlet/:id` — delete the outlet and all its news.
+- `GET /radio/admin/news` — list recent news (with body previews) for moderation.
+- `DELETE /radio/admin/news/:id` — remove a news item before its 7-day TTL.
+
+Set the secret once: `npx wrangler secret put RADIO_ADMIN_TOKEN`. Then open
+`/admin.html`, paste that token, and manage keys / outlets / news from the browser.
+
 ## Client — a 📻 Radio screen (both shells, over core)
 
 The queue/polling/pause logic is **one shared implementation** in

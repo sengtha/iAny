@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>iAny Radio · Admin</title>
+    <style>
+      :root { color-scheme: light dark; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; font-family: system-ui, "Noto Sans Khmer", sans-serif;
+        background: #eef2ff; color: #0f172a; line-height: 1.5;
+      }
+      .wrap { max-width: 720px; margin: 0 auto; padding: 20px 16px 80px; }
+      h1 { font-size: 20px; margin: 0 0 2px; }
+      h2 { font-size: 15px; margin: 26px 0 10px; color: #3730a3; }
+      .sub { color: #64748b; font-size: 13px; margin: 0 0 18px; }
+      label { display: block; font-weight: 600; font-size: 13px; margin: 12px 0 4px; }
+      input {
+        width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px;
+        font: inherit; background: #fff; color: #0f172a;
+      }
+      button {
+        border: 0; border-radius: 8px; background: #4f46e5; color: #fff;
+        font: inherit; font-weight: 700; padding: 10px 14px; cursor: pointer;
+      }
+      button.sm { padding: 6px 10px; font-size: 13px; font-weight: 600; }
+      button.ghost { background: #fff; color: #3730a3; border: 1px solid #c7d2fe; }
+      button.warn { background: #fff; color: #b45309; border: 1px solid #fcd34d; }
+      button.danger { background: #fff; color: #dc2626; border: 1px solid #fecaca; }
+      button:disabled { opacity: .5; cursor: not-allowed; }
+      .card {
+        background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
+        padding: 14px; margin-bottom: 10px;
+      }
+      .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+      .between { justify-content: space-between; }
+      .grow { flex: 1; min-width: 0; }
+      .muted { color: #64748b; font-size: 12px; }
+      .pill {
+        font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+      }
+      .pill.on { background: #dcfce7; color: #166534; }
+      .pill.off { background: #fee2e2; color: #991b1b; }
+      .name { font-weight: 700; font-size: 15px; }
+      .title { font-weight: 600; }
+      .preview { color: #475569; font-size: 13px; margin: 4px 0 0; }
+      .msg { margin-top: 12px; padding: 10px 12px; border-radius: 8px; font-size: 14px; display: none; }
+      .msg.ok { display: block; background: #dcfce7; color: #166534; }
+      .msg.err { display: block; background: #fee2e2; color: #991b1b; }
+      .empty { color: #64748b; font-size: 13px; padding: 8px 2px; }
+      /* one-time token reveal */
+      .token-box {
+        margin-top: 10px; padding: 12px; background: #fffbeb; border: 1px solid #fcd34d;
+        border-radius: 10px; display: none;
+      }
+      .token-box.show { display: block; }
+      .token-box code {
+        display: block; word-break: break-all; background: #fff; border: 1px solid #e2e8f0;
+        border-radius: 6px; padding: 8px 10px; margin: 6px 0; user-select: all; font-size: 13px;
+      }
+      .hide { display: none; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>📻 iAny Radio · Admin</h1>
+      <p class="sub">Issue API keys · manage outlets · manage news</p>
+
+      <!-- Auth gate -->
+      <div id="gate" class="card">
+        <label for="token">Admin token <span class="muted">(RADIO_ADMIN_TOKEN)</span></label>
+        <div class="row">
+          <input id="token" class="grow" type="password" autocomplete="off" placeholder="Bearer admin token" />
+          <button id="connect">Connect</button>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <label style="margin:0;font-weight:400" class="muted">
+            <input id="remember" type="checkbox" style="width:auto" /> remember on this device
+          </label>
+        </div>
+        <div id="gateMsg" class="msg"></div>
+      </div>
+
+      <!-- Management (hidden until connected) -->
+      <div id="panel" class="hide">
+        <div class="row between">
+          <h2 style="margin:26px 0 10px">Outlets</h2>
+          <button class="ghost sm" id="signout">Sign out</button>
+        </div>
+
+        <div class="card">
+          <label for="newName">Issue a new API key</label>
+          <div class="row">
+            <input id="newName" class="grow" maxlength="80" placeholder="Outlet name (e.g. VOA Khmer)" />
+            <button id="create">Create</button>
+          </div>
+          <div id="tokenBox" class="token-box">
+            <strong>API key — copy it now, it is shown only once:</strong>
+            <code id="tokenVal"></code>
+            <span class="muted">Give this to the outlet for <b>outlet.html</b>. Only its hash is stored; if lost, use Rotate.</span>
+          </div>
+          <div id="createMsg" class="msg"></div>
+        </div>
+
+        <div id="outlets"></div>
+
+        <div class="row between">
+          <h2>News</h2>
+          <button class="ghost sm" id="refreshNews">Refresh</button>
+        </div>
+        <div id="news"></div>
+      </div>
+    </div>
+
+    <script>
+      // The admin API lives on the worker; use an absolute base so this page works
+      // whether it is served from the worker, the PWA origin, or opened locally.
+      var API = 'https://iany.sengtha.workers.dev'
+      var $ = function (id) { return document.getElementById(id) }
+      var token = ''
+
+      if (localStorage.getItem('iany_admin_token')) {
+        $('token').value = localStorage.getItem('iany_admin_token')
+        $('remember').checked = true
+      }
+
+      function el(tag, props, kids) {
+        var n = document.createElement(tag)
+        if (props) for (var k in props) {
+          if (k === 'class') n.className = props[k]
+          else if (k === 'text') n.textContent = props[k]
+          else n.setAttribute(k, props[k])
+        }
+        ;(kids || []).forEach(function (c) { if (c) n.appendChild(c) })
+        return n
+      }
+      function fmtDate(s) { try { return new Date(s).toLocaleString() } catch (e) { return s } }
+      function daysLeft(s) {
+        var ms = new Date(s).getTime() - Date.now()
+        return Math.max(0, Math.ceil(ms / 86400000))
+      }
+
+      async function api(path, opts) {
+        opts = opts || {}
+        opts.headers = Object.assign({ authorization: 'Bearer ' + token }, opts.headers || {})
+        var res = await fetch(API + path, opts)
+        var data = await res.json().catch(function () { return {} })
+        if (!res.ok) throw new Error((data && data.error) || ('HTTP ' + res.status))
+        return data
+      }
+
+      function showMsg(id, kind, text) {
+        var m = $(id); m.className = 'msg ' + kind; m.textContent = text
+      }
+
+      // ---- connect / auth ----
+      $('connect').addEventListener('click', connect)
+      $('token').addEventListener('keydown', function (e) { if (e.key === 'Enter') connect() })
+
+      async function connect() {
+        token = $('token').value.trim()
+        if (!token) return showMsg('gateMsg', 'err', 'Enter the admin token.')
+        showMsg('gateMsg', 'ok', 'Connecting…')
+        try {
+          await api('/radio/admin/outlets')
+          if ($('remember').checked) localStorage.setItem('iany_admin_token', token)
+          else localStorage.removeItem('iany_admin_token')
+          $('gate').classList.add('hide')
+          $('panel').classList.remove('hide')
+          loadOutlets(); loadNews()
+        } catch (e) {
+          showMsg('gateMsg', 'err', e.message === 'HTTP 401' || /unauthor/i.test(e.message)
+            ? 'Wrong admin token.' : e.message)
+        }
+      }
+      $('signout').addEventListener('click', function () {
+        localStorage.removeItem('iany_admin_token')
+        token = ''
+        $('panel').classList.add('hide'); $('gate').classList.remove('hide')
+        $('gateMsg').className = 'msg'
+      })
+
+      // ---- create / rotate: reveal token once ----
+      $('create').addEventListener('click', async function () {
+        var name = $('newName').value.trim()
+        if (!name) return showMsg('createMsg', 'err', 'Enter an outlet name.')
+        $('create').disabled = true
+        try {
+          var r = await api('/radio/admin/outlet', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ name: name }),
+          })
+          revealToken(r.token)
+          showMsg('createMsg', 'ok', '✓ Created "' + name + '".')
+          $('newName').value = ''
+          loadOutlets()
+        } catch (e) {
+          showMsg('createMsg', 'err', e.message)
+        } finally { $('create').disabled = false }
+      })
+      function revealToken(tok) {
+        $('tokenVal').textContent = tok
+        $('tokenBox').classList.add('show')
+      }
+
+      // ---- outlets ----
+      async function loadOutlets() {
+        var box = $('outlets'); box.innerHTML = ''
+        var data
+        try { data = await api('/radio/admin/outlets') } catch (e) {
+          box.appendChild(el('div', { class: 'empty', text: 'Failed: ' + e.message })); return
+        }
+        if (!data.outlets.length) {
+          box.appendChild(el('div', { class: 'card' }, [el('div', { class: 'empty', text: 'No outlets yet. Issue an API key above.' })]))
+          return
+        }
+        data.outlets.forEach(function (o) { box.appendChild(outletCard(o)) })
+      }
+
+      function outletCard(o) {
+        var active = !!o.active
+        var pill = el('span', { class: 'pill ' + (active ? 'on' : 'off'), text: active ? 'ACTIVE' : 'DISABLED' })
+        var head = el('div', { class: 'row between' }, [
+          el('div', { class: 'grow' }, [
+            el('div', { class: 'name', text: o.name }),
+            el('div', { class: 'muted', text: (o.liveCount || 0) + ' live · created ' + fmtDate(o.createdAt) }),
+          ]),
+          pill,
+        ])
+        var toggle = el('button', { class: 'sm ' + (active ? 'warn' : 'ghost'), text: active ? 'Disable' : 'Enable' })
+        toggle.onclick = function () { setActive(o.id, !active) }
+        var rotate = el('button', { class: 'sm ghost', text: 'Rotate key' })
+        rotate.onclick = function () { rotateKey(o.id, o.name) }
+        var del = el('button', { class: 'sm danger', text: 'Delete' })
+        del.onclick = function () { deleteOutlet(o.id, o.name) }
+        var actions = el('div', { class: 'row', style: 'margin-top:10px' }, [toggle, rotate, del])
+        return el('div', { class: 'card' }, [head, actions])
+      }
+
+      async function setActive(id, active) {
+        try {
+          await api('/radio/admin/outlet/' + id + '/active', {
+            method: 'POST', headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ active: active }),
+          })
+          loadOutlets()
+        } catch (e) { alert('Failed: ' + e.message) }
+      }
+      async function rotateKey(id, name) {
+        if (!confirm('Rotate the API key for "' + name + '"? The current key stops working immediately.')) return
+        try {
+          var r = await api('/radio/admin/outlet/' + id + '/rotate', { method: 'POST' })
+          revealToken(r.token)
+          $('tokenBox').scrollIntoView({ behavior: 'smooth', block: 'center' })
+          showMsg('createMsg', 'ok', '✓ New key for "' + name + '" — copy it now.')
+        } catch (e) { alert('Failed: ' + e.message) }
+      }
+      async function deleteOutlet(id, name) {
+        if (!confirm('Delete "' + name + '" and ALL its news? This cannot be undone.')) return
+        try { await api('/radio/admin/outlet/' + id, { method: 'DELETE' }); loadOutlets(); loadNews() }
+        catch (e) { alert('Failed: ' + e.message) }
+      }
+
+      // ---- news ----
+      $('refreshNews').addEventListener('click', loadNews)
+      async function loadNews() {
+        var box = $('news'); box.innerHTML = ''
+        var data
+        try { data = await api('/radio/admin/news') } catch (e) {
+          box.appendChild(el('div', { class: 'empty', text: 'Failed: ' + e.message })); return
+        }
+        if (!data.news.length) {
+          box.appendChild(el('div', { class: 'card' }, [el('div', { class: 'empty', text: 'No news posted yet.' })]))
+          return
+        }
+        data.news.forEach(function (n) { box.appendChild(newsCard(n)) })
+      }
+      function newsCard(n) {
+        var meta = el('div', { class: 'muted', text: n.outletName + ' · ' + fmtDate(n.createdAt) + ' · expires in ' + daysLeft(n.expiresAt) + 'd' })
+        var del = el('button', { class: 'sm danger', text: 'Delete' })
+        del.onclick = function () { deleteNews(n.id, n.title) }
+        var head = el('div', { class: 'row between' }, [
+          el('div', { class: 'grow' }, [meta, el('div', { class: 'title', text: n.title })]),
+          del,
+        ])
+        var body = n.bodyPreview ? el('p', { class: 'preview', text: n.bodyPreview + (n.bodyPreview.length >= 160 ? '…' : '') }) : null
+        return el('div', { class: 'card' }, [head, body])
+      }
+      async function deleteNews(id, title) {
+        if (!confirm('Delete this news item?\n\n' + title)) return
+        try { await api('/radio/admin/news/' + id, { method: 'DELETE' }); loadNews() }
+        catch (e) { alert('Failed: ' + e.message) }
+      }
+    </script>
+  </body>
+</html>

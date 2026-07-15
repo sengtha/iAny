@@ -159,13 +159,35 @@ async function serveRadio(url: URL, request: Request, env: Env): Promise<Respons
   const path = url.pathname.slice('/radio/'.length)
   if (request.method === 'OPTIONS') {
     return new Response(null, {
-      headers: { ...JSON_HEADERS, 'access-control-allow-methods': 'GET,POST,OPTIONS',
+      headers: { ...JSON_HEADERS, 'access-control-allow-methods': 'GET,POST,DELETE,OPTIONS',
         'access-control-allow-headers': 'authorization,content-type' },
     })
   }
   if (path === 'feed' && request.method === 'GET') return radioFeed(url, env)
   if (path === 'news' && request.method === 'POST') return radioPostNews(request, env)
-  if (path === 'admin/outlet' && request.method === 'POST') return radioCreateOutlet(request, env)
+  if (path === 'admin' || path.startsWith('admin/')) return serveRadioAdmin(path, request, env)
+  return json({ error: 'not found' }, 404)
+}
+
+// Admin surface (all require the RADIO_ADMIN_TOKEN bearer): issue API keys,
+// manage outlets, manage news. Backs public/admin.html.
+async function serveRadioAdmin(path: string, request: Request, env: Env): Promise<Response> {
+  if (!env.RADIO_ADMIN_TOKEN || bearer(request) !== env.RADIO_ADMIN_TOKEN) {
+    return json({ error: 'unauthorized' }, 401)
+  }
+  const seg = path.split('/') // ['admin', kind, id?, action?]
+  const kind = seg[1]
+  const id = seg[2]
+  const action = seg[3]
+  const m = request.method
+
+  if (kind === 'outlets' && m === 'GET') return adminListOutlets(env)
+  if (kind === 'outlet' && !id && m === 'POST') return radioCreateOutlet(request, env)
+  if (kind === 'outlet' && id && action === 'rotate' && m === 'POST') return adminRotateToken(id, env)
+  if (kind === 'outlet' && id && action === 'active' && m === 'POST') return adminSetActive(id, request, env)
+  if (kind === 'outlet' && id && !action && m === 'DELETE') return adminDeleteOutlet(id, env)
+  if (kind === 'news' && m === 'GET') return adminListNews(env)
+  if (kind === 'news' && id && m === 'DELETE') return adminDeleteNews(id, env)
   return json({ error: 'not found' }, 404)
 }
 
@@ -245,6 +267,68 @@ async function radioCreateOutlet(request: Request, env: Env): Promise<Response> 
   ).bind(id, name, await sha256hex(token), new Date().toISOString()).run()
   // token is shown once; store the hash only.
   return json({ id, name, token })
+}
+
+// List every outlet with its live (non-expired) news count. No tokens — those
+// are never recoverable (only the hash is stored); use rotate to reissue.
+async function adminListOutlets(env: Env): Promise<Response> {
+  const now = new Date().toISOString()
+  const { results } = await env.DB.prepare(
+    `SELECT o.id, o.name, o.verified, o.active, o.created_at AS createdAt,
+            (SELECT COUNT(*) FROM news n WHERE n.outlet_id = o.id AND n.expires_at > ?) AS liveCount
+       FROM outlets o ORDER BY o.created_at DESC`,
+  ).bind(now).all()
+  return json({ outlets: results ?? [] })
+}
+
+// Reissue an outlet's API key: mint a new token, replace the stored hash, and
+// return the plaintext ONCE. The old token stops working immediately.
+async function adminRotateToken(id: string, env: Env): Promise<Response> {
+  const token = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '')
+  const r = await env.DB.prepare('UPDATE outlets SET token_hash = ? WHERE id = ?')
+    .bind(await sha256hex(token), id).run()
+  if (!r.meta.changes) return json({ error: 'outlet not found' }, 404)
+  return json({ id, token })
+}
+
+// Enable / disable an outlet (the kill switch). Disabled outlets can't post.
+async function adminSetActive(id: string, request: Request, env: Env): Promise<Response> {
+  let payload: { active?: boolean }
+  try {
+    payload = (await request.json()) as { active?: boolean }
+  } catch {
+    return json({ error: 'bad json' }, 400)
+  }
+  const r = await env.DB.prepare('UPDATE outlets SET active = ? WHERE id = ?')
+    .bind(payload.active ? 1 : 0, id).run()
+  if (!r.meta.changes) return json({ error: 'outlet not found' }, 404)
+  return json({ id, active: payload.active ? 1 : 0 })
+}
+
+// Delete an outlet and all its news.
+async function adminDeleteOutlet(id: string, env: Env): Promise<Response> {
+  await env.DB.prepare('DELETE FROM news WHERE outlet_id = ?').bind(id).run()
+  const r = await env.DB.prepare('DELETE FROM outlets WHERE id = ?').bind(id).run()
+  if (!r.meta.changes) return json({ error: 'outlet not found' }, 404)
+  return json({ id, deleted: true })
+}
+
+// List recent news for moderation (includes items near expiry). Body trimmed.
+async function adminListNews(env: Env): Promise<Response> {
+  const { results } = await env.DB.prepare(
+    `SELECT id, outlet_id AS outletId, outlet_name AS outletName, title,
+            substr(body, 1, 160) AS bodyPreview, sponsor,
+            created_at AS createdAt, expires_at AS expiresAt
+       FROM news ORDER BY created_at DESC LIMIT 100`,
+  ).all()
+  return json({ news: results ?? [] })
+}
+
+// Delete a single news item (before its 7-day TTL).
+async function adminDeleteNews(id: string, env: Env): Promise<Response> {
+  const r = await env.DB.prepare('DELETE FROM news WHERE id = ?').bind(id).run()
+  if (!r.meta.changes) return json({ error: 'news not found' }, 404)
+  return json({ id, deleted: true })
 }
 
 // Read-only proxy for Hugging Face model metadata (file lists), so clients in
