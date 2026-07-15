@@ -8,6 +8,8 @@ import {
   EMBEDDING_DIMS,
   EMBEDDING_MODEL,
   PACK_FORMAT,
+  packChecksum,
+  verifyPack,
   type KnowledgePack,
 } from '@iany/core'
 import { exportPackData, importPackData } from '../db/database'
@@ -34,6 +36,7 @@ async function buildPack(name: string, author = '', description = ''): Promise<K
       chunking: { maxChars: CHUNK_MAX_CHARS, overlapSentences: CHUNK_OVERLAP_SENTENCES },
       createdAt: new Date().toISOString(),
       counts: { documents: documents.length, chunks: chunks.length },
+      checksum: packChecksum(documents, chunks),
     },
     documents,
     chunks,
@@ -60,18 +63,27 @@ export async function exportAndSharePack(name: string): Promise<{ shared: boolea
   return { shared: true, documents }
 }
 
-/** Pick a received pack file and import it. */
-export async function importPackFromFile(): Promise<{ name: string; documents: number } | null> {
+/** Pick a received pack file and import it. Verifies integrity first (checksum,
+ *  format, dims) so a truncated Bluetooth transfer can't import a half-file. */
+export async function importPackFromFile(): Promise<{
+  name: string
+  documents: number
+  warnings: string[]
+} | null> {
   const res = await DocumentPicker.getDocumentAsync({
     copyToCacheDirectory: true,
     type: ['application/json', '*/*'],
   })
   if (res.canceled || !res.assets || res.assets.length === 0) return null
-  const raw = await FileSystem.readAsStringAsync(res.assets[0].uri)
-  const pack = JSON.parse(raw) as KnowledgePack
-  if (!pack || !pack.manifest || pack.manifest.format !== PACK_FORMAT) {
-    throw new Error('Not an iAny pack file.')
+  let pack: KnowledgePack
+  try {
+    pack = JSON.parse(await FileSystem.readAsStringAsync(res.assets[0].uri)) as KnowledgePack
+  } catch {
+    throw new Error('Could not read the file — it may be incomplete. Re-share it.')
   }
+  const check = verifyPack(pack)
+  if (!check.ok) throw new Error(check.errors.join('\n'))
+
   await importPackData(
     {
       id: pack.manifest.id,
@@ -82,5 +94,5 @@ export async function importPackFromFile(): Promise<{ name: string; documents: n
     pack.documents ?? [],
     pack.chunks ?? [],
   )
-  return { name: pack.manifest.name, documents: pack.documents?.length ?? 0 }
+  return { name: pack.manifest.name, documents: pack.documents?.length ?? 0, warnings: check.warnings }
 }

@@ -4,6 +4,7 @@
  */
 export * from './types'
 export * from './bytes'
+export * from './pack'
 export * from './text'
 export * from './prompt'
 export * from './engine'

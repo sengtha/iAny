@@ -2,12 +2,14 @@ import {
   CHUNK_MAX_CHARS,
   CHUNK_OVERLAP_SENTENCES,
   EMBEDDING_DIMS,
-  EMBEDDING_MODEL_ID,
   type KnowledgePack,
   type PackChunk,
   type PackDocument,
   type PackRow,
 } from '../types'
+// Canonical model name + integrity live in core so a pack made here imports on
+// mobile and vice-versa (both write the SAME embeddingModel string).
+import { EMBEDDING_MODEL, PACK_FORMAT, packChecksum, verifyPack } from '@iany/core'
 import { b64ToF32, f32ToB64, fromVectorLiteral, toVectorLiteral } from '../lib/base64'
 import { getDB } from './client'
 
@@ -73,30 +75,33 @@ export async function exportPack(meta: {
   const langs = new Set(docs.rows.map((d) => d.lang))
   return {
     manifest: {
-      format: 'iany-pack/1',
+      format: PACK_FORMAT,
       id: crypto.randomUUID(),
       name: meta.name,
       description: meta.description ?? '',
       author: meta.author ?? '',
       language: [...langs].join(','),
-      embeddingModel: EMBEDDING_MODEL_ID,
+      // canonical name (not the ONNX repo id) so mobile accepts this pack too
+      embeddingModel: EMBEDDING_MODEL,
       dims: EMBEDDING_DIMS,
       chunking: { maxChars: CHUNK_MAX_CHARS, overlapSentences: CHUNK_OVERLAP_SENTENCES },
       createdAt: new Date().toISOString(),
       counts: { documents: docs.rows.length, chunks: packChunks.length },
+      checksum: packChecksum(docs.rows, packChunks),
     },
     documents: docs.rows,
     chunks: packChunks,
   }
 }
 
+/** Validate a pack before import — shared core rules (format, dims, checksum).
+ *  Dims mismatch is a hard error here because the PWA vector index is fixed-width
+ *  and can't ingest a different size. */
 export function validatePack(pack: unknown): KnowledgePack {
   const p = pack as KnowledgePack
-  if (p?.manifest?.format !== 'iany-pack/1') throw new Error('pack-invalid-format')
-  if (p.manifest.embeddingModel !== EMBEDDING_MODEL_ID || p.manifest.dims !== EMBEDDING_DIMS) {
-    throw new Error('pack-model-mismatch')
-  }
-  if (!Array.isArray(p.documents) || !Array.isArray(p.chunks)) throw new Error('pack-invalid-format')
+  const check = verifyPack(p)
+  if (!check.ok) throw new Error(check.errors.join('; '))
+  if (p.manifest.dims !== EMBEDDING_DIMS) throw new Error('pack-model-mismatch')
   return p
 }
 

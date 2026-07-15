@@ -46,7 +46,8 @@ export function PacksScreen({ onClose, onChanged }: { onClose: () => void; onCha
     try {
       const r = await importPackFromFile()
       if (r) {
-        Alert.alert('Imported', `"${r.name}" · ${r.documents} documents added.`)
+        const warn = r.warnings.length ? `\n\nNote:\n• ${r.warnings.join('\n• ')}` : ''
+        Alert.alert('Imported', `"${r.name}" · ${r.documents} documents added.${warn}`)
         await refresh()
         onChanged()
       }

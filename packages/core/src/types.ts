@@ -80,6 +80,9 @@ export interface PackManifest {
   chunking: { maxChars: number; overlapSentences: number }
   createdAt: string
   counts: { documents: number; chunks: number }
+  /** Content checksum (packChecksum) — detects a truncated/corrupted transfer
+   *  (e.g. an interrupted Bluetooth send). Optional for backward compatibility. */
+  checksum?: string
 }
 
 export interface PackDocument {
