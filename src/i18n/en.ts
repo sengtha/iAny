@@ -3,6 +3,7 @@ export const en = {
   navChat: 'Chat',
   navLibrary: 'Library',
   navPacks: 'Packs',
+  navRadio: 'Radio',
   navSettings: 'Settings',
 
   chatPlaceholder: 'Ask anything about what you fed me…',

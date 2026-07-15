@@ -3,6 +3,7 @@ import type { Translation } from './en'
 export const km: Translation = {
   appTagline: 'បំប៉ន AI ពីអ្វីក៏បាន។ ដំណើរការ 100% ក្នុងឧបករណ៍របស់អ្នក។',
   navChat: 'សន្ទនា',
+  navRadio: 'វិទ្យុ',
   navLibrary: 'បណ្ណាល័យ',
   navPacks: 'កញ្ចប់ចំណេះ',
   navSettings: 'ការកំណត់',

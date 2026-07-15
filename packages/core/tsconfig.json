@@ -1,7 +1,9 @@
 {
   "compilerOptions": {
     "target": "ES2021",
-    "lib": ["ES2021"],
+    // DOM lib is for isomorphic type shims only (setTimeout, etc.); core makes
+    // no actual DOM/RN calls — all platform I/O is injected (tts, fetchFeed).
+    "lib": ["ES2021", "DOM"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "declaration": true,

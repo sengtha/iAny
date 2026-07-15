@@ -3,14 +3,16 @@ import { useI18n } from './i18n'
 import { ChatView } from './views/ChatView'
 import { LibraryView } from './views/LibraryView'
 import { PacksView } from './views/PacksView'
+import { RadioView } from './views/RadioView'
 import { SettingsView } from './views/SettingsView'
 
-type Tab = 'chat' | 'library' | 'packs' | 'settings'
+type Tab = 'chat' | 'library' | 'packs' | 'radio' | 'settings'
 
 const TAB_ICONS: Record<Tab, string> = {
   chat: '💬',
   library: '📚',
   packs: '📦',
+  radio: '📻',
   settings: '⚙️',
 }
 
@@ -22,6 +24,7 @@ export default function App() {
     chat: t('navChat'),
     library: t('navLibrary'),
     packs: t('navPacks'),
+    radio: t('navRadio'),
     settings: t('navSettings'),
   }
 
@@ -41,6 +44,7 @@ export default function App() {
         {tab === 'chat' && <ChatView />}
         {tab === 'library' && <LibraryView />}
         {tab === 'packs' && <PacksView />}
+        {tab === 'radio' && <RadioView />}
         {tab === 'settings' && <SettingsView />}
       </main>
 
