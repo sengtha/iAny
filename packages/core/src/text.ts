@@ -80,6 +80,39 @@ export function intToKhmer(n: number): string {
   return ''
 }
 
+/**
+ * Insert word boundaries into Khmer text (which is written without spaces).
+ * The TTS voice was trained on text WITH spaces, so segmenting into words makes
+ * it read with correct pronunciation + prosody. Uses the platform's ICU word
+ * breaker (`Intl.Segmenter('km')`) — available in browsers and on Cloudflare
+ * Workers. Where it's missing (e.g. React Native's Hermes), this is a no-op and
+ * the text is returned unchanged, so callers can use it safely everywhere.
+ *
+ * Existing spaces/newlines are preserved as separators; only runs of Khmer
+ * script get split.
+ */
+export function segmentKhmer(text: string): string {
+  const Seg = (globalThis as { Intl?: { Segmenter?: typeof Intl.Segmenter } }).Intl?.Segmenter
+  if (!Seg || !/[ក-៿]/.test(text)) return text
+  let seg: Intl.Segmenter
+  try {
+    seg = new Seg('km', { granularity: 'word' })
+  } catch {
+    return text
+  }
+  // Segment each whitespace-delimited run separately so we don't lose the
+  // author's own spacing (phrase breaks, foreign words, punctuation spacing).
+  return text
+    .split(/(\s+)/)
+    .map((part) => {
+      if (/^\s+$/.test(part) || !/[ក-៿]/.test(part)) return part
+      const words = [...seg.segment(part)].map((s) => s.segment.trim()).filter(Boolean)
+      return words.join(' ')
+    })
+    .join('')
+    .replace(/\s{2,}/g, ' ')
+}
+
 /** Replace digit runs (Arabic or Khmer, with , separators / . decimals) with
  *  Khmer number words so a Khmer voice can pronounce them. */
 export function normalizeNumbers(text: string): string {

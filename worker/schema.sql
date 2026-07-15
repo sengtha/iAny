@@ -18,10 +18,15 @@ CREATE TABLE IF NOT EXISTS news (
   outlet_name TEXT NOT NULL,          -- denormalized so the app always attributes
   title       TEXT NOT NULL,
   body        TEXT NOT NULL,          -- Khmer; foreign words transliterated (enforced)
+  tts_title   TEXT,                   -- word-segmented (ICU) copy read aloud by the voice
+  tts_body    TEXT,                   -- "" (display uses the clean title/body)
   sponsor     TEXT,
   lang        TEXT NOT NULL DEFAULT 'km',
   created_at  TEXT NOT NULL,
   expires_at  TEXT NOT NULL           -- created_at + 7 days; cron purges past this
 );
+-- Migration for an existing DB (columns added after launch; safe to run once):
+--   ALTER TABLE news ADD COLUMN tts_title TEXT;
+--   ALTER TABLE news ADD COLUMN tts_body  TEXT;
 CREATE INDEX IF NOT EXISTS idx_news_created ON news (created_at);
 CREATE INDEX IF NOT EXISTS idx_news_expires ON news (expires_at);

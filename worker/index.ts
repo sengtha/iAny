@@ -140,6 +140,7 @@ export default {
  * ------------------------------------------------------------------ */
 
 import { RADIO_LIMITS, withinLatinBudget, type NewsSubmission } from '../packages/core/src/radio'
+import { segmentKhmer } from '../packages/core/src/text'
 
 const JSON_HEADERS = { 'content-type': 'application/json', 'access-control-allow-origin': '*' }
 const json = (data: unknown, status = 200) =>
@@ -212,7 +213,8 @@ async function radioFeed(url: URL, env: Env): Promise<Response> {
   const since = url.searchParams.get('since') ?? '1970-01-01T00:00:00.000Z'
   const now = new Date().toISOString()
   const { results } = await env.DB.prepare(
-    `SELECT id, outlet_id AS outletId, outlet_name AS outletName, title, body, sponsor,
+    `SELECT id, outlet_id AS outletId, outlet_name AS outletName, title, body,
+            tts_title AS ttsTitle, tts_body AS ttsBody, sponsor,
             lang, created_at AS createdAt, expires_at AS expiresAt
        FROM news WHERE expires_at > ? AND created_at > ?
        ORDER BY created_at DESC LIMIT 50`,
@@ -288,10 +290,11 @@ async function radioPostNews(request: Request, env: Env): Promise<Response> {
   const createdAt = new Date()
   const expiresAt = new Date(createdAt.getTime() + RADIO_LIMITS.ttlDays * 86400_000)
   await env.DB.prepare(
-    `INSERT INTO news (id, outlet_id, outlet_name, title, body, sponsor, lang, created_at, expires_at)
-     VALUES (?,?,?,?,?,?,?,?,?)`,
-  ).bind(id, outlet.id, outlet.name, v.title, v.text, v.sponsor || null,
-    body.lang === 'en' ? 'en' : 'km', createdAt.toISOString(), expiresAt.toISOString()).run()
+    `INSERT INTO news (id, outlet_id, outlet_name, title, body, tts_title, tts_body, sponsor, lang, created_at, expires_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+  ).bind(id, outlet.id, outlet.name, v.title, v.text, segmentKhmer(v.title), segmentKhmer(v.text),
+    v.sponsor || null, body.lang === 'en' ? 'en' : 'km',
+    createdAt.toISOString(), expiresAt.toISOString()).run()
   return json({ id, expiresAt: expiresAt.toISOString() })
 }
 
@@ -317,8 +320,10 @@ async function radioMineEdit(
   const v = validateNews(body)
   if ('error' in v) return v.error
   const r = await env.DB.prepare(
-    'UPDATE news SET title = ?, body = ?, sponsor = ?, lang = ? WHERE id = ? AND outlet_id = ?',
-  ).bind(v.title, v.text, v.sponsor || null, body.lang === 'en' ? 'en' : 'km', id, outlet.id).run()
+    `UPDATE news SET title = ?, body = ?, tts_title = ?, tts_body = ?, sponsor = ?, lang = ?
+       WHERE id = ? AND outlet_id = ?`,
+  ).bind(v.title, v.text, segmentKhmer(v.title), segmentKhmer(v.text), v.sponsor || null,
+    body.lang === 'en' ? 'en' : 'km', id, outlet.id).run()
   if (!r.meta.changes) return json({ error: 'not found' }, 404)
   return json({ id, updated: true })
 }
