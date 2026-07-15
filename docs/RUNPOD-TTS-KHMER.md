@@ -326,6 +326,9 @@ sanity run → `khmer_tts.onnx` (109 MB) + `tts_meta.json` on HF.
 
 ```python
 import torch, os, string, json, numpy as np, transformers.pytorch_utils as _ptu
+# RunPod images often set HF_HUB_ENABLE_HF_TRANSFER=1 but don't ship the package
+# -> "No module named 'hf_transfer'". Disable it (this download is small enough).
+os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "0"
 if not hasattr(_ptu, "isin_mps_friendly"):
     _ptu.isin_mps_friendly = lambda e, t: torch.isin(e, t)
 from TTS.tts.configs.vits_config import VitsConfig
