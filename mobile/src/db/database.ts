@@ -1,6 +1,13 @@
 import { open, type DB } from '@op-engineering/op-sqlite'
 import { randomUUID } from 'expo-crypto'
-import { EMBEDDING_DIMS, type ChunkHit } from '../domain/types'
+import {
+  EMBEDDING_DIMS,
+  base64ToFloat32,
+  float32ToBase64,
+  type ChunkHit,
+  type PackChunk,
+  type PackDocument,
+} from '@iany/core'
 import { chunkText, detectLang } from '../domain/chunk'
 
 /**
@@ -310,4 +317,156 @@ export async function deleteDocument(id: string): Promise<void> {
     if (vecEnabled) await d.execute('DELETE FROM chunks_vec WHERE chunk_id = ?;', [chunkId])
   }
   await d.execute('DELETE FROM documents WHERE id = ?;', [id])
+}
+
+/* ------------------------------------------------------------------ *
+ * Knowledge packs — the portable, cross-platform unit. Export the     *
+ * on-device docs+chunks+embeddings as iany-pack/1 (shared with the    *
+ * PWA), and import a received one. Embeddings travel as base64 LE      *
+ * float32 (core codec), so a pack made on either side searches on the  *
+ * other.                                                               *
+ * ------------------------------------------------------------------ */
+
+export interface PackData {
+  documents: PackDocument[]
+  chunks: PackChunk[]
+}
+
+/** Read every active document + chunk (+ its embedding) for a pack export. */
+export async function exportPackData(): Promise<PackData> {
+  const d = await getDb()
+  const docRows = rowsOf(
+    await d.execute(
+      `SELECT id, title, lang, content FROM documents WHERE deleted_at IS NULL ORDER BY created_at;`,
+    ),
+  )
+  const documents: PackDocument[] = docRows.map((r) => ({
+    id: r.id as string,
+    title: r.title as string,
+    lang: r.lang as string,
+    content: r.content as string,
+  }))
+  const chunkRows = rowsOf(
+    await d.execute(
+      `SELECT c.document_id, c.seq, c.text, c.id AS chunk_id
+         FROM chunks c JOIN documents dd ON dd.id = c.document_id AND dd.deleted_at IS NULL
+        ORDER BY c.document_id, c.seq;`,
+    ),
+  )
+  const chunks: PackChunk[] = []
+  for (const r of chunkRows) {
+    let embedding = ''
+    if (vecEnabled) {
+      const vr = rowsOf(
+        await d.execute(`SELECT vec_to_json(embedding) AS emb FROM chunks_vec WHERE chunk_id = ?;`, [
+          r.chunk_id as string,
+        ]),
+      )
+      const j = vr[0]?.emb
+      if (typeof j === 'string') {
+        try {
+          embedding = float32ToBase64(Float32Array.from(JSON.parse(j) as number[]))
+        } catch {
+          embedding = ''
+        }
+      }
+    }
+    chunks.push({
+      document_id: r.document_id as string,
+      seq: Number(r.seq),
+      text: r.text as string,
+      tokens: '',
+      embedding,
+    })
+  }
+  return { documents, chunks }
+}
+
+/** Insert an imported pack: its metadata row, documents (remapped to fresh ids),
+ *  chunks, FTS, and vectors (when dims match the app's embedding space). */
+export async function importPackData(
+  pack: { id: string; name: string; description: string; author: string },
+  documents: PackDocument[],
+  chunks: PackChunk[],
+): Promise<void> {
+  const d = await getDb()
+  await d.execute(
+    `INSERT OR REPLACE INTO packs (id, name, description, author, origin) VALUES (?, ?, ?, ?, 'imported');`,
+    [pack.id, pack.name, pack.description, pack.author],
+  )
+  const idMap: Record<string, string> = {}
+  for (const doc of documents) {
+    const newId = randomUUID()
+    idMap[doc.id] = newId
+    await d.execute(
+      `INSERT INTO documents (id, title, lang, source_type, pack_id, content) VALUES (?, ?, ?, 'pack', ?, ?);`,
+      [newId, doc.title, doc.lang, pack.id, doc.content],
+    )
+  }
+  for (const ch of chunks) {
+    const docId = idMap[ch.document_id]
+    if (!docId) continue
+    const chunkId = randomUUID()
+    await d.execute(`INSERT INTO chunks (id, document_id, seq, text) VALUES (?, ?, ?, ?);`, [
+      chunkId,
+      docId,
+      ch.seq,
+      ch.text,
+    ])
+    await d.execute(`INSERT INTO chunks_fts (text, chunk_id) VALUES (?, ?);`, [ch.text, chunkId])
+    if (vecEnabled && ch.embedding) {
+      const v = base64ToFloat32(ch.embedding)
+      if (v.length === EMBEDDING_DIMS) {
+        await d.execute(`INSERT INTO chunks_vec (chunk_id, embedding) VALUES (?, ?);`, [
+          chunkId,
+          vecLiteral(v),
+        ])
+      }
+    }
+  }
+}
+
+export interface PackSummary {
+  id: string
+  name: string
+  description: string
+  author: string
+  doc_count: number
+  created_at: string
+}
+
+export async function listPacks(): Promise<PackSummary[]> {
+  const d = await getDb()
+  const rows = rowsOf(
+    await d.execute(
+      `SELECT p.id, p.name, p.description, p.author, p.created_at,
+              (SELECT COUNT(*) FROM documents dd WHERE dd.pack_id = p.id AND dd.deleted_at IS NULL) AS doc_count
+         FROM packs p WHERE p.deleted_at IS NULL ORDER BY p.created_at DESC;`,
+    ),
+  )
+  return rows.map((r) => ({
+    id: r.id as string,
+    name: r.name as string,
+    description: (r.description as string) ?? '',
+    author: (r.author as string) ?? '',
+    doc_count: Number(r.doc_count ?? 0),
+    created_at: r.created_at as string,
+  }))
+}
+
+export async function deletePack(id: string): Promise<void> {
+  const d = await getDb()
+  const rows = rowsOf(
+    await d.execute(
+      `SELECT c.id FROM chunks c JOIN documents dd ON dd.id = c.document_id WHERE dd.pack_id = ?;`,
+      [id],
+    ),
+  )
+  for (const r of rows) {
+    const chunkId = r.id as string
+    await d.execute('DELETE FROM chunks_fts WHERE chunk_id = ?;', [chunkId])
+    if (vecEnabled) await d.execute('DELETE FROM chunks_vec WHERE chunk_id = ?;', [chunkId])
+  }
+  await d.execute('DELETE FROM documents WHERE pack_id = ?;', [id])
+  await d.execute('DELETE FROM packs WHERE id = ?;', [id])
 }

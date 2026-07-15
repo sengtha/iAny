@@ -27,6 +27,7 @@ import { tts, type TtsProgress } from './src/ai/tts'
 import { clearModelCache } from './src/ai/modelFile'
 import { RadioScreen } from './src/RadioScreen'
 import { ModelsScreen } from './src/ModelsScreen'
+import { PacksScreen } from './src/PacksScreen'
 
 /**
  * Stage 2 smoke-test screen: on-device SQLite + FTS5 (Stage 1) plus opt-in
@@ -51,6 +52,7 @@ export default function App() {
   const [ttsState, setTtsState] = useState<TtsProgress>({ status: tts.status })
   const [showRadio, setShowRadio] = useState(false)
   const [showModels, setShowModels] = useState(false)
+  const [showPacks, setShowPacks] = useState(false)
 
   const onRedownload = async () => {
     setBusy(true)
@@ -223,12 +225,18 @@ export default function App() {
               <Pressable onPress={() => setShowModels((v) => !v)} hitSlop={8}>
                 <Text style={styles.redl}>⚙ Models</Text>
               </Pressable>
+              <Pressable onPress={() => setShowPacks((v) => !v)} hitSlop={8}>
+                <Text style={styles.redl}>📦 Packs</Text>
+              </Pressable>
               <Pressable onPress={onRedownload} disabled={busy} hitSlop={8}>
                 <Text style={styles.redl}>↻ All</Text>
               </Pressable>
             </View>
           </View>
           {showModels ? <ModelsScreen onClose={() => setShowModels(false)} /> : null}
+          {showPacks ? (
+            <PacksScreen onClose={() => setShowPacks(false)} onChanged={refresh} />
+          ) : null}
           {showRadio ? <RadioScreen onClose={() => setShowRadio(false)} /> : null}
           <Text style={styles.hint}>
             On-device search + AI answers, fully offline. Enable BOTH for grounded Khmer
@@ -472,7 +480,7 @@ const styles = StyleSheet.create({
   },
   speakChipText: { color: '#166534', fontWeight: '700', fontSize: 13 },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  headerBtns: { flexDirection: 'row', gap: 14, alignItems: 'center' },
+  headerBtns: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'flex-end' },
   redl: { color: '#2563eb', fontWeight: '700', fontSize: 13 },
   btnOutline: {
     borderWidth: 1,

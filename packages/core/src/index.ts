@@ -3,6 +3,7 @@
  * Import everything from here: `import { ask, chunkText, buildRagPrompt } from '@iany/core'`.
  */
 export * from './types'
+export * from './bytes'
 export * from './text'
 export * from './prompt'
 export * from './engine'
