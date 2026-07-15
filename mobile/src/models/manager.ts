@@ -44,11 +44,13 @@ const GEN_Q4 = GEN_MODEL_FILES[0]
 const GEN_Q8 = GEN_MODEL_FILES[1] ?? GEN_MODEL_FILES[0]
 
 export const MODELS: ManagedModel[] = [
+  // gen-q4/gen-q8 use GEN_MODEL_REPO (now ft3, the current model). gen-q4 is
+  // first, so it is the DEFAULT active model.
   {
     id: 'gen-q4',
     kind: 'generation',
     label: 'Khmer LLM · Q4',
-    note: 'Smaller + faster. Good default for the S10.',
+    note: 'Current model (ft3 — fuller answers). Smaller + faster; best default for the S10.',
     repo: GEN_MODEL_REPO,
     files: [GEN_Q4],
     selectable: true,
@@ -57,27 +59,28 @@ export const MODELS: ManagedModel[] = [
     id: 'gen-q8',
     kind: 'generation',
     label: 'Khmer LLM · Q8',
-    note: 'Higher quality, ~2× the size + a bit slower.',
+    note: 'Current model (ft3), higher quality — ~2× the size + a bit slower.',
     repo: GEN_MODEL_REPO,
     files: [GEN_Q8],
     selectable: true,
   },
+  // ft2 = the older training (shorter answers), kept selectable for comparison.
   {
-    id: 'gen-ft3-q4',
+    id: 'gen-ft2-q4',
     kind: 'generation',
-    label: 'Khmer LLM · ft3 · Q4',
-    note: 'Newer training (fuller answers). Available once ft3 finishes.',
-    repo: 'sengtha/Qwen3-0.6B-khm-ft3-Q8_0-GGUF',
-    files: ['Qwen3-0.6B-khm-ft3-Q4_K_M.gguf'],
+    label: 'Khmer LLM · ft2 · Q4',
+    note: 'Older training (shorter answers). Kept for comparison.',
+    repo: 'sengtha/Qwen3-0.6B-khm-ft2-Q8_0-GGUF',
+    files: ['Qwen3-0.6B-khm-ft2-Q4_K_M.gguf'],
     selectable: true,
   },
   {
-    id: 'gen-ft3-q8',
+    id: 'gen-ft2-q8',
     kind: 'generation',
-    label: 'Khmer LLM · ft3 · Q8',
-    note: 'Newer training, higher quality. Available once ft3 finishes.',
-    repo: 'sengtha/Qwen3-0.6B-khm-ft3-Q8_0-GGUF',
-    files: ['Qwen3-0.6B-khm-ft3-Q8_0.gguf'],
+    label: 'Khmer LLM · ft2 · Q8',
+    note: 'Older training, higher quality. Kept for comparison.',
+    repo: 'sengtha/Qwen3-0.6B-khm-ft2-Q8_0-GGUF',
+    files: ['Qwen3-0.6B-khm-ft2-Q8_0.gguf'],
     selectable: true,
   },
   {

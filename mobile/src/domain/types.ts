@@ -45,17 +45,18 @@ export const EMBEDDING_MODEL_FILES = [
 // fine-tuned on iAny's Khmer corpus (CPT on FineWeb-2 + ParaCrawl) for better
 // Khmer. Same 32k vocab -> still ~600MB, loads + runs at ~26 tok/s on the S10.
 // To A/B against the base, swap REPO back to '...-khm-32768-Q8_0-GGUF'.
-// khm-ft2 = the CPT model + Q&A SFT (Stage B on sengtha/khmer-qa) — it answers
-// correctly (picks the right span) instead of grabbing a random context word.
-export const GEN_MODEL_REPO = 'sengtha/Qwen3-0.6B-khm-ft2-Q8_0-GGUF'
+// khm-ft3 = the CURRENT model (CPT + Q&A SFT retrained on the richer khmer-qa
+// dataset) — it writes fuller, more complete Khmer answers, fixing the
+// "answers too short" problem in ft2. This is the model released publicly and
+// the app's default. ft2 stays available as a selectable fallback in Models.
+export const GEN_MODEL_REPO = 'sengtha/Qwen3-0.6B-khm-ft3-Q8_0-GGUF'
 // Prefer Q4_K_M (~half the size of Q8, and faster on a phone CPU — inference is
 // memory-bandwidth-bound, so fewer bytes/token = quicker; small quality cost on
 // a 0.6B). Falls back to Q8 automatically: if the Q4 file isn't in the repo yet
-// the HEAD probe misses and discoverFile picks the Q8 that's there. Upload a
-// Q4_K_M gguf into the same repo to switch the S10 over — no app change needed.
+// the HEAD probe misses and discoverFile picks the Q8 that's there.
 export const GEN_MODEL_FILES = [
-  'Qwen3-0.6B-khm-ft2-Q4_K_M.gguf',
-  'Qwen3-0.6B-khm-ft2-Q8_0.gguf',
+  'Qwen3-0.6B-khm-ft3-Q4_K_M.gguf',
+  'Qwen3-0.6B-khm-ft3-Q8_0.gguf',
 ]
 
 /**
