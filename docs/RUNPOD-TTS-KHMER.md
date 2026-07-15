@@ -339,7 +339,10 @@ from TTS.tts.models.vits import Vits
 from huggingface_hub import hf_hub_download, HfApi, login
 login("hf_xxxx")
 
-REPO = "sengtha/khmer-tts-female-v1"
+# ⚠️ Set REPO to the version you're actually shipping (v2), and use it for BOTH
+# the download AND the upload below. A stale "…-v1" here silently exports the OLD
+# voice or writes to the wrong repo.
+REPO = "sengtha/khmer-tts-female-v2"
 mp = hf_hub_download(REPO, "best_model.pth"); cp = hf_hub_download(REPO, "config.json")
 config = VitsConfig(); config.load_json(cp)
 config.characters.characters = "".join(chr(c) for c in range(0x1780,0x1800)) + string.ascii_letters + string.digits
@@ -375,6 +378,49 @@ api.upload_file(path_or_fileobj="tts_meta.json", path_in_repo="tts_meta.json", r
 **Vocab fix reminder:** the saved `config.json` keeps only 144 Khmer tokens; the
 model is **206** (Khmer + ASCII + digits) — rebuild `config.characters.characters`
 as above before export/inference or the tokenizer is wrong.
+
+**⚠️ Verify `length_scale` actually baked in** (the app can't set it — it's frozen
+into the graph at export). After exporting, scan the onnx: the duration multiply
+(the `Mul` feeding `Ceil`) must carry your rate, not `1.0`. The v2 export shipped
+`1.0` by mistake, so the app read fast/thin while RunPod (1.15) sounded right.
+
+```python
+import onnx; from onnx import numpy_helper
+g = onnx.load("khmer_tts.onnx").graph
+prod = {o:n for n in g.node for o in n.output}
+mul  = prod[next(n for n in g.node if n.op_type=="Ceil").input[0]]
+for name in mul.input:
+    if name in prod and prod[name].op_type=="Constant":
+        v = numpy_helper.to_array(prod[name].attribute[0].t)
+        if v.size==1: print("baked length_scale =", float(v))   # must be 1.15
+```
+
+### Fix the speaking rate on an already-exported onnx (no retrain, no re-export)
+`length_scale` is a single constant in the graph, so you can retune it in seconds
+without touching the checkpoint. This downloads the live onnx, rewrites that one
+value, and re-uploads to the same repo/filename. In the app afterwards:
+**Models → Khmer voice → Remove, then Redownload** (filename is unchanged, so the
+cache must be cleared to pick up the new file).
+
+```python
+import onnx, numpy as np
+from onnx import numpy_helper
+from huggingface_hub import hf_hub_download, HfApi, login
+REPO, RATE = "sengtha/khmer-tts-female-v2", 1.15
+login()  # HF token with write access
+
+m = onnx.load(hf_hub_download(REPO, "khmer_tts.onnx")); g = m.graph
+prod = {o:n for n in g.node for o in n.output}
+mul  = prod[next(n for n in g.node if n.op_type=="Ceil").input[0]]  # length_scale mul
+for name in mul.input:
+    if name in prod and prod[name].op_type == "Constant":
+        a = prod[name].attribute[0]; old = numpy_helper.to_array(a.t)
+        if old.size == 1:
+            a.t.CopyFrom(numpy_helper.from_array(np.array(RATE, dtype=old.dtype)))
+            print("length_scale", float(old), "->", RATE)
+onnx.checker.check_model(m); onnx.save(m, "khmer_tts.onnx")
+HfApi().upload_file(path_or_fileobj="khmer_tts.onnx", path_in_repo="khmer_tts.onnx", repo_id=REPO)
+```
 
 ### iAny integration (next)
 `onnxruntime-react-native` + a JS port of the tokenizer (vocab from `tts_meta.json`,
