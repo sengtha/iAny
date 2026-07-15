@@ -340,10 +340,10 @@ config.characters.characters = "".join(chr(c) for c in range(0x1780,0x1800)) + s
 model = Vits.init_from_config(config); model.load_checkpoint(config, mp, eval=True, strict=False); model.eval()
 
 # SPEAKING RATE: length_scale > 1.0 = slower (duration only, pitch unchanged).
-# The trained voice reads fast; ~1.3 sounds more natural. This is a scalar read
-# inside inference, so tracing bakes it into the ONNX permanently. Tune it with
-# the speed test cell first, then set your chosen value here.
-model.length_scale = 1.3
+# The trained voice reads fast; 1.15 was chosen (gentle slow-down, still natural).
+# It's a scalar read inside inference, so tracing bakes it into the ONNX
+# permanently. Re-tune with the speed test cell if you want a different pace.
+model.length_scale = 1.15
 
 class OnnxVits(torch.nn.Module):
     def __init__(self, m): super().__init__(); self.m = m
