@@ -58,9 +58,14 @@ const ALLOWED_PREFIXES = [
   'sengtha/Qwen3-0.6B-khm-ft-Q8_0-GGUF/',
   // + Q&A SFT (Stage B) on sengtha/khmer-qa -> answers correctly. Current model.
   'sengtha/Qwen3-0.6B-khm-ft2-Q8_0-GGUF/',
+  // ft3: retrained on the richer khmer-qa (fuller answers). Q8 + Q4. Pre-listed
+  // so it's servable the moment training finishes — pick it in the Models screen.
+  'sengtha/Qwen3-0.6B-khm-ft3-Q8_0-GGUF/',
   // On-device Khmer TTS: VITS voice (trained on DDD-Cambodia 727h) as ONNX +
   // tts_meta.json (grapheme vocab). Runs via onnxruntime-react-native, offline.
   'sengtha/khmer-tts-female-v1/',
+  // Continued-training voice (more data + steps). Ready when §7 export lands.
+  'sengtha/khmer-tts-female-v2/',
   // Limit test: bigger base Qwen3 (1.7B, full vocab) to probe the S10 ceiling.
   'unsloth/Qwen3-1.7B-GGUF/',
 ]

@@ -14,6 +14,7 @@ import {
   ensureModelFile,
   findCachedFile,
   importModelFile,
+  listCachedModels,
 } from '../ai/modelFile'
 
 /**
@@ -59,6 +60,24 @@ export const MODELS: ManagedModel[] = [
     note: 'Higher quality, ~2× the size + a bit slower.',
     repo: GEN_MODEL_REPO,
     files: [GEN_Q8],
+    selectable: true,
+  },
+  {
+    id: 'gen-ft3-q4',
+    kind: 'generation',
+    label: 'Khmer LLM · ft3 · Q4',
+    note: 'Newer training (fuller answers). Available once ft3 finishes.',
+    repo: 'sengtha/Qwen3-0.6B-khm-ft3-Q8_0-GGUF',
+    files: ['Qwen3-0.6B-khm-ft3-Q4_K_M.gguf'],
+    selectable: true,
+  },
+  {
+    id: 'gen-ft3-q8',
+    kind: 'generation',
+    label: 'Khmer LLM · ft3 · Q8',
+    note: 'Newer training, higher quality. Available once ft3 finishes.',
+    repo: 'sengtha/Qwen3-0.6B-khm-ft3-Q8_0-GGUF',
+    files: ['Qwen3-0.6B-khm-ft3-Q8_0.gguf'],
     selectable: true,
   },
   {
@@ -170,4 +189,10 @@ export function formatBytes(n: number): string {
   if (n <= 0) return '0 MB'
   if (n < 1e9) return `${Math.round(n / 1e6)} MB`
   return `${(n / 1e9).toFixed(2)} GB`
+}
+
+/** Total bytes of all downloaded model files on this device. */
+export async function totalModelStorage(): Promise<number> {
+  const files = await listCachedModels()
+  return files.reduce((sum, f) => sum + f.size, 0)
 }

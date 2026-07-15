@@ -10,6 +10,7 @@ import {
   removeModel,
   setActiveGenId,
   shareModel,
+  totalModelStorage,
   type ManagedModel,
   type ModelState,
 } from './models/manager'
@@ -28,11 +29,13 @@ export function ModelsScreen({ onClose }: { onClose: () => void }) {
   const [activeGen, setActiveGen] = useState('')
   const [progress, setProgress] = useState<Record<string, number>>({})
   const [busy, setBusy] = useState<string | null>(null)
+  const [total, setTotal] = useState(0)
 
   const refresh = useCallback(async () => {
     const entries = await Promise.all(MODELS.map(async (m) => [m.id, await modelState(m)] as const))
     setStates(Object.fromEntries(entries))
     setActiveGen(await getActiveGenId())
+    setTotal(await totalModelStorage())
   }, [])
 
   useEffect(() => {
@@ -96,6 +99,7 @@ export function ModelsScreen({ onClose }: { onClose: () => void }) {
       </View>
       <Text style={styles.hint}>
         Download once, then Share phone-to-phone (Bluetooth / Nearby) so others skip the download.
+        {total > 0 ? `  ·  ${formatBytes(total)} on device` : ''}
       </Text>
 
       <ScrollView style={styles.list}>
