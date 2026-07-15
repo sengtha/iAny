@@ -80,7 +80,6 @@ export function LibraryView() {
     <div className="library">
       <section className="card">
         <h2>{t('libraryTitle')}</h2>
-        <p>{t('libraryBody')}</p>
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}

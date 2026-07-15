@@ -60,7 +60,6 @@ export function PacksView() {
     <div className="packs">
       <section className="card">
         <h2>{t('packsTitle')}</h2>
-        <p>{t('packsBody')}</p>
         <input
           value={packName}
           onChange={(e) => setPackName(e.target.value)}
