@@ -96,7 +96,7 @@ export const MODELS: ManagedModel[] = [
     id: 'voice',
     kind: 'voice',
     label: 'Khmer voice',
-    note: 'On-device TTS — reads answers and the Radio aloud.',
+    note: 'On-device TTS — reads the Radio news aloud.',
     repo: TTS_MODEL_REPO,
     files: [TTS_ONNX_FILE],
     selectable: false,

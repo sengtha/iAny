@@ -24,7 +24,7 @@ import type { ChunkHit } from './src/domain/types'
 import { embedder, type EmbedderProgress } from './src/ai/embedder'
 import { generator, type GenProgress } from './src/ai/generator'
 import { ask } from './src/ai/ask'
-import { tts, type TtsProgress } from './src/ai/tts'
+import { tts } from './src/ai/tts'
 import { clearModelCache } from './src/ai/modelFile'
 import { RadioScreen } from './src/RadioScreen'
 import { ModelsScreen } from './src/ModelsScreen'
@@ -50,7 +50,6 @@ export default function App() {
   const [gen, setGen] = useState<GenProgress>({ status: generator.status })
   const [answer, setAnswer] = useState('')
   const [speed, setSpeed] = useState<string | null>(null)
-  const [ttsState, setTtsState] = useState<TtsProgress>({ status: tts.status })
   const [showRadio, setShowRadio] = useState(false)
   const [showModels, setShowModels] = useState(false)
   const [showPacks, setShowPacks] = useState(false)
@@ -64,27 +63,12 @@ export default function App() {
       await clearModelCache()
       setGen({ status: 'off' })
       setEmb({ status: 'off' })
-      setTtsState({ status: 'off' })
       setAnswer('')
       setError(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       setBusy(false)
-    }
-  }
-
-  const onSpeak = async (raw: string) => {
-    // Streaming per-sentence synthesis reads the full text; just drop any error
-    // banner and bound pathological lengths.
-    const text = raw.replace(/^⚠️.*/s, '').trim().slice(0, 2000)
-    if (!text) return
-    try {
-      if (!tts.ready) await tts.init(setTtsState)
-      setTtsState({ status: 'ready' })
-      await tts.speak(text)
-    } catch (e) {
-      setTtsState({ status: 'error', error: e instanceof Error ? e.message : String(e) })
     }
   }
 
@@ -328,19 +312,6 @@ export default function App() {
                 {answer || '…'}
               </Text>
               {speed && <Text style={styles.speed}>{speed}</Text>}
-              {answer.length > 0 && !answer.startsWith('⚠️') && (
-                <Pressable style={styles.speakBtn} onPress={() => onSpeak(answer)}>
-                  <Text style={styles.speakBtnText}>
-                    {ttsState.status === 'downloading'
-                      ? `🔊 downloading voice ${Math.round((ttsState.progress ?? 0) * 100)}%`
-                      : ttsState.status === 'loading'
-                        ? '🔊 loading voice…'
-                        : ttsState.status === 'error'
-                          ? `🔊 error: ${ttsState.error ?? ''}`
-                          : '🔊 Speak (Khmer)'}
-                  </Text>
-                </Pressable>
-              )}
             </View>
           )}
 
@@ -353,12 +324,7 @@ export default function App() {
                 <View key={r.chunk_id} style={styles.card}>
                   <Text style={styles.cardTitle}>{r.title}</Text>
                   <Text style={styles.cardText}>{r.text}</Text>
-                  <View style={styles.cardFooter}>
-                    <Text style={styles.score}>score {r.score.toFixed(4)}</Text>
-                    <Pressable style={styles.speakChip} onPress={() => onSpeak(r.text)}>
-                      <Text style={styles.speakChipText}>🔊 Read</Text>
-                    </Pressable>
-                  </View>
+                  <Text style={styles.score}>score {r.score.toFixed(4)}</Text>
                 </View>
               ))}
             </View>
@@ -506,25 +472,6 @@ const styles = StyleSheet.create({
   answerLabel: { fontWeight: '700', marginBottom: 6, color: '#15803d' },
   answerText: { color: '#14532d', fontSize: 15, lineHeight: 22 },
   speed: { color: '#166534', fontSize: 12, marginTop: 10, fontWeight: '600' },
-  speakBtn: {
-    marginTop: 12,
-    alignSelf: 'flex-start',
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 8,
-    backgroundColor: '#16a34a',
-  },
-  speakBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  cardFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 },
-  speakChip: {
-    paddingVertical: 5,
-    paddingHorizontal: 12,
-    borderRadius: 14,
-    backgroundColor: '#dcfce7',
-    borderWidth: 1,
-    borderColor: '#86efac',
-  },
-  speakChipText: { color: '#166534', fontWeight: '700', fontSize: 13 },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
