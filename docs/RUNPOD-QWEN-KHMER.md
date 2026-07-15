@@ -116,6 +116,11 @@ print("SAFETENSORS SAVED ->", FT_REPO, flush=True)
 subprocess.run("apt-get update -qq && apt-get install -y -qq cmake build-essential git", shell=True)
 subprocess.run("test -d llama.cpp || git clone --depth 1 https://github.com/ggml-org/llama.cpp", shell=True, check=True)
 subprocess.run([sys.executable,"-m","pip","install","-q","-r","llama.cpp/requirements.txt"], check=True)
+# transformers>=4.51 (needed to TRAIN Qwen3) saves extra_special_tokens as a LIST,
+# then crashes its own tokenizer loader during convert ("'list' object has no
+# attribute 'keys'"). The convert runs as a subprocess, so pin a convert-safe
+# transformers on disk here — training already finished in this process.
+subprocess.run([sys.executable,"-m","pip","install","-q","transformers==4.46.3"], check=True)
 # force get_vocab_base_pre() -> "qwen2" (the trimmed vocab isn't in llama.cpp's hash list)
 for p in pathlib.Path("llama.cpp").rglob("*.py"):
     s = p.read_text()
