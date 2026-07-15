@@ -325,6 +325,9 @@ repeatedly). Fix: **skip coqui's exporter**, wrap the model, and export with
 sanity run → `khmer_tts.onnx` (109 MB) + `tts_meta.json` on HF.
 
 ```python
+import subprocess, sys
+# torch.onnx.export needs `onnx` to serialize; the sanity run needs onnxruntime.
+subprocess.run([sys.executable,"-m","pip","install","-q","onnx","onnxruntime"])
 import torch, os, string, json, numpy as np, transformers.pytorch_utils as _ptu
 # RunPod images often set HF_HUB_ENABLE_HF_TRANSFER=1 but don't ship the package
 # -> "No module named 'hf_transfer'". Disable it (this download is small enough).
