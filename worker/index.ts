@@ -25,49 +25,18 @@ const TESSDATA_FAST = 'https://raw.githubusercontent.com/tesseract-ocr/tessdata_
 // Only mirror the models iAny actually uses — this endpoint must not be an
 // open proxy.
 const ALLOWED_PREFIXES = [
-  'onnx-community/embeddinggemma-300m-ONNX/',
-  'onnx-community/gemma-4-E2B-it-ONNX/',
-  'onnx-community/gemma-3-1b-it-ONNX-GQA/',
-  'onnx-community/gemma-4-E4B-it-ONNX/',
-  'sengtha/iany-khmer-tiny-v1-ONNX/',
-  // Native app (llama.rn) embedding model — GGUF served through this mirror
-  // so devices in regions that can't reach huggingface.co still get it.
-  // EmbeddingGemma matches the PWA (portable packs) and handles Khmer well.
-  'ggml-org/embeddinggemma-300M-GGUF/',
-  'cstr/multilingual-e5-small-GGUF/',
-  // Native app (llama.rn) generation models — Gemma 3, GGUF. 270M fits weak
-  // phones (S10); 1B for capable devices.
-  'ggml-org/gemma-3-1b-it-GGUF/',
-  'bartowski/google_gemma-3-270m-it-GGUF/',
-  // iAny's own Khmer fine-tune (Gemma 3 270M), converted to GGUF — the real
-  // S10 generation model.
-  'sengtha/iany-khmer-tiny-v1-Q8_0-GGUF/',
-  // Small-vocab diagnostic (SmolLM2, ~49k vocab vs Gemma's 262k) to test
-  // whether Gemma's vocabulary is what blocks generation on the S10.
-  'bartowski/SmolLM2-135M-Instruct-GGUF/',
-  // Medium-vocab multilingual (Qwen2.5-0.5B, ~152k vocab) — smaller logits
-  // buffer than Gemma, some Khmer; candidate S10 generation model.
-  'bartowski/Qwen2.5-0.5B-Instruct-GGUF/',
-  // The S10 Khmer model: Qwen3 0.6B trimmed to a 32k Khmer vocab (tiny logits
-  // buffer, Khmer-trained, non-Gemma). Converted from alphaedge-ai's model.
-  'sengtha/Qwen3-0.6B-khm-32768-Q8_0-GGUF/',
-  // Fine-tuned on iAny's Khmer corpus (CPT on FineWeb-2 + ParaCrawl) for better
-  // Khmer — same 32k vocab so it still fits the S10.
-  'sengtha/Qwen3-0.6B-khm-ft-Q8_0-GGUF/',
-  // ft3: retrained on the richer khmer-qa (fuller answers). Q8 + Q4. Pre-listed
-  // so it's servable the moment training finishes — pick it in the Models screen.
-  'sengtha/Qwen3-0.6B-khm-ft3-Q8_0-GGUF/',
-  // On-device Khmer TTS: VITS voice (trained on DDD-Cambodia 727h) as ONNX +
-  // tts_meta.json (grapheme vocab). Runs via onnxruntime-react-native, offline.
-  'sengtha/khmer-tts-female-v1/',
-  // Continued-training voice (more data + steps). Ready when §7 export lands.
-  'sengtha/khmer-tts-female-v2/',
-  // On-device Khmer OCR: seanghay/KhmerOCR (MIT) mirror — a YOLO-style text
-  // detector (det.onnx) + CRNN/CTC recognizer (rec.onnx). Runs via
-  // onnxruntime-web (PWA) and onnxruntime-react-native (mobile), offline.
-  'sengtha/khmer-ocr/',
-  // Limit test: bigger base Qwen3 (1.7B, full vocab) to probe the S10 ceiling.
-  'unsloth/Qwen3-1.7B-GGUF/',
+  // PWA (Transformers.js / ONNX) — semantic search + answering models.
+  'onnx-community/embeddinggemma-300m-ONNX/', // semantic search
+  'sengtha/iany-khmer-tiny-v1-ONNX/', // iAny Khmer 270M (default)
+  'onnx-community/gemma-3-1b-it-ONNX-GQA/', // Gemma 3 1B
+  'onnx-community/gemma-4-E2B-it-ONNX/', // Gemma 4 E2B
+  'onnx-community/gemma-4-E4B-it-ONNX/', // Gemma 4 E4B
+  // Mobile (llama.rn / GGUF) — embedder + Khmer LLM.
+  'ggml-org/embeddinggemma-300M-GGUF/', // semantic search (matches the PWA for portable packs)
+  'sengtha/Qwen3-0.6B-khm-ft3-Q8_0-GGUF/', // iAny Khmer LLM (Q4 + Q8)
+  // Shared on-device models.
+  'sengtha/khmer-tts-female-v2/', // Khmer TTS voice (Radio)
+  'sengtha/khmer-ocr/', // Khmer OCR — detector + recognizer
 ]
 // OCR language data, served through the same mirror. Khmer uses the
 // high-accuracy models; English's fast model is accurate enough.
