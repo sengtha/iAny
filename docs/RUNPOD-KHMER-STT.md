@@ -105,18 +105,28 @@ print(ds)
 
 ---
 
-## 3. Fine-tune whisper-tiny (the HF recipe)
+## 3. Fine-tune whisper-tiny — as a background job
+
+An hours-long train must **not** die when your phone or browser disconnects.
+Same pattern as the TTS run: write the script to a file, log in once so
+checkpoints push to HF (they survive even a pod deletion), then launch it
+**detached** with `nohup`.
+
+### 3a. Write the training script (a notebook cell — `%%writefile` saves it)
 
 ```python
-# train.py
+%%writefile /workspace/train.py
+import os, evaluate, torch
+from dataclasses import dataclass
+from typing import Any
 from datasets import load_from_disk
 from transformers import (WhisperProcessor, WhisperForConditionalGeneration,
                           Seq2SeqTrainingArguments, Seq2SeqTrainer)
-from dataclasses import dataclass
-from typing import Any
-import evaluate, torch
+from transformers.trainer_utils import get_last_checkpoint
 
 BASE = "openai/whisper-tiny"
+OUT  = "/workspace/whisper-tiny-khmer"
+HUB  = "sengtha/whisper-tiny-khmer"        # your HF repo (auto-created on first push)
 processor = WhisperProcessor.from_pretrained(BASE, language="Khmer", task="transcribe")
 ds = load_from_disk("/workspace/ds")
 
@@ -154,13 +164,14 @@ model.generation_config.task = "transcribe"
 model.generation_config.forced_decoder_ids = None
 
 args = Seq2SeqTrainingArguments(
-    output_dir="/workspace/whisper-tiny-khmer",
+    output_dir=OUT,
     per_device_train_batch_size=32, gradient_accumulation_steps=1,
-    learning_rate=3.75e-5, warmup_steps=200, max_steps=3000,   # ↑ if you have lots of data
+    learning_rate=3.75e-5, warmup_steps=200, max_steps=3000,   # ↑ with more data
     fp16=True, predict_with_generate=True, generation_max_length=225,
     eval_strategy="steps", eval_steps=500, save_steps=500, logging_steps=25,
-    per_device_eval_batch_size=16, report_to=["tensorboard"],
+    save_total_limit=2, per_device_eval_batch_size=16, report_to=["tensorboard"],
     load_best_model_at_end=True, metric_for_best_model="cer", greater_is_better=False,
+    push_to_hub=True, hub_model_id=HUB, hub_strategy="checkpoint",  # checkpoints -> HF
 )
 # NOTE: on transformers <4.41 use `evaluation_strategy=` instead of `eval_strategy=`.
 
@@ -169,15 +180,45 @@ trainer = Seq2SeqTrainer(model=model, args=args,
     data_collator=Collator(processor), compute_metrics=compute_metrics,
     tokenizer=processor.feature_extractor)
 
-trainer.train()
-trainer.save_model("/workspace/whisper-tiny-khmer")
-processor.save_pretrained("/workspace/whisper-tiny-khmer")
-print("done — best CER:", trainer.state.best_metric)
+resume = get_last_checkpoint(OUT) if os.path.isdir(OUT) else None
+if resume is None and os.path.isdir(f"{OUT}/last-checkpoint"):
+    resume = f"{OUT}/last-checkpoint"          # a checkpoint pulled back from HF
+print("RESUME FROM:", resume, flush=True)
+trainer.train(resume_from_checkpoint=resume)   # resumes if a checkpoint exists
+
+trainer.save_model(OUT); processor.save_pretrained(OUT)
+trainer.push_to_hub()                          # final model -> HF
+print("DONE — best CER:", trainer.state.best_metric, flush=True)
 ```
 
-Tips: watch eval **CER** drop in TensorBoard. `max_steps` ~3000 is a starting
-point; scale up with data. If it overfits (train CER ≪ eval CER), add more/varied
-speakers or lower `max_steps`. whisper-tiny trains in **~1–3 h on a 4090** (< $5).
+### 3b. Log in once, then launch it detached
+
+In the **Terminal** (not a cell): log in once so `push_to_hub` has a token
+(cached to disk — the script never hard-codes it), then run with `nohup`.
+
+```bash
+huggingface-cli login          # paste your HF WRITE token once
+cd /workspace
+nohup python train.py > train.out 2>&1 &      # detached — survives disconnects
+echo "pid $!"
+tail -f train.out                             # watch; Ctrl-C stops WATCHING, not training
+```
+
+Close the tab / lock the phone — it keeps training. Check on it later with
+`tail -f /workspace/train.out` or `nvidia-smi` (GPU busy = alive). Stop it
+deliberately with `pkill -f train.py`.
+
+**If the pod dies mid-run:** the checkpoints are already on HF. On a fresh pod,
+redo §1–2, pull the last checkpoint back, then relaunch — it resumes exactly:
+
+```bash
+huggingface-cli download sengtha/whisper-tiny-khmer --include "last-checkpoint/*" \
+  --local-dir /workspace/whisper-tiny-khmer
+```
+
+Watch eval **CER** fall in TensorBoard. `max_steps` ~3000 is a start; scale with
+data. If it overfits (train CER ≪ eval CER), use more of DDD's speakers or fewer
+steps. whisper-tiny trains in **~1–3 h on a 4090** (< $5).
 
 ---
 
