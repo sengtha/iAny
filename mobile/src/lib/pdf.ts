@@ -1,8 +1,16 @@
 /**
  * On-device PDF text extraction via expo-pdf-text-extract, which reads the PDF
  * text layer with native libraries (Apache PDFBox on Android, PDFKit on iOS) —
- * fully offline, no OCR. Text-based PDFs extract cleanly; scanned/image-only
- * PDFs have no text layer and yield little.
+ * fully offline, no OCR.
+ *
+ * Khmer Unicode: PDFBox maps glyphs back to Unicode through the PDF's ToUnicode
+ * table and emits them in reading order (the module sets sortByPosition), so a
+ * PDF with a proper Khmer Unicode text layer extracts as correct logical-order
+ * Khmer. We NFC-normalize the result so Khmer combining sequences match how the
+ * rest of the app (chunking, embeddings, TTS) expects them. PDFs with no real
+ * text layer (scanned images, or legacy non-Unicode Khmer fonts like Limon)
+ * have nothing to map and yield little — that's inherent to the file, not fixable
+ * here without OCR.
  *
  * The native module only exists in a development / EAS build, not Expo Go, so
  * everything is guarded by `isAvailable()`.
@@ -18,6 +26,7 @@ export function pdfSupported(): boolean {
 export async function extractPdfText(uri: string): Promise<string> {
   const text = await extractText(uri)
   return text
+    .normalize('NFC')
     .replace(/\r\n/g, '\n')
     .replace(/[ \t]+/g, ' ')
     .replace(/ *\n */g, '\n')

@@ -39,6 +39,7 @@ export async function extractPdfText(
       const text = content.items
         .map((it) => ('str' in it ? (it as TextItem).str : ''))
         .join(' ')
+        .normalize('NFC') // canonical Khmer/Unicode order for chunking + search
         .replace(/[ \t]+/g, ' ')
         .trim()
       if (text) pages.push(text)
