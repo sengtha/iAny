@@ -124,6 +124,11 @@ from transformers import (WhisperProcessor, WhisperForConditionalGeneration,
                           Seq2SeqTrainingArguments, Seq2SeqTrainer)
 from transformers.trainer_utils import get_last_checkpoint
 
+# Starting point — two valid choices (it's cheap, so try both and keep the lower CER):
+#   "openai/whisper-tiny"            -> clean base, learns Khmer from DDD (default; DDD is big)
+#   "PhanithLIM/whisper-tiny-aug-…"  -> warm-start from a Khmer model (faster convergence)
+# ⚠️ Must be a TRANSFORMERS checkpoint. A *-ct2 (CTranslate2) model is inference-only
+#    and CANNOT be fine-tuned here — use its pre-ct2 HF source instead.
 BASE = "openai/whisper-tiny"
 OUT  = "/workspace/whisper-tiny-khmer"
 HUB  = "sengtha/whisper-tiny-khmer"        # your HF repo (auto-created on first push)
