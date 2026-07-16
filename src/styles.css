@@ -678,6 +678,18 @@ progress {
     padding: 8px 24px 24px;
   }
 
+  /* Cap the readable column so forms, inputs and prose don't stretch across
+     a wide desktop. Centered; the doc/pack grids below still fill this width
+     (two comfortable columns). Radio is exempt — it stays full-bleed. */
+  .chat,
+  .library,
+  .packs,
+  .settings {
+    width: 100%;
+    max-width: 860px;
+    margin-inline: auto;
+  }
+
   .tabs {
     grid-area: nav;
     flex-direction: column;
@@ -730,6 +742,17 @@ progress {
 @media (min-width: 1200px) {
   .app {
     max-width: 1200px;
+  }
+}
+
+/* Radio stays full-bleed dark, but its player/list content centers on desktop
+   instead of stretching the disc, text and replay rows edge to edge. */
+@media (min-width: 768px) {
+  .radio-player,
+  .radio-list {
+    width: 100%;
+    max-width: 620px;
+    margin-inline: auto;
   }
 }
 
