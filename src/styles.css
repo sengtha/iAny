@@ -741,28 +741,70 @@ progress {
   overflow: hidden;
 }
 .radio-screen {
-  position: relative;
   height: 100%;
+  overflow-y: auto;
+  background: #0f172a;
+  color: #eef2ff;
+}
+/* The immersive player fills the first screenful; the list flows below it. */
+.radio-player {
+  min-height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  color: #eef2ff;
   padding: calc(14px + env(safe-area-inset-top)) 20px 20px;
-  overflow: hidden;
-}
-.radio-bg {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
   background:
-    radial-gradient(70% 45% at 50% 0%, rgba(129, 140, 248, 0.35), transparent 60%),
-    radial-gradient(90% 60% at 50% 120%, rgba(79, 70, 229, 0.45), transparent 60%),
+    radial-gradient(70% 40% at 50% 0%, rgba(129, 140, 248, 0.32), transparent 60%),
+    radial-gradient(90% 45% at 50% 100%, rgba(79, 70, 229, 0.4), transparent 60%),
     linear-gradient(180deg, #1e1b4b 0%, #0f172a 100%);
 }
-.radio-screen > *:not(.radio-bg) {
-  position: relative;
-  z-index: 1;
+
+/* "Today" replay list */
+.radio-list {
+  padding: 6px 16px calc(24px + env(safe-area-inset-bottom));
+  background: #0f172a;
+}
+.radio-list-title {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #a5b4fc;
+  margin: 6px 4px 10px;
+}
+.radio-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 11px 13px;
+  margin-bottom: 8px;
+  min-height: 0;
+  color: #eef2ff;
+}
+.radio-item.on {
+  border-color: rgba(129, 140, 248, 0.7);
+  background: rgba(129, 140, 248, 0.12);
+}
+.radio-item-meta {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #a5b4fc;
+}
+.radio-item-title {
+  font-size: 0.95rem;
+  line-height: 1.4;
+  color: #eef2ff;
+}
+@media (hover: hover) {
+  .radio-item:hover {
+    background: rgba(255, 255, 255, 0.07);
+  }
 }
 
 .radio-top {

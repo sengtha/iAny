@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from 'react'
+import { useEffect, useSyncExternalStore } from 'react'
 import { radio } from '../radio'
 import { radioVoice } from '../ai/radioVoice'
 
@@ -11,9 +11,14 @@ import { radioVoice } from '../ai/radioVoice'
 export function RadioView() {
   useSyncExternalStore(
     radio.subscribe,
-    () => `${radio.state}|${radio.current?.id ?? ''}|${radio.error}`,
+    () => `${radio.state}|${radio.current?.id ?? ''}|${radio.error}|${radio.todayItems.length}`,
   )
+  // Load today's feed on open so the list shows even before pressing play.
+  useEffect(() => {
+    void radio.refresh()
+  }, [])
   const { state, current, error } = radio
+  const today = radio.todayItems
   const active = state === 'playing' || state === 'waiting' || state === 'loading'
   const playing = state === 'playing'
 
@@ -32,82 +37,104 @@ export function RadioView() {
 
   return (
     <div className="radio-screen">
-      <div className="radio-bg" aria-hidden />
+      <div className="radio-player">
+        <header className="radio-top">
+          <div className="radio-word">
+            <span aria-hidden>📻</span> iAny Radio
+          </div>
+          <span className={playing ? 'radio-live on' : 'radio-live'}>
+            <i />
+            {playing ? 'ON AIR' : active ? 'TUNING' : 'OFF AIR'}
+          </span>
+        </header>
 
-      <header className="radio-top">
-        <div className="radio-word">
-          <span aria-hidden>📻</span> iAny Radio
-        </div>
-        <span className={playing ? 'radio-live on' : 'radio-live'}>
-          <i />
-          {playing ? 'ON AIR' : active ? 'TUNING' : 'OFF AIR'}
-        </span>
-      </header>
-
-      <div className="radio-stage">
-        <div className={playing ? 'radio-disc spin' : 'radio-disc'}>
-          <div className="radio-disc-face">
-            {current ? initials(current.outletName) : <span aria-hidden>📻</span>}
+        <div className="radio-stage">
+          <div className={playing ? 'radio-disc spin' : 'radio-disc'}>
+            <div className="radio-disc-face">
+              {current ? initials(current.outletName) : <span aria-hidden>📻</span>}
+            </div>
+          </div>
+          <div className={playing ? 'radio-eq on' : 'radio-eq'} aria-hidden>
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
           </div>
         </div>
-        <div className={playing ? 'radio-eq on' : 'radio-eq'} aria-hidden>
-          <span />
-          <span />
-          <span />
-          <span />
-          <span />
+
+        <div className="radio-meta">
+          {current ? (
+            <>
+              <div className="radio-outlet">ព័ត៌មានពី · {current.outletName}</div>
+              <h2 className="radio-headline">{current.title}</h2>
+              <p className="radio-body">{current.body}</p>
+              {current.sponsor ? (
+                <div className="radio-sponsor">Sponsored · {current.sponsor}</div>
+              ) : null}
+            </>
+          ) : (
+            <p className="radio-idle">Verified Khmer news, read aloud on your device.</p>
+          )}
         </div>
-      </div>
 
-      <div className="radio-meta">
-        {current ? (
-          <>
-            <div className="radio-outlet">
-              ព័ត៌មានពី · {current.outletName}
-            </div>
-            <h2 className="radio-headline">{current.title}</h2>
-            <p className="radio-body">{current.body}</p>
-            {current.sponsor ? (
-              <div className="radio-sponsor">Sponsored · {current.sponsor}</div>
-            ) : null}
-          </>
-        ) : (
-          <p className="radio-idle">
-            Verified Khmer news, read aloud on your device.
+        <div className="radio-status">{status}</div>
+
+        <div className="radio-transport">
+          <button
+            className="radio-ctl"
+            onClick={() => radio.stop()}
+            disabled={state === 'idle'}
+            aria-label="Stop"
+          >
+            ⏹
+          </button>
+          <button
+            className="radio-play"
+            onClick={() => (active ? radio.pause() : void radio.start())}
+            aria-label={active ? 'Pause' : 'Play'}
+          >
+            {active ? '⏸' : '▶'}
+          </button>
+          <button className="radio-ctl" onClick={() => radio.skip()} aria-label="Next">
+            ⏭
+          </button>
+        </div>
+
+        {state !== 'idle' && !radioVoice.usingKhmerVoice() ? (
+          <p className="radio-warn">
+            Using the browser voice. Download the Khmer voice in Settings for correct pronunciation.
           </p>
-        )}
+        ) : null}
       </div>
 
-      <div className="radio-status">{status}</div>
-
-      <div className="radio-transport">
-        <button
-          className="radio-ctl"
-          onClick={() => radio.stop()}
-          disabled={state === 'idle'}
-          aria-label="Stop"
-        >
-          ⏹
-        </button>
-        <button
-          className="radio-play"
-          onClick={() => (active ? radio.pause() : void radio.start())}
-          aria-label={active ? 'Pause' : 'Play'}
-        >
-          {active ? '⏸' : '▶'}
-        </button>
-        <button className="radio-ctl" onClick={() => radio.skip()} aria-label="Next">
-          ⏭
-        </button>
-      </div>
-
-      {state !== 'idle' && !radioVoice.usingKhmerVoice() ? (
-        <p className="radio-warn">
-          Using the browser voice. Download the Khmer voice in Settings for correct pronunciation.
-        </p>
+      {today.length > 0 ? (
+        <div className="radio-list">
+          <div className="radio-list-title">ថ្ងៃនេះ · Today</div>
+          {today.map((item) => (
+            <button
+              key={item.id}
+              className={item.id === current?.id ? 'radio-item on' : 'radio-item'}
+              onClick={() => void radio.playItem(item)}
+            >
+              <span className="radio-item-meta">
+                {item.outletName} · {fmtTime(item.createdAt)}
+              </span>
+              <span className="radio-item-title">{item.title}</span>
+            </button>
+          ))}
+        </div>
       ) : null}
     </div>
   )
+}
+
+function fmtTime(iso: string): string {
+  try {
+    return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  } catch {
+    return ''
+  }
 }
 
 /** Two-letter monogram for the disc face (Latin initials, else first glyph). */

@@ -101,6 +101,8 @@ export class RadioPlayer {
   error = ''
   private queue: NewsItem[] = []
   private seen = new Set<string>()
+  /** Every item fetched this session (for the browsable "today" list). */
+  private itemsById = new Map<string, NewsItem>()
   private cursor = ''
   private runId = 0
   private cancelCurrent: (() => void) | null = null
@@ -138,13 +140,46 @@ export class RadioPlayer {
    *  reads chronologically. Returns how many fresh items were added. */
   private async fill(): Promise<number> {
     const data = await this.fetchFeed(this.cursor)
-    const fresh = (data.items ?? []).filter((i) => !this.seen.has(i.id))
+    const items = data.items ?? []
+    for (const i of items) this.itemsById.set(i.id, i) // keep for the browse list
+    const fresh = items.filter((i) => !this.seen.has(i.id))
     for (const i of [...fresh].reverse()) {
       this.seen.add(i.id)
       this.queue.push(i)
     }
     if (data.cursor) this.cursor = data.cursor
     return fresh.length
+  }
+
+  /** Today's news (local day), newest first — for the "listen again" list. */
+  get todayItems(): NewsItem[] {
+    const start = new Date()
+    start.setHours(0, 0, 0, 0)
+    return [...this.itemsById.values()]
+      .filter((i) => new Date(i.createdAt).getTime() >= start.getTime())
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  }
+
+  /** Load the feed without starting playback (so the list shows before play). */
+  async refresh(): Promise<void> {
+    try {
+      await this.fill()
+      this.emit()
+    } catch (e) {
+      this.set('error', errMsg(e))
+    }
+  }
+
+  /** Play a specific item now (replay from the list). Continues the bulletin
+   *  with the rest afterward. */
+  async playItem(item: NewsItem): Promise<void> {
+    this.itemsById.set(item.id, item)
+    this.queue.unshift(item)
+    if (this.state === 'playing') {
+      this.skip() // cancel current; the loop picks up the item we just unshifted
+    } else {
+      await this.start()
+    }
   }
 
   async start(): Promise<void> {

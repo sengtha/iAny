@@ -1,5 +1,14 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react'
-import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native'
+import {
+  Animated,
+  Easing,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native'
 import { radio } from './radio/player'
 
 /**
@@ -12,9 +21,14 @@ import { radio } from './radio/player'
 export function RadioScreen({ onClose }: { onClose: () => void }) {
   useSyncExternalStore(
     radio.subscribe,
-    () => `${radio.state}|${radio.current?.id ?? ''}|${radio.error}`,
+    () => `${radio.state}|${radio.current?.id ?? ''}|${radio.error}|${radio.todayItems.length}`,
   )
+  useEffect(() => {
+    void radio.refresh()
+  }, [])
+  const { height } = useWindowDimensions()
   const { state, current, error } = radio
+  const today = radio.todayItems
   const active = state === 'playing' || state === 'waiting' || state === 'loading'
   const playing = state === 'playing'
 
@@ -80,7 +94,8 @@ export function RadioScreen({ onClose }: { onClose: () => void }) {
   const liveLabel = playing ? 'ON AIR' : active ? 'TUNING' : 'OFF AIR'
 
   return (
-    <View style={styles.screen}>
+    <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+      <View style={[styles.screen, { minHeight: height - 40 }]}>
       <View style={styles.top}>
         <Text style={styles.word}>📻 iAny Radio</Text>
         <View style={styles.topRight}>
@@ -147,8 +162,42 @@ export function RadioScreen({ onClose }: { onClose: () => void }) {
           <Text style={styles.ctlText}>⏭</Text>
         </Pressable>
       </View>
-    </View>
+      </View>
+
+      {today.length > 0 ? (
+        <View style={styles.list}>
+          <Text style={styles.listTitle}>ថ្ងៃនេះ · Today</Text>
+          {today.map((item) => (
+            <Pressable
+              key={item.id}
+              style={[styles.item, item.id === current?.id && styles.itemOn]}
+              onPress={() => void radio.playItem(item)}
+            >
+              <Text style={styles.itemMeta}>
+                {item.outletName} · {fmtTime(item.createdAt)}
+              </Text>
+              <Text style={styles.itemTitle} numberOfLines={2}>
+                {item.title}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+    </ScrollView>
   )
+}
+
+function fmtTime(iso: string): string {
+  try {
+    const d = new Date(iso)
+    let h = d.getHours()
+    const m = d.getMinutes().toString().padStart(2, '0')
+    const ampm = h >= 12 ? 'PM' : 'AM'
+    h = h % 12 || 12
+    return `${h}:${m} ${ampm}`
+  } catch {
+    return ''
+  }
 }
 
 /** Two-letter monogram for the disc (Latin initials, else first glyph). */
@@ -166,7 +215,32 @@ function initials(name: string): string {
 const EQ_MAX = [16, 26, 12, 22, 14]
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#1e1b4b', padding: 20, alignItems: 'center' },
+  scroll: { flex: 1, backgroundColor: '#1e1b4b' },
+  scrollContent: { flexGrow: 1 },
+  screen: { backgroundColor: '#1e1b4b', padding: 20, alignItems: 'center' },
+
+  list: { paddingHorizontal: 16, paddingBottom: 28, backgroundColor: '#1e1b4b' },
+  listTitle: {
+    color: '#a5b4fc',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    marginBottom: 10,
+    marginLeft: 4,
+  },
+  item: {
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+    gap: 3,
+  },
+  itemOn: { borderColor: 'rgba(129,140,248,0.7)', backgroundColor: 'rgba(129,140,248,0.12)' },
+  itemMeta: { color: '#a5b4fc', fontSize: 12, fontWeight: '700' },
+  itemTitle: { color: '#eef2ff', fontSize: 15, lineHeight: 21 },
   top: {
     width: '100%',
     flexDirection: 'row',
