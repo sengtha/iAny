@@ -66,6 +66,10 @@ const ALLOWED_PREFIXES = [
   'sengtha/khmer-tts-female-v1/',
   // Continued-training voice (more data + steps). Ready when §7 export lands.
   'sengtha/khmer-tts-female-v2/',
+  // On-device Khmer OCR: seanghay/KhmerOCR (MIT) mirror — a YOLO-style text
+  // detector (det.onnx) + CRNN/CTC recognizer (rec.onnx). Runs via
+  // onnxruntime-web (PWA) and onnxruntime-react-native (mobile), offline.
+  'sengtha/khmer-ocr/',
   // Limit test: bigger base Qwen3 (1.7B, full vocab) to probe the S10 ceiling.
   'unsloth/Qwen3-1.7B-GGUF/',
 ]
