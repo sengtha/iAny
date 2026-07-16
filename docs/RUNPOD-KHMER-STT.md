@@ -116,10 +116,10 @@ checkpoints push to HF (they survive even a pod deletion), then launch it
 
 ```python
 %%writefile /workspace/train.py
-import os, evaluate, torch
+import os, io, evaluate, torch, soundfile as sf
 from dataclasses import dataclass
 from typing import Any
-from datasets import load_from_disk
+from datasets import load_from_disk, Audio
 from transformers import (WhisperProcessor, WhisperForConditionalGeneration,
                           Seq2SeqTrainingArguments, Seq2SeqTrainer)
 from transformers.trainer_utils import get_last_checkpoint
@@ -136,11 +136,15 @@ BASE = "openai/whisper-tiny"
 OUT  = "/workspace/whisper-tiny-khmer"
 HUB  = "sengtha/whisper-tiny-khmer"        # your HF repo (auto-created on first push)
 processor = WhisperProcessor.from_pretrained(BASE, language="Khmer", task="transcribe")
-ds = load_from_disk("/workspace/ds")
+# decode=False + soundfile: newer `datasets` needs `torchcodec` to decode an
+# Audio column, which isn't installed — decode the wavs ourselves (same as §2).
+ds = load_from_disk("/workspace/ds").cast_column("audio", Audio(decode=False))
 
 def prepare(b):
     a = b["audio"]
-    b["input_features"] = processor.feature_extractor(a["array"], sampling_rate=16000).input_features[0]
+    y, sr = sf.read(io.BytesIO(a["bytes"]) if a.get("bytes") else a["path"], dtype="float32")
+    if y.ndim > 1: y = y.mean(axis=1)
+    b["input_features"] = processor.feature_extractor(y, sampling_rate=16000).input_features[0]
     b["labels"] = processor.tokenizer(b["sentence"]).input_ids
     return b
 ds = ds.map(prepare, remove_columns=ds["train"].column_names, num_proc=2)
