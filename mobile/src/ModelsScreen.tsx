@@ -17,6 +17,7 @@ import {
 import { generator } from './ai/generator'
 import { embedder } from './ai/embedder'
 import { tts } from './ai/tts'
+import { khmerOcr } from './ai/khmerocr'
 
 /**
  * Models screen: choose the LLM quant, and download / redownload / delete /
@@ -166,6 +167,7 @@ export function ModelsScreen({ onClose }: { onClose?: () => void }) {
     if (m.kind === 'generation') await generator.release()
     else if (m.kind === 'voice') await tts.reset()
     else if (m.kind === 'embedding') await embedder.release?.()
+    else if (m.kind === 'ocr') await khmerOcr.reset()
   }
 }
 

@@ -6,11 +6,14 @@ import {
   EMBEDDING_MODEL_REPO,
   GEN_MODEL_FILES,
   GEN_MODEL_REPO,
+  OCR_MODEL_FILES,
+  OCR_MODEL_REPO,
   TTS_MODEL_REPO,
   TTS_ONNX_FILE,
 } from '../domain/types'
 import {
   deleteCachedFiles,
+  ensureFile,
   ensureModelFile,
   findCachedFile,
   importModelFile,
@@ -25,7 +28,7 @@ import {
  * iAny's offline, low-data context.
  */
 
-export type ModelKind = 'generation' | 'embedding' | 'voice'
+export type ModelKind = 'generation' | 'embedding' | 'voice' | 'ocr'
 
 export interface ManagedModel {
   id: string
@@ -33,10 +36,13 @@ export interface ManagedModel {
   label: string
   note: string
   repo: string
-  /** candidate filenames; files[0] is the canonical name for import. */
+  /** By default these are ALTERNATIVE candidate names (files[0] is canonical for
+   *  import). When `bundle` is true they are ALL required (e.g. OCR = det + rec). */
   files: string[]
   /** can it be picked as the active model for its kind? */
   selectable: boolean
+  /** true = every entry in `files` is required (a multi-file model). */
+  bundle?: boolean
 }
 
 // GEN_MODEL_FILES is [Q4, Q8] (Q4 first). Offer both as choices.
@@ -101,6 +107,16 @@ export const MODELS: ManagedModel[] = [
     files: [TTS_ONNX_FILE],
     selectable: false,
   },
+  {
+    id: 'ocr',
+    kind: 'ocr',
+    label: 'Khmer OCR',
+    note: 'Reads Khmer text from photos/scans (detector + recognizer, ~25 MB).',
+    repo: OCR_MODEL_REPO,
+    files: [...OCR_MODEL_FILES],
+    selectable: false,
+    bundle: true,
+  },
 ]
 
 /* ---- active-generation selection (persisted to a small JSON file) ---- */
@@ -148,6 +164,16 @@ export interface ModelState {
 }
 
 export async function modelState(m: ManagedModel): Promise<ModelState> {
+  if (m.bundle) {
+    // Every file is required: downloaded only when ALL are present; size sums.
+    let sizeBytes = 0
+    for (const file of m.files) {
+      const f = await findCachedFile([file])
+      if (!f) return { downloaded: false, sizeBytes }
+      sizeBytes += f.size
+    }
+    return { downloaded: true, sizeBytes }
+  }
   const f = await findCachedFile(m.files)
   return { downloaded: f != null, sizeBytes: f?.size ?? 0 }
 }
@@ -157,6 +183,14 @@ export async function downloadModel(
   m: ManagedModel,
   onProgress?: (fraction: number) => void,
 ): Promise<void> {
+  if (m.bundle) {
+    // Fetch every required file; report combined progress across them.
+    const n = m.files.length
+    for (let i = 0; i < n; i++) {
+      await ensureFile(m.repo, m.files[i], (f) => onProgress?.((i + f) / n))
+    }
+    return
+  }
   await ensureModelFile(m.repo, m.files, onProgress)
 }
 
@@ -168,9 +202,24 @@ export async function removeModel(m: ManagedModel): Promise<void> {
  *  Quick Share / etc.). Returns false if it isn't downloaded or sharing is
  *  unavailable. */
 export async function shareModel(m: ManagedModel): Promise<boolean> {
+  if (!(await Sharing.isAvailableAsync())) return false
+  if (m.bundle) {
+    // Share each required file in turn (the OS sheet handles one at a time);
+    // the receiver imports each. Returns true if at least one was shared.
+    let shared = false
+    for (const file of m.files) {
+      const f = await findCachedFile([file])
+      if (!f) continue
+      await Sharing.shareAsync(f.uri, {
+        mimeType: 'application/octet-stream',
+        dialogTitle: `Share ${m.label} — ${file}`,
+      })
+      shared = true
+    }
+    return shared
+  }
   const f = await findCachedFile(m.files)
   if (!f) return false
-  if (!(await Sharing.isAvailableAsync())) return false
   await Sharing.shareAsync(f.uri, {
     mimeType: 'application/octet-stream',
     dialogTitle: `Share ${m.label}`,
@@ -184,7 +233,14 @@ export async function importModel(m: ManagedModel): Promise<boolean> {
   const res = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true })
   if (res.canceled || !res.assets || res.assets.length === 0) return false
   const asset = res.assets[0]
-  await importModelFile(asset.uri, m.files[0].replace(/\//g, '_'))
+  // For a bundle, save the picked file under whichever required name it matches
+  // (by basename) so importing det + rec separately lands them correctly.
+  let dest = m.files[0]
+  if (m.bundle) {
+    const picked = (asset.name ?? '').toLowerCase()
+    dest = m.files.find((f) => picked.includes(f.toLowerCase())) ?? m.files[0]
+  }
+  await importModelFile(asset.uri, dest.replace(/\//g, '_'))
   return true
 }
 

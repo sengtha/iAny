@@ -77,6 +77,14 @@ export const TTS_MODEL_REPO = 'sengtha/khmer-tts-female-v2'
 export const TTS_ONNX_FILE = 'khmer_tts_v3.onnx'
 export const TTS_META_FILE = 'tts_meta.json'
 
+/**
+ * On-device Khmer OCR: seanghay/KhmerOCR (MIT) mirror — a YOLO-style text
+ * detector (det.onnx) + a CRNN/CTC recognizer (rec.onnx). Both are REQUIRED
+ * (it's a bundle, not alternatives). Runs via onnxruntime-react-native, offline.
+ */
+export const OCR_MODEL_REPO = 'sengtha/khmer-ocr'
+export const OCR_MODEL_FILES = ['det.onnx', 'rec.onnx'] as const
+
 /** iAny model mirror (Cloudflare worker pull-through cache). */
 export const MODEL_MIRROR = 'https://iany.sengtha.workers.dev/models'
 /** Read-only HF metadata proxy on the same worker (repo file lists), so the

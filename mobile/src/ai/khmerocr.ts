@@ -11,6 +11,7 @@ import {
   REC_HEIGHT,
   type OcrImage,
 } from '@iany/core'
+import { OCR_MODEL_FILES, OCR_MODEL_REPO } from '../domain/types'
 import { ensureFile, errStr } from './modelFile'
 
 /**
@@ -24,7 +25,8 @@ import { ensureFile, errStr } from './modelFile'
  * (native resize/orient) + jpeg-js (pure-JS RGBA decode).
  */
 
-const OCR_REPO = 'sengtha/khmer-ocr'
+const OCR_REPO = OCR_MODEL_REPO
+const [DET_FILE, REC_FILE] = OCR_MODEL_FILES
 // Cap the decoded image: enough resolution for legible text, small enough that
 // the JS decode + preprocessing loop stay reasonable on a 2019-era phone.
 const MAX_SIDE = 1600
@@ -45,15 +47,26 @@ class KhmerOcrNative {
     return this.det !== null && this.rec !== null
   }
 
+  /** Release the loaded sessions so a delete/redownload isn't held open. */
+  async reset(): Promise<void> {
+    const d = this.det
+    const r = this.rec
+    this.det = null
+    this.rec = null
+    this.status = 'off'
+    await (d as { release?: () => Promise<void> } | null)?.release?.().catch(() => {})
+    await (r as { release?: () => Promise<void> } | null)?.release?.().catch(() => {})
+  }
+
   /** Download (once) + load both models. */
   async init(onProgress?: (p: OcrProgress) => void): Promise<void> {
     if (this.ready) return
     try {
       this.status = 'downloading'
-      const detPath = await ensureFile(OCR_REPO, 'det.onnx', (f) =>
+      const detPath = await ensureFile(OCR_REPO, DET_FILE, (f) =>
         onProgress?.({ status: 'downloading', progress: f * 0.45 }),
       )
-      const recPath = await ensureFile(OCR_REPO, 'rec.onnx', (f) =>
+      const recPath = await ensureFile(OCR_REPO, REC_FILE, (f) =>
         onProgress?.({ status: 'downloading', progress: 0.45 + f * 0.55 }),
       )
       this.status = 'loading'
