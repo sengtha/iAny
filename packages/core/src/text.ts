@@ -88,7 +88,7 @@ export function intToKhmer(n: number): string {
  * hard-split by characters as a last resort, so a chunk is never huge — that's
  * what made a long news body appear to hang.
  */
-export function splitForSpeech(text: string, maxChars = 55): string[] {
+export function splitForSpeech(text: string, maxChars = 110): string[] {
   const chunks: string[] = []
   const push = (s: string) => {
     const t = s.trim()

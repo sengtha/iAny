@@ -36,7 +36,7 @@ class KhmerOnnxTts implements RadioTts {
   private idOf: Record<string, number> = {}
   private blankId = 0
   private ctx: AudioContext | null = null
-  private source: AudioBufferSourceNode | null = null
+  private sources: AudioBufferSourceNode[] = []
   private speakId = 0
   private synthSeq = 0
   private pending = new Map<
@@ -165,55 +165,63 @@ class KhmerOnnxTts implements RadioTts {
     })
   }
 
-  /** Speak the full text, streaming sentence-by-sentence (synth next while playing). */
+  /**
+   * Speak the full text. All chunks are sent to the worker up front so it
+   * produces PCM continuously (never idles waiting for playback), and each
+   * buffer is scheduled back-to-back on the AudioContext clock — gapless while
+   * synthesis keeps up, and only a tiny catch-up gap if it briefly can't. This
+   * removes the per-chunk "synth then play" stall that caused long waits.
+   */
   async speak(text: string): Promise<void> {
     if (!this.worker || !this.meta) throw new Error('voice not ready')
     this.stop()
     const myId = ++this.speakId
     if (!this.ctx) this.ctx = new AudioContext()
-    await this.ctx.resume().catch(() => {})
-    const sentences = splitForSpeech(text)
+    const ctx = this.ctx
+    await ctx.resume().catch(() => {})
+    const chunks = splitForSpeech(text)
       .map((s) => this.textToIds(s))
       .filter((a) => a.length > 0)
-    if (sentences.length === 0) return
-    let pcm = await this.synth(sentences[0])
-    for (let i = 0; i < sentences.length; i++) {
-      if (myId !== this.speakId) return // superseded
-      const next = i + 1 < sentences.length ? this.synth(sentences[i + 1]) : null
-      await this.play(pcm, myId)
-      if (myId !== this.speakId || !next) return
-      pcm = await next
-    }
-  }
+    if (chunks.length === 0) return
 
-  private play(pcm: Float32Array, myId: number): Promise<void> {
-    return new Promise((resolve) => {
-      const ctx = this.ctx!
-      const buf = ctx.createBuffer(1, pcm.length, this.meta!.sample_rate)
+    const sr = this.meta.sample_rate
+    const pending = chunks.map((ids) => this.synth(ids)) // worker runs them in order
+    let nextTime = 0
+    let lastEnded: Promise<void> | null = null
+    for (let i = 0; i < pending.length; i++) {
+      let pcm: Float32Array
+      try {
+        pcm = await pending[i]
+      } catch {
+        continue // drop a failed chunk rather than stalling the whole read
+      }
+      if (myId !== this.speakId) return // superseded by stop()/skip
+      const buf = ctx.createBuffer(1, pcm.length, sr)
       buf.getChannelData(0).set(pcm)
       const src = ctx.createBufferSource()
       src.buffer = buf
       src.connect(ctx.destination)
-      src.onended = () => resolve()
-      this.source = src
-      if (myId !== this.speakId) {
-        resolve()
-        return
-      }
-      src.start()
-    })
+      const startAt = Math.max(ctx.currentTime + 0.03, nextTime)
+      src.start(startAt)
+      nextTime = startAt + buf.duration
+      this.sources.push(src)
+      lastEnded = new Promise((resolve) => {
+        src.onended = () => resolve()
+      })
+    }
+    if (lastEnded) await lastEnded
   }
 
   stop(): void {
     this.speakId++
-    if (this.source) {
+    for (const s of this.sources) {
       try {
-        this.source.stop()
+        s.stop()
       } catch {
         /* already stopped */
       }
-      this.source = null
     }
+    this.sources = []
   }
 }
 
