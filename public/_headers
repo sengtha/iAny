@@ -1,0 +1,8 @@
+# Cross-origin isolation → enables SharedArrayBuffer → multi-threaded wasm for
+# onnxruntime-web (the Khmer voice) and transformers.js (the LLM), which is
+# several times faster than single-thread. `credentialless` COEP keeps
+# same-origin/cross-origin resource loading working without needing CORP on
+# every asset (safer than require-corp). Served by Cloudflare Workers assets.
+/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: credentialless
