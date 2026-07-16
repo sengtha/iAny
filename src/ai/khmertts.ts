@@ -51,12 +51,9 @@ class KhmerOnnxTts implements RadioTts {
 
   /** Is the onnx already cached (so the radio can use it without a download)? */
   async isDownloaded(): Promise<boolean> {
-    try {
-      const c = await caches.open(VOICE_CACHE)
-      return (await c.match(TTS_ONNX)) != null
-    } catch {
-      return false
-    }
+    const c = await this.openCache()
+    if (!c) return false
+    return (await c.match(TTS_ONNX).catch(() => undefined)) != null
   }
 
   /** Download (once) + load the ONNX voice into the worker. */
@@ -84,30 +81,47 @@ class KhmerOnnxTts implements RadioTts {
     }
   }
 
-  /** Stream the onnx from the Cache API (or fetch + cache it) with progress. */
+  /** Load the onnx bytes: from the Cache API if available (offline reuse), else
+   *  a plain download. The Cache API isn't available in every context (blocked
+   *  site-data, some privacy modes) — so it's optional, never required. */
   private async loadOnnx(onProgress: (f: number) => void): Promise<Uint8Array> {
-    const cache = await caches.open(VOICE_CACHE)
-    let res = await cache.match(TTS_ONNX)
-    if (!res) {
-      const net = await fetch(TTS_ONNX)
-      if (!net.ok || !net.body) throw new Error(`voice download failed (${net.status})`)
-      const total = Number(net.headers.get('content-length') || 0)
-      const reader = net.body.getReader()
-      const chunks: Uint8Array[] = []
-      let received = 0
-      for (;;) {
-        const { done, value } = await reader.read()
-        if (done) break
-        chunks.push(value)
-        received += value.length
-        if (total) onProgress(received / total)
+    // Try the cache first (best-effort; ignore any failure).
+    const cache = await this.openCache()
+    if (cache) {
+      const hit = await cache.match(TTS_ONNX).catch(() => undefined)
+      if (hit) {
+        onProgress(1)
+        return new Uint8Array(await hit.arrayBuffer())
       }
-      await cache.put(TTS_ONNX, new Response(new Blob(chunks as BlobPart[])))
-      res = await cache.match(TTS_ONNX)
-    } else {
-      onProgress(1)
     }
-    return new Uint8Array(await res!.arrayBuffer())
+    // Download (with progress).
+    const net = await fetch(TTS_ONNX)
+    if (!net.ok || !net.body) throw new Error(`voice download failed (${net.status})`)
+    const total = Number(net.headers.get('content-length') || 0)
+    const reader = net.body.getReader()
+    const chunks: Uint8Array[] = []
+    let received = 0
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      chunks.push(value)
+      received += value.length
+      if (total) onProgress(received / total)
+    }
+    const blob = new Blob(chunks as BlobPart[])
+    // Cache for next time — best-effort; a failure here must not break loading.
+    if (cache) await cache.put(TTS_ONNX, new Response(blob)).catch(() => {})
+    return new Uint8Array(await blob.arrayBuffer())
+  }
+
+  /** Open the voice cache, or null if the Cache API is unavailable/blocked. */
+  private async openCache(): Promise<Cache | null> {
+    try {
+      if (typeof caches === 'undefined') return null
+      return await caches.open(VOICE_CACHE)
+    } catch {
+      return null
+    }
   }
 
   /** Spin up the inference worker and hand it the model bytes (zero-copy). */
