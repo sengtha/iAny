@@ -17,21 +17,20 @@ You only *train once* (the HF model), then convert to each format.
 
 ## 0. What you need first — the data
 
-The one thing this guide can't do for you: get DDD into `(audio, transcript)`
-pairs. You need a folder of **16 kHz mono WAV** clips + their Khmer transcripts.
-The simplest layout — a `metadata.csv`:
+Good news — DDD is ready-made for this. It's
+**[`DDD-Cambodia/khmer-speech-dataset`](https://huggingface.co/datasets/DDD-Cambodia/khmer-speech-dataset)**
+on HF: **~450k clips**, **multi-speaker** (male + female, many `speaker_id`s like
+`f-adt1-0001` / `m-adt1-0001`), with `audio` + `transcript` columns. That speaker
+diversity is exactly what STT needs (the single-speaker worry was only about the
+TTS *subset* — the full corpus is diverse), so you don't have to assemble anything.
 
-```csv
-path,sentence
-clips/0001.wav,សួស្ដី តើអ្នកសុខសប្បាយជាទេ
-clips/0002.wav,ការអប់រំ និងសុខភាព គឺជាមូលដ្ឋានសំខាន់
-```
-
-⚠️ **Speaker diversity matters for STT.** If DDD is the *single-speaker* set you
-used for the TTS voice, an STT trained only on it will overfit to that voice.
-**Mix in other Khmer speech** for robustness:
-- OpenSLR **SLR42** (Google Khmer), **Common Voice** Khmer, any field recordings.
-Combine them all into one `metadata.csv`. More speakers + noise = better real-world CER.
+Two practical facts drive §2:
+- It's **huge (~495 GB, parquet with the audio embedded)** — do **not** download it
+  all. §2 **streams** a capped subset (e.g. 80 h) and shuffles it for speaker/topic
+  variety.
+- Newer `datasets` errors when decoding its audio, so we use the same workaround as
+  the TTS pipeline (`Audio(decode=False)` + decode with `soundfile`) — see
+  `docs/RUNPOD-TTS-KHMER.md`.
 
 ---
 
@@ -40,11 +39,9 @@ Combine them all into one `metadata.csv`. More speakers + noise = better real-wo
 1. runpod.io → sign in → add a few $ credit.
 2. **Pods → Deploy → GPU Cloud.** whisper-tiny is tiny, so a cheap card is plenty:
    pick **RTX A4000 / RTX 4090** (~$0.2–0.7/hr).
-3. Template: **RunPod PyTorch 2.x**. Set a **Volume** (e.g. 50 GB, mounted at
-   `/workspace`) so your data + checkpoints persist.
+3. Template: **RunPod PyTorch 2.x**. Set a **Volume ~150 GB** at `/workspace`
+   (the streamed audio subset + checkpoints need room) so it persists.
 4. Deploy → **Connect → Jupyter Lab** (or Web Terminal / SSH).
-5. Upload your `clips/` + `metadata.csv` into `/workspace` (Jupyter upload, or
-   `runpodctl`, or `wget` from your HF/R2).
 
 Install deps (terminal):
 
@@ -54,23 +51,57 @@ pip install -U "transformers>=4.44" datasets accelerate evaluate jiwer librosa s
 
 ---
 
-## 2. Build the dataset
+## 2. Build the training subset (stream from DDD)
+
+Streams DDD, decodes + resamples each clip to **16 kHz mono**, writes WAVs, and
+saves a ready-to-train `datasets` dataset. It **shuffles** the stream so the
+subset spans many speakers/topics (not one block), and caps at `TARGET_HOURS`.
+Writing WAVs to disk (not RAM) keeps it memory-safe.
 
 ```python
 # build_ds.py  — run in the pod
-from datasets import Dataset, Audio
-import pandas as pd
+import os, io, soundfile as sf, librosa
+from datasets import load_dataset, Dataset, Audio
+from huggingface_hub import login
+from getpass import getpass
 
-df = pd.read_csv("/workspace/metadata.csv")           # columns: path, sentence
-df["path"] = "/workspace/" + df["path"]                # make absolute if needed
-ds = (Dataset.from_pandas(df)
-        .cast_column("path", Audio(sampling_rate=16000))  # auto-resamples to 16k
-        .rename_column("path", "audio")
-        .rename_column("sentence", "sentence"))
-ds = ds.train_test_split(test_size=0.02, seed=42)      # ~2% held out for eval
+login(getpass("HF token: "))            # typed at the prompt, not stored in code
+REPO = "DDD-Cambodia/khmer-speech-dataset"
+OUT = "/workspace/clips"; os.makedirs(OUT, exist_ok=True)
+TARGET_HOURS = 80        # plenty for whisper-tiny; raise for lower CER
+MIN_SEC, MAX_SEC = 0.5, 20
+
+raw = (load_dataset(REPO, split="train", streaming=True)
+       .cast_column("audio", Audio(decode=False))      # sidestep the audio-codec dep
+       .shuffle(seed=42, buffer_size=10000))            # mix speakers/topics
+
+meta, total, i = [], 0.0, 0
+for ex in raw:
+    a = ex["audio"]
+    b = a["bytes"] if a.get("bytes") else open(a["path"], "rb").read()
+    y, sr = sf.read(io.BytesIO(b), dtype="float32")
+    if y.ndim > 1: y = y.mean(1)                        # to mono
+    if sr != 16000: y = librosa.resample(y, orig_sr=sr, target_sr=16000); sr = 16000
+    dur = len(y) / sr
+    if not (MIN_SEC <= dur <= MAX_SEC): continue
+    txt = (ex.get("transcript") or "").strip()
+    if not txt: continue
+    p = f"{OUT}/{i:06d}.wav"; sf.write(p, y, sr)
+    meta.append({"path": p, "sentence": txt})
+    total += dur; i += 1
+    if i % 2000 == 0: print(f"{i} clips, {total/3600:.1f} h", flush=True)
+    if total >= TARGET_HOURS * 3600: break
+
+ds = (Dataset.from_list(meta)
+        .cast_column("path", Audio(sampling_rate=16000))
+        .rename_column("path", "audio"))
+ds = ds.train_test_split(test_size=0.01, seed=42)       # ~1% held out for eval
 ds.save_to_disk("/workspace/ds")
 print(ds)
 ```
+
+~80 h ≈ 50–60k clips ≈ ~9 GB on disk. Want more speaker/noise variety? Also fold in
+**OpenSLR SLR42** / **Common Voice** Khmer the same way (append to `meta`).
 
 ---
 
