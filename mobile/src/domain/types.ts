@@ -71,10 +71,10 @@ export const GEN_MODEL_FILES = [
 export const TTS_MODEL_REPO = 'sengtha/khmer-tts-female-v2'
 // Filename is a CACHE-BUST KEY. The voice is cached by filename, so any change
 // to the onnx must use a NEW name to force a fresh download (users can't always
-// reach the Models row to delete the old file). `ls100` = length_scale 1.0
-// baked in (the natural/original speed; we tried 1.15 = slower but reverted).
-// Bump this whenever the onnx changes.
-export const TTS_ONNX_FILE = 'khmer_tts_ls100.onnx'
+// reach the Models row to delete the old file). v3 = the tuned "smooth" export:
+// length_scale 1.15 + noise_scale 0.5 + noise_scale_w 0.6 (less timing jitter),
+// read WITHOUT word-segmentation (author's spacing only). Bump on any onnx change.
+export const TTS_ONNX_FILE = 'khmer_tts_v3.onnx'
 export const TTS_META_FILE = 'tts_meta.json'
 
 /** iAny model mirror (Cloudflare worker pull-through cache). */

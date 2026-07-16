@@ -82,11 +82,10 @@ export function intToKhmer(n: number): string {
 
 /**
  * Split text into short chunks for streaming TTS. Sentence boundaries (។ ! ? .)
- * are hard breaks; any sentence longer than `maxChars` is further split at word
- * spaces (present after segmentKhmer) so each synth stays fast and audio starts
- * quickly. A single space-less run longer than the limit (unsegmented text) is
- * hard-split by characters as a last resort, so a chunk is never huge — that's
- * what made a long news body appear to hang.
+ * are hard breaks; any sentence longer than `maxChars` is further split at the
+ * author's spaces so each synth stays fast and audio starts quickly. A single
+ * space-less run longer than the limit is hard-split by characters as a last
+ * resort, so a chunk is never huge — that's what made a long body appear to hang.
  */
 export function splitForSpeech(text: string, maxChars = 110): string[] {
   const chunks: string[] = []
@@ -121,39 +120,6 @@ export function splitForSpeech(text: string, maxChars = 110): string[] {
     push(cur)
   }
   return chunks
-}
-
-/**
- * Insert word boundaries into Khmer text (which is written without spaces).
- * The TTS voice was trained on text WITH spaces, so segmenting into words makes
- * it read with correct pronunciation + prosody. Uses the platform's ICU word
- * breaker (`Intl.Segmenter('km')`) — available in browsers and on Cloudflare
- * Workers. Where it's missing (e.g. React Native's Hermes), this is a no-op and
- * the text is returned unchanged, so callers can use it safely everywhere.
- *
- * Existing spaces/newlines are preserved as separators; only runs of Khmer
- * script get split.
- */
-export function segmentKhmer(text: string): string {
-  const Seg = (globalThis as { Intl?: { Segmenter?: typeof Intl.Segmenter } }).Intl?.Segmenter
-  if (!Seg || !/[ក-៿]/.test(text)) return text
-  let seg: Intl.Segmenter
-  try {
-    seg = new Seg('km', { granularity: 'word' })
-  } catch {
-    return text
-  }
-  // Segment each whitespace-delimited run separately so we don't lose the
-  // author's own spacing (phrase breaks, foreign words, punctuation spacing).
-  return text
-    .split(/(\s+)/)
-    .map((part) => {
-      if (/^\s+$/.test(part) || !/[ក-៿]/.test(part)) return part
-      const words = [...seg.segment(part)].map((s) => s.segment.trim()).filter(Boolean)
-      return words.join(' ')
-    })
-    .join('')
-    .replace(/\s{2,}/g, ' ')
 }
 
 /** Replace digit runs (Arabic or Khmer, with , separators / . decimals) with

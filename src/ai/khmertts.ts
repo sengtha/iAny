@@ -12,11 +12,12 @@ import { normalizeNumbers, splitForSpeech, type RadioTts } from '@iany/core'
  */
 
 const TTS_BASE = '/models/sengtha/khmer-tts-female-v2/resolve/main'
-// ls100 = length_scale 1.0 (natural/original speed). The filename is the
-// cache-bust key; bump it (and VOICE_CACHE) whenever the onnx changes.
-const TTS_ONNX = `${TTS_BASE}/khmer_tts_ls100.onnx`
+// v3 = tuned "smooth" export: length_scale 1.15 + noise_scale 0.5 +
+// noise_scale_w 0.6 (less timing jitter). Filename is the cache-bust key; bump
+// it (and VOICE_CACHE) whenever the onnx changes.
+const TTS_ONNX = `${TTS_BASE}/khmer_tts_v3.onnx`
 const TTS_META = `${TTS_BASE}/tts_meta.json`
-const VOICE_CACHE = 'iany-voice-v2'
+const VOICE_CACHE = 'iany-voice-v3'
 
 interface TtsMeta {
   vocab: string[]

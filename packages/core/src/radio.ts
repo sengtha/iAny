@@ -22,11 +22,6 @@ export interface NewsItem {
   outletName: string
   title: string
   body: string
-  /** Word-segmented copies for the TTS voice (server-computed at post time via
-   *  ICU). Read aloud in place of title/body when present; display still uses
-   *  the clean title/body. Absent on old rows → the voice falls back to them. */
-  ttsTitle?: string
-  ttsBody?: string
   /** Optional short sponsor line; the app labels it "ឧបត្ថម្ភដោយ / Sponsored". */
   sponsor?: string
   lang: 'km' | 'en'
@@ -69,11 +64,7 @@ export function withinLatinBudget(body: string): boolean {
 /** The spoken form of an item: outlet name FIRST (attribution), then title,
  *  body, and a labeled sponsor. Identical on every platform. */
 export function attributedText(item: NewsItem): string {
-  // Prefer the word-segmented copies (better pronunciation); fall back to the
-  // display text for old items that predate segmentation.
-  const title = item.ttsTitle || item.title
-  const body = item.ttsBody || item.body
-  let t = `ព័ត៌មានពី ${item.outletName}។ ${title}។ ${body}`
+  let t = `ព័ត៌មានពី ${item.outletName}។ ${item.title}។ ${item.body}`
   if (item.sponsor && item.sponsor.trim()) t += ` ឧបត្ថម្ភដោយ ${item.sponsor.trim()}។`
   return t
 }
