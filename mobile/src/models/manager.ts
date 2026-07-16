@@ -70,25 +70,6 @@ export const MODELS: ManagedModel[] = [
     files: [GEN_Q8],
     selectable: true,
   },
-  // ft2 = the older training (shorter answers), kept selectable for comparison.
-  {
-    id: 'gen-ft2-q4',
-    kind: 'generation',
-    label: 'Khmer LLM · ft2 · Q4',
-    note: 'Older training (shorter answers). Kept for comparison.',
-    repo: 'sengtha/Qwen3-0.6B-khm-ft2-Q8_0-GGUF',
-    files: ['Qwen3-0.6B-khm-ft2-Q4_K_M.gguf'],
-    selectable: true,
-  },
-  {
-    id: 'gen-ft2-q8',
-    kind: 'generation',
-    label: 'Khmer LLM · ft2 · Q8',
-    note: 'Older training, higher quality. Kept for comparison.',
-    repo: 'sengtha/Qwen3-0.6B-khm-ft2-Q8_0-GGUF',
-    files: ['Qwen3-0.6B-khm-ft2-Q8_0.gguf'],
-    selectable: true,
-  },
   {
     id: 'embed',
     kind: 'embedding',

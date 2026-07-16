@@ -58,21 +58,6 @@ export const GEN_MODELS: GenModelSpec[] = [
     khmerRag: true,
   },
   {
-    choice: 'tiny',
-    id: 'onnx-community/gemma-3-270m-it-ONNX',
-    name: 'Gemma 3 270M',
-    cpuOk: true,
-    minBytes: 80 * 1e6,
-  },
-  {
-    choice: 'small',
-    id: 'onnx-community/Qwen3-0.6B-ONNX',
-    name: 'Qwen3 0.6B',
-    cpuOk: true,
-    minBytes: 250 * 1e6,
-    noThink: true,
-  },
-  {
     choice: 'compact',
     id: 'onnx-community/gemma-3-1b-it-ONNX-GQA',
     name: 'Gemma 3 1B',
