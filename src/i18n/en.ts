@@ -125,6 +125,7 @@ export const en = {
   settingsStats: 'Knowledge base',
   settingsStatsDocs: 'documents',
   settingsStatsChunks: 'knowledge chunks',
+  settingsCredits: 'Credits',
   settingsDanger: 'Danger zone',
   settingsWipe: 'Erase everything',
   settingsWipeConfirm: 'Erase all documents, packs and chunks? This cannot be undone.',

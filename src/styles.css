@@ -435,6 +435,18 @@ details.advanced[open] > summary {
   margin-bottom: 8px;
 }
 
+.credits {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 0.82rem;
+  color: var(--fg-muted);
+  line-height: 1.7;
+}
+.credits strong {
+  color: var(--fg);
+  font-weight: 600;
+}
+
 button.chip {
   min-height: 34px;
   padding: 6px 13px;

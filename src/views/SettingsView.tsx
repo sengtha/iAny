@@ -512,6 +512,24 @@ export function SettingsView() {
         )}
       </section>
 
+      <section className="card">
+        <h2>{t('settingsCredits')}</h2>
+        <ul className="credits">
+          <li>
+            Khmer voice — <strong>DDD-Cambodia</strong> corpus (CC-BY-SA-4.0) · VITS / Coqui TTS
+          </li>
+          <li>
+            Khmer OCR — <strong>seanghay/KhmerOCR</strong> (MIT)
+          </li>
+          <li>
+            Answering — <strong>Qwen3-0.6B</strong> (Apache-2.0), Gemma (Google)
+          </li>
+          <li>
+            Semantic search — <strong>EmbeddingGemma</strong> (Google)
+          </li>
+        </ul>
+      </section>
+
       <p className="hint build-id">iAny · build {__BUILD_ID__}</p>
 
       <section className="card">

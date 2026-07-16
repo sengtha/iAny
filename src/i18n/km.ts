@@ -127,6 +127,7 @@ export const km: Translation = {
   settingsStats: 'មូលដ្ឋានចំណេះដឹង',
   settingsStatsDocs: 'ឯកសារ',
   settingsStatsChunks: 'កំណាត់ចំណេះដឹង',
+  settingsCredits: 'ឥណទាន',
   settingsDanger: 'តំបន់គ្រោះថ្នាក់',
   settingsWipe: 'លុបទាំងអស់',
   settingsWipeConfirm: 'លុបឯកសារ កញ្ចប់ និងកំណាត់ទាំងអស់? មិនអាចត្រឡប់វិញបានទេ។',
