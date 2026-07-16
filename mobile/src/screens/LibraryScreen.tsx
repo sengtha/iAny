@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -85,23 +86,34 @@ export function LibraryScreen() {
     }
   }
 
-  const onScanImage = async () => {
+  // Offer camera (take a photo of a document) or the photo library.
+  const onScanImage = () => {
     if (busy || ocr) return
+    Alert.alert('Scan text', 'Read Khmer text from a photo', [
+      { text: '📷 Take photo', onPress: () => void scanFrom('camera') },
+      { text: '🖼 Choose photo', onPress: () => void scanFrom('library') },
+      { text: 'Cancel', style: 'cancel' },
+    ])
+  }
+
+  const scanFrom = async (source: 'camera' | 'library') => {
     setError('')
     try {
-      const picked = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        quality: 1,
-      })
+      if (source === 'camera') {
+        const perm = await ImagePicker.requestCameraPermissionsAsync()
+        if (!perm.granted) {
+          setError('Camera permission is needed to take a photo.')
+          return
+        }
+      }
+      const picked =
+        source === 'camera'
+          ? await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 1 })
+          : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 1 })
       if (picked.canceled) return
       const asset = picked.assets[0]
       setOcr({ status: khmerOcr.ready ? 'reading' : 'downloading' })
-      const text = await khmerOcr.recognizeImage(
-        asset.uri,
-        asset.width ?? 0,
-        asset.height ?? 0,
-        setOcr,
-      )
+      const text = await khmerOcr.recognizeImage(asset.uri, asset.width ?? 0, asset.height ?? 0, setOcr)
       if (text.trim()) {
         // OCR output needs a human glance before it's fed — drop it into the box.
         setContent((prev) => (prev.trim() ? `${prev}\n\n${text}` : text))
