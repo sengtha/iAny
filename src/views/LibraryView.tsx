@@ -3,6 +3,7 @@ import { useModelStatus } from '../hooks/useModelStatus'
 import { useI18n } from '../i18n'
 import { deleteDocument, listDocuments, type DocumentSummary } from '../db/documents'
 import { extractPdfText } from '../lib/pdf'
+import { khmerOcr, type OcrStatus } from '../ai/khmerOcr'
 import { ingestDocument, type IngestProgress } from '../rag/ingest'
 import {
   classifyDoc,
@@ -19,6 +20,7 @@ export function LibraryView() {
   const [text, setText] = useState('')
   const [progress, setProgress] = useState<IngestProgress | null>(null)
   const [reading, setReading] = useState<string | null>(null)
+  const [ocr, setOcr] = useState<{ status: OcrStatus; progress?: number; line?: string } | null>(null)
   const [error, setError] = useState('')
 
   const refresh = () => {
@@ -76,7 +78,34 @@ export function LibraryView() {
     if (inputs.length) void feed(inputs)
   }
 
-  const busy = progress !== null || reading !== null
+  // Scan a photo / image → Khmer OCR. The text lands in the compose box for a
+  // human glance before it's fed (OCR is never perfect).
+  const onScanImage = async (file: File | null) => {
+    if (!file) return
+    setError('')
+    setOcr({ status: khmerOcr.ready ? 'ready' : 'downloading' })
+    try {
+      const recognized = await khmerOcr.recognizeImage(file, (p) => {
+        setOcr({
+          status: p.status,
+          progress: p.progress,
+          line: p.line ? `${p.line.done}/${p.line.total}` : undefined,
+        })
+      })
+      if (!recognized.trim()) {
+        setError(t('libraryOcrEmpty'))
+      } else {
+        setText((prev) => (prev.trim() ? `${prev}\n\n${recognized}` : recognized))
+        if (!title) setTitle(titleFromFilename(file.name))
+      }
+    } catch {
+      setError(t('errorGeneric'))
+    } finally {
+      setOcr(null)
+    }
+  }
+
+  const busy = progress !== null || reading !== null || ocr !== null
   const embedderLoading = status.embedder.status === 'loading'
 
   return (
@@ -118,8 +147,44 @@ export function LibraryView() {
               }}
             />
           </label>
+          <label className="filepick">
+            {t('libraryScanImage')}
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              hidden
+              disabled={busy}
+              onChange={(e) => {
+                void onScanImage(e.target.files?.[0] ?? null)
+                e.target.value = ''
+              }}
+            />
+          </label>
         </div>
         <p className="hint">{t('libraryFileTypes')}</p>
+        {ocr && (
+          <div className="notice">
+            {ocr.status === 'downloading' && (
+              <>
+                <progress value={ocr.progress ?? 0} max={1} />
+                <p className="hint">
+                  {t('libraryOcrDownloading')} {Math.round((ocr.progress ?? 0) * 100)}%
+                </p>
+              </>
+            )}
+            {ocr.status === 'loading' && <p className="hint">{t('libraryOcrPreparing')}</p>}
+            {ocr.status === 'ready' && (
+              <>
+                <progress />
+                <p className="hint">
+                  {t('libraryOcrReading')}
+                  {ocr.line ? ` ${ocr.line}` : ''}
+                </p>
+              </>
+            )}
+          </div>
+        )}
         {reading && (
           <div className="notice">
             <progress />

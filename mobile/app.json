@@ -31,6 +31,13 @@
           "forceCxx20": true,
           "enableOpenCL": false
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "iAny reads Khmer text from the photos you choose.",
+          "cameraPermission": "iAny scans Khmer text from the photos you take."
+        }
       ]
     ],
     "extra": {

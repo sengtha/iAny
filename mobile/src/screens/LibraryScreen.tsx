@@ -10,8 +10,10 @@ import {
   TextInput,
   View,
 } from 'react-native'
+import * as ImagePicker from 'expo-image-picker'
 import { addDocument, deleteDocument, listDocuments, type DocSummary } from '../db/database'
 import { embedder, type EmbedderProgress } from '../ai/embedder'
+import { khmerOcr, type OcrProgress } from '../ai/khmerocr'
 import { pickAndReadDocuments } from '../lib/importFile'
 import { C, shadow } from '../theme'
 
@@ -27,6 +29,7 @@ export function LibraryScreen() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [emb, setEmb] = useState<EmbedderProgress>({ status: embedder.status })
+  const [ocr, setOcr] = useState<OcrProgress | null>(null)
 
   const refresh = () => {
     void listDocuments().then(setDocs)
@@ -82,6 +85,37 @@ export function LibraryScreen() {
     }
   }
 
+  const onScanImage = async () => {
+    if (busy || ocr) return
+    setError('')
+    try {
+      const picked = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 1,
+      })
+      if (picked.canceled) return
+      const asset = picked.assets[0]
+      setOcr({ status: khmerOcr.ready ? 'reading' : 'downloading' })
+      const text = await khmerOcr.recognizeImage(
+        asset.uri,
+        asset.width ?? 0,
+        asset.height ?? 0,
+        setOcr,
+      )
+      if (text.trim()) {
+        // OCR output needs a human glance before it's fed — drop it into the box.
+        setContent((prev) => (prev.trim() ? `${prev}\n\n${text}` : text))
+        if (!title) setTitle('Scan')
+      } else {
+        setError('No text found. Try a clearer, straight-on photo.')
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setOcr(null)
+    }
+  }
+
   const onDelete = async (id: string) => {
     await deleteDocument(id)
     refresh()
@@ -128,14 +162,36 @@ export function LibraryScreen() {
               )}
             </Pressable>
             <Pressable
-              style={[styles.btnOutline, busy && styles.btnDimOutline]}
+              style={[styles.btnOutline, (busy || !!ocr) && styles.btnDimOutline]}
               onPress={onImportFile}
-              disabled={busy}
+              disabled={busy || !!ocr}
             >
               <Text style={styles.btnOutlineText}>📎 Import file</Text>
             </Pressable>
+            <Pressable
+              style={[styles.btnOutline, (busy || !!ocr) && styles.btnDimOutline]}
+              onPress={onScanImage}
+              disabled={busy || !!ocr}
+            >
+              <Text style={styles.btnOutlineText}>📷 Scan</Text>
+            </Pressable>
           </View>
-          <Text style={styles.typesHint}>PDF, TXT, Markdown, HTML, CSV, JSON, RTF & more</Text>
+          <Text style={styles.typesHint}>PDF, TXT, Markdown, HTML, CSV, JSON, RTF — or 📷 scan Khmer text</Text>
+          {ocr ? (
+            <View style={styles.ocrRow}>
+              <ActivityIndicator size="small" color={C.accent} />
+              <Text style={styles.searchHint}>
+                {'  '}
+                {ocr.status === 'downloading'
+                  ? `Downloading OCR… ${Math.round((ocr.progress ?? 0) * 100)}%`
+                  : ocr.status === 'loading'
+                    ? 'Preparing OCR…'
+                    : ocr.line
+                      ? `Reading… ${ocr.line.done}/${ocr.line.total}`
+                      : 'Reading…'}
+              </Text>
+            </View>
+          ) : null}
           {error ? <Text style={styles.err}>⚠️ {error}</Text> : null}
         </View>
 
@@ -232,6 +288,7 @@ const styles = StyleSheet.create({
   btnDimOutline: { opacity: 0.5 },
   btnOutlineText: { color: C.accentText, fontWeight: '700', fontSize: 14 },
   typesHint: { color: C.muted, fontSize: 12, marginTop: 8 },
+  ocrRow: { flexDirection: 'row', alignItems: 'center', marginTop: 10 },
   err: { color: C.danger, fontSize: 13, marginTop: 10 },
   searchRow: { marginTop: 12, marginBottom: 4 },
   searchOn: { color: C.green, fontWeight: '700', fontSize: 13 },
