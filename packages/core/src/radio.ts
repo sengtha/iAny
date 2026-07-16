@@ -82,6 +82,19 @@ export interface RadioTts {
   stop(): Promise<void> | void
 }
 
+/**
+ * Background loop music for the gaps between bulletins. The player calls
+ * `play()` when it enters the `waiting` state (no fresh news) and `stop()` the
+ * moment news arrives or playback ends — so the two never overlap. Platform I/O
+ * (Web Audio / expo-av) is injected, like RadioTts. `play()` must be idempotent:
+ * it's only called on the transition INTO waiting, but should no-op if already
+ * playing.
+ */
+export interface RadioWaitingMusic {
+  play(): Promise<void> | void
+  stop(): Promise<void> | void
+}
+
 export type RadioState = 'idle' | 'loading' | 'playing' | 'paused' | 'waiting' | 'error'
 
 const errMsg = (e: unknown): string => (e instanceof Error ? e.message : String(e))
@@ -102,15 +115,19 @@ export class RadioPlayer {
   private readonly tts: RadioTts
   private readonly fetchFeed: (since: string) => Promise<RadioFeed>
   private readonly pollMs: number
+  private readonly music: RadioWaitingMusic | null
 
   constructor(opts: {
     tts: RadioTts
     fetchFeed: (since: string) => Promise<RadioFeed>
     pollMs?: number
+    /** Optional loop music for the `waiting` gaps between bulletins. */
+    music?: RadioWaitingMusic
   }) {
     this.tts = opts.tts
     this.fetchFeed = opts.fetchFeed
     this.pollMs = opts.pollMs ?? 20000
+    this.music = opts.music ?? null
   }
 
   /** Subscribe for re-render; returns an unsubscribe. Bound for useSyncExternalStore. */
@@ -122,8 +139,18 @@ export class RadioPlayer {
     this.listeners.forEach((f) => f())
   }
   private set(state: RadioState, error = '') {
+    const wasWaiting = this.state === 'waiting'
     this.state = state
     this.error = error
+    // Loop music fills the `waiting` gaps only. Start it once on entering
+    // waiting; stop the instant we leave (news playing, paused, stopped, error).
+    if (this.music) {
+      if (state === 'waiting') {
+        if (!wasWaiting) void this.music.play()
+      } else if (wasWaiting) {
+        void this.music.stop()
+      }
+    }
     this.emit()
   }
 

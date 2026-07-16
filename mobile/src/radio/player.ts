@@ -1,6 +1,7 @@
 import { RadioPlayer, type RadioFeed } from '@iany/core'
 import { RADIO_API } from '../domain/types'
 import { tts } from '../ai/tts'
+import { waitingMusic } from '../ai/waitingMusic'
 
 /**
  * The mobile radio player = core's shared RadioPlayer wired to the native TTS
@@ -14,4 +15,4 @@ const fetchFeed = async (since: string): Promise<RadioFeed> => {
   return (await res.json()) as RadioFeed
 }
 
-export const radio = new RadioPlayer({ tts, fetchFeed })
+export const radio = new RadioPlayer({ tts, fetchFeed, music: waitingMusic })

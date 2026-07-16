@@ -59,18 +59,30 @@ export default defineConfig({
         // instead: each device only ever needs the one matching its
         // capabilities (WebGPU vs CPU), so precaching all of them would
         // waste ~75 MB per install. Same for the Vite-bundled copy.
-        globIgnores: ['ort/**', '**/ort-wasm*', 'tess/**'],
+        globIgnores: ['ort/**', '**/ort-wasm*'],
         maximumFileSizeToCacheInBytes: 30 * 1024 * 1024,
         navigateFallback: 'index.html',
         runtimeCaching: [
           {
-            urlPattern: ({ url }) =>
-              url.pathname.startsWith('/ort/') || url.pathname.startsWith('/tess/'),
+            urlPattern: ({ url }) => url.pathname.startsWith('/ort/'),
             handler: 'CacheFirst',
             options: {
               cacheName: 'runtime-engines',
               expiration: { maxEntries: 24 },
               cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            // Radio loop music (.mp3) and the pdf.js worker (.mjs) are bundled
+            // but not precached — cache them the first time they're used, so
+            // installs stay lean but the features work offline afterward.
+            urlPattern: ({ url }) => /\.(mp3|mjs)$/.test(url.pathname),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'runtime-media',
+              expiration: { maxEntries: 20 },
+              cacheableResponse: { statuses: [0, 200] },
+              rangeRequests: true,
             },
           },
         ],

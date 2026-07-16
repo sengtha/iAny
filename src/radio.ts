@@ -1,5 +1,6 @@
 import { RadioPlayer, type RadioFeed } from '@iany/core'
 import { radioVoice } from './ai/radioVoice'
+import { waitingMusic } from './ai/waitingMusic'
 
 /**
  * PWA radio = core's shared RadioPlayer wired to radioVoice (the trained iAny
@@ -12,4 +13,4 @@ const fetchFeed = async (since: string): Promise<RadioFeed> => {
   return (await res.json()) as RadioFeed
 }
 
-export const radio = new RadioPlayer({ tts: radioVoice, fetchFeed })
+export const radio = new RadioPlayer({ tts: radioVoice, fetchFeed, music: waitingMusic })
