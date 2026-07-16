@@ -69,13 +69,12 @@ export const GEN_MODEL_FILES = [
 // v2: continued training (~200k steps, more data) + length_scale 1.15 (slower,
 // clearer). Same ONNX interface as v1, so no app code changes beyond the repo.
 export const TTS_MODEL_REPO = 'sengtha/khmer-tts-female-v2'
-// Filename is a CACHE-BUST KEY. The voice is cached by filename in the app's
-// files dir, so re-uploading the same name would keep serving the stale copy
-// (and users can't always reach the Models row to delete it). The corrected
-// voice (length_scale 1.15 baked in — the original export shipped 1.0, which
-// read too fast) is published under a NEW name, so a fresh build auto-downloads
-// it with no manual delete/redownload. Bump this whenever the onnx changes.
-export const TTS_ONNX_FILE = 'khmer_tts_ls115.onnx'
+// Filename is a CACHE-BUST KEY. The voice is cached by filename, so any change
+// to the onnx must use a NEW name to force a fresh download (users can't always
+// reach the Models row to delete the old file). `ls100` = length_scale 1.0
+// baked in (the natural/original speed; we tried 1.15 = slower but reverted).
+// Bump this whenever the onnx changes.
+export const TTS_ONNX_FILE = 'khmer_tts_ls100.onnx'
 export const TTS_META_FILE = 'tts_meta.json'
 
 /** iAny model mirror (Cloudflare worker pull-through cache). */
