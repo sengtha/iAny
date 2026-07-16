@@ -1,12 +1,13 @@
-import { useSyncExternalStore } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { useEffect, useRef, useSyncExternalStore } from 'react'
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native'
 import { radio } from './radio/player'
 
 /**
  * 📻 iAny Radio — an immersive full-screen player that reads the news feed aloud
  * with the on-device Khmer TTS, always attributing the outlet. Thin view over
- * the RadioPlayer singleton (subscribed via useSyncExternalStore). Styled to
- * match the PWA player (deep-indigo stage, monogram disc, transport controls).
+ * the RadioPlayer singleton (subscribed via useSyncExternalStore). Matches the
+ * PWA player: deep-indigo stage, spinning monogram disc, animated equalizer,
+ * blinking ON AIR badge, circular transport controls.
  */
 export function RadioScreen({ onClose }: { onClose: () => void }) {
   useSyncExternalStore(
@@ -16,6 +17,52 @@ export function RadioScreen({ onClose }: { onClose: () => void }) {
   const { state, current, error } = radio
   const active = state === 'playing' || state === 'waiting' || state === 'loading'
   const playing = state === 'playing'
+
+  // Animations (mirror the PWA CSS): disc spin, equalizer bounce, ON AIR blink.
+  const spin = useRef(new Animated.Value(0)).current
+  const dot = useRef(new Animated.Value(1)).current
+  const bars = useRef(EQ_MAX.map(() => new Animated.Value(7))).current
+
+  useEffect(() => {
+    if (!playing) {
+      spin.stopAnimation()
+      spin.setValue(0)
+      dot.stopAnimation()
+      dot.setValue(1)
+      bars.forEach((b) => {
+        b.stopAnimation()
+        b.setValue(7)
+      })
+      return
+    }
+    const spinLoop = Animated.loop(
+      Animated.timing(spin, { toValue: 1, duration: 8000, easing: Easing.linear, useNativeDriver: true }),
+    )
+    const dotLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(dot, { toValue: 0.2, duration: 500, useNativeDriver: true }),
+        Animated.timing(dot, { toValue: 1, duration: 500, useNativeDriver: true }),
+      ]),
+    )
+    const barLoops = bars.map((b, i) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(b, { toValue: EQ_MAX[i], duration: 280 + i * 55, useNativeDriver: false }),
+          Animated.timing(b, { toValue: 7, duration: 280 + i * 55, useNativeDriver: false }),
+        ]),
+      ),
+    )
+    spinLoop.start()
+    dotLoop.start()
+    barLoops.forEach((l) => l.start())
+    return () => {
+      spinLoop.stop()
+      dotLoop.stop()
+      barLoops.forEach((l) => l.stop())
+    }
+  }, [playing, spin, dot, bars])
+
+  const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] })
 
   const status =
     state === 'loading'
@@ -38,7 +85,9 @@ export function RadioScreen({ onClose }: { onClose: () => void }) {
         <Text style={styles.word}>📻 iAny Radio</Text>
         <View style={styles.topRight}>
           <View style={[styles.live, playing && styles.liveOn]}>
-            <View style={[styles.dot, playing && styles.dotOn]} />
+            <Animated.View
+              style={[styles.dot, playing && styles.dotOn, playing && { opacity: dot }]}
+            />
             <Text style={[styles.liveText, playing && styles.liveTextOn]}>{liveLabel}</Text>
           </View>
           <Pressable onPress={onClose} hitSlop={10}>
@@ -48,14 +97,15 @@ export function RadioScreen({ onClose }: { onClose: () => void }) {
       </View>
 
       <View style={styles.stage}>
-        <View style={styles.disc}>
+        <View style={styles.discWrap}>
+          <Animated.View style={[styles.disc, { transform: [{ rotate }] }]} />
           <View style={styles.discFace}>
             <Text style={styles.discText}>{current ? initials(current.outletName) : '📻'}</Text>
           </View>
         </View>
         <View style={styles.eq}>
-          {EQ_HEIGHTS.map((h, i) => (
-            <View key={i} style={[styles.eqBar, { height: playing ? h : 7 }]} />
+          {bars.map((h, i) => (
+            <Animated.View key={i} style={[styles.eqBar, { height: h }]} />
           ))}
         </View>
       </View>
@@ -113,7 +163,7 @@ function initials(name: string): string {
   return Array.from(name.trim())[0] ?? '📻'
 }
 
-const EQ_HEIGHTS = [14, 24, 10, 20, 12]
+const EQ_MAX = [16, 26, 12, 22, 14]
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#1e1b4b', padding: 20, alignItems: 'center' },
@@ -143,15 +193,18 @@ const styles = StyleSheet.create({
   close: { color: '#c7d2fe', fontSize: 18, fontWeight: '700' },
 
   stage: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 18, width: '100%' },
+  discWrap: { width: 176, height: 176, alignItems: 'center', justifyContent: 'center' },
   disc: {
+    position: 'absolute',
     width: 176,
     height: 176,
     borderRadius: 88,
-    alignItems: 'center',
-    justifyContent: 'center',
     backgroundColor: '#4f46e5',
+    borderTopColor: '#a5b4fc',
+    borderRightColor: '#312e81',
+    borderBottomColor: '#312e81',
+    borderLeftColor: '#312e81',
     borderWidth: 10,
-    borderColor: '#312e81',
     shadowColor: '#312e81',
     shadowOpacity: 0.6,
     shadowRadius: 30,
