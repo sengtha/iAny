@@ -28,9 +28,7 @@ const ALLOWED_PREFIXES = [
   'onnx-community/embeddinggemma-300m-ONNX/',
   'onnx-community/gemma-4-E2B-it-ONNX/',
   'onnx-community/gemma-3-1b-it-ONNX-GQA/',
-  'onnx-community/gemma-3-270m-it-ONNX/',
   'onnx-community/gemma-4-E4B-it-ONNX/',
-  'onnx-community/Qwen3-0.6B-ONNX/',
   'sengtha/iany-khmer-tiny-v1-ONNX/',
   // Native app (llama.rn) embedding model — GGUF served through this mirror
   // so devices in regions that can't reach huggingface.co still get it.
@@ -56,8 +54,6 @@ const ALLOWED_PREFIXES = [
   // Fine-tuned on iAny's Khmer corpus (CPT on FineWeb-2 + ParaCrawl) for better
   // Khmer — same 32k vocab so it still fits the S10.
   'sengtha/Qwen3-0.6B-khm-ft-Q8_0-GGUF/',
-  // + Q&A SFT (Stage B) on sengtha/khmer-qa -> answers correctly. Current model.
-  'sengtha/Qwen3-0.6B-khm-ft2-Q8_0-GGUF/',
   // ft3: retrained on the richer khmer-qa (fuller answers). Q8 + Q4. Pre-listed
   // so it's servable the moment training finishes — pick it in the Models screen.
   'sengtha/Qwen3-0.6B-khm-ft3-Q8_0-GGUF/',
