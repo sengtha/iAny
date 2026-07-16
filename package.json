@@ -18,9 +18,9 @@
     "@huggingface/transformers": "^4.2.0",
     "dompurify": "^3.4.11",
     "marked": "^18.0.6",
+    "pdfjs-dist": "^4.10.38",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "tesseract.js": "^7.0.0"
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260702.1",

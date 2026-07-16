@@ -12,6 +12,7 @@ import {
 } from 'react-native'
 import { addDocument, deleteDocument, listDocuments, type DocSummary } from '../db/database'
 import { embedder, type EmbedderProgress } from '../ai/embedder'
+import { pickAndReadDocuments } from '../lib/importFile'
 import { C, shadow } from '../theme'
 
 /**
@@ -58,6 +59,29 @@ export function LibraryScreen() {
     }
   }
 
+  const onImportFile = async () => {
+    if (busy) return
+    setError('')
+    try {
+      const res = await pickAndReadDocuments()
+      if (!res) return // cancelled
+      setBusy(true)
+      for (const doc of res.docs) {
+        await addDocument({ title: doc.title, content: doc.content }, activeEmbedder())
+      }
+      refresh()
+      const notes: string[] = []
+      if (res.pdfSkipped.length)
+        notes.push('PDFs import on the web app — share the knowledge pack to this phone.')
+      if (res.skipped.length) notes.push(`Skipped (unsupported): ${res.skipped.join(', ')}`)
+      if (notes.length) setError(notes.join('\n'))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const onDelete = async (id: string) => {
     await deleteDocument(id)
     refresh()
@@ -91,17 +115,27 @@ export function LibraryScreen() {
             multiline
             editable={!busy}
           />
-          <Pressable
-            style={[styles.btn, (busy || !content.trim()) && styles.btnDim]}
-            onPress={onAdd}
-            disabled={busy || !content.trim()}
-          >
-            {busy ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <Text style={styles.btnText}>Add</Text>
-            )}
-          </Pressable>
+          <View style={styles.btnRow}>
+            <Pressable
+              style={[styles.btn, styles.flex, (busy || !content.trim()) && styles.btnDim]}
+              onPress={onAdd}
+              disabled={busy || !content.trim()}
+            >
+              {busy ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={styles.btnText}>Add</Text>
+              )}
+            </Pressable>
+            <Pressable
+              style={[styles.btnOutline, busy && styles.btnDimOutline]}
+              onPress={onImportFile}
+              disabled={busy}
+            >
+              <Text style={styles.btnOutlineText}>📎 Import file</Text>
+            </Pressable>
+          </View>
+          <Text style={styles.typesHint}>TXT, Markdown, HTML, CSV, JSON, RTF & more</Text>
           {error ? <Text style={styles.err}>⚠️ {error}</Text> : null}
         </View>
 
@@ -184,6 +218,20 @@ const styles = StyleSheet.create({
   },
   btnDim: { backgroundColor: '#a5b4fc' },
   btnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  btnRow: { flexDirection: 'row', gap: 8 },
+  btnOutline: {
+    borderWidth: 1,
+    borderColor: C.accentBorder,
+    backgroundColor: C.accentSoft,
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnDimOutline: { opacity: 0.5 },
+  btnOutlineText: { color: C.accentText, fontWeight: '700', fontSize: 14 },
+  typesHint: { color: C.muted, fontSize: 12, marginTop: 8 },
   err: { color: C.danger, fontSize: 13, marginTop: 10 },
   searchRow: { marginTop: 12, marginBottom: 4 },
   searchOn: { color: C.green, fontWeight: '700', fontSize: 13 },

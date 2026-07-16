@@ -2,8 +2,7 @@
 // (bundlers can't statically discover them; client networks often can't
 // reach CDNs):
 // - onnxruntime-web WASM variants -> public/ort/   (see src/ai/worker.ts)
-// - tesseract.js worker + core    -> public/tess/  (see src/lib/ocr.ts)
-// Both directories are gitignored; this runs automatically before dev/build.
+// This runs automatically before dev/build; public/ort is gitignored.
 import { copyFileSync, mkdirSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -22,5 +21,3 @@ copyMatching(
   'public/ort',
   /^ort-wasm-simd-threaded.*\.(wasm|mjs)$/,
 )
-copyMatching('node_modules/tesseract.js/dist', 'public/tess', /^worker\.min\.js$/)
-copyMatching('node_modules/tesseract.js-core', 'public/tess', /^tesseract-core.*\.(js|wasm)$/)

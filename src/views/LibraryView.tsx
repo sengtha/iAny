@@ -2,20 +2,23 @@ import { useEffect, useState } from 'react'
 import { useModelStatus } from '../hooks/useModelStatus'
 import { useI18n } from '../i18n'
 import { deleteDocument, listDocuments, type DocumentSummary } from '../db/documents'
-import { ocrImage, type OcrLang } from '../lib/ocr'
+import { extractPdfText } from '../lib/pdf'
 import { ingestDocument, type IngestProgress } from '../rag/ingest'
+import {
+  classifyDoc,
+  extractTextFromString,
+  fileAcceptAttribute,
+  titleFromFilename,
+} from '@iany/core'
 
 export function LibraryView() {
-  const { t, lang } = useI18n()
+  const { t } = useI18n()
   const status = useModelStatus()
   const [docs, setDocs] = useState<DocumentSummary[]>([])
   const [title, setTitle] = useState('')
   const [text, setText] = useState('')
   const [progress, setProgress] = useState<IngestProgress | null>(null)
-  const [ocr, setOcr] = useState<{ progress: number; stage: string } | null>(null)
-  // Khmer scans must run without English: the Latin recognizer misreads
-  // Khmer glyphs and pollutes the output. Default follows the UI language.
-  const [ocrLang, setOcrLang] = useState<OcrLang>(lang === 'km' ? 'khm' : 'eng')
+  const [reading, setReading] = useState<string | null>(null)
   const [error, setError] = useState('')
 
   const refresh = () => {
@@ -39,41 +42,41 @@ export function LibraryView() {
     }
   }
 
+  // Read each picked file into text according to its type: plain/markup/RTF are
+  // decoded here; PDFs go through pdf.js. Unsupported types are skipped with a
+  // note instead of failing the whole batch.
   const onFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return
-    const inputs = await Promise.all(
-      Array.from(files).map(async (f) => ({
-        title: f.name.replace(/\.(txt|md|markdown)$/i, ''),
-        content: await f.text(),
-        sourceType: 'file',
-      })),
-    )
-    void feed(inputs)
-  }
-
-  const onPhoto = async (file: File | null) => {
-    if (!file) return
     setError('')
-    setOcr({ progress: 0, stage: 'loading' })
+    const inputs: { title: string; content: string; sourceType?: string }[] = []
+    const skipped: string[] = []
     try {
-      const text = await ocrImage(file, ocrLang, (p, stage) => setOcr({ progress: p, stage }))
-      if (!text) {
-        setError(t('libraryOcrEmpty'))
-      } else {
-        // Into the compose box for review — OCR output needs a human glance
-        // before it becomes knowledge.
-        setText((prev) => (prev.trim() ? `${prev}\n\n${text}` : text))
-        if (!title) setTitle(file.name.replace(/\.[a-z0-9]+$/i, ''))
+      for (const f of Array.from(files)) {
+        const kind = classifyDoc(f.name, f.type)
+        if (kind === 'pdf') {
+          setReading(f.name)
+          const content = await extractPdfText(f)
+          if (content.trim()) inputs.push({ title: titleFromFilename(f.name), content, sourceType: 'pdf' })
+          else skipped.push(f.name)
+        } else if (kind === 'text') {
+          const content = extractTextFromString(f.name, await f.text())
+          if (content.trim()) inputs.push({ title: titleFromFilename(f.name), content, sourceType: 'file' })
+          else skipped.push(f.name)
+        } else {
+          skipped.push(f.name)
+        }
       }
-    } catch (e) {
-      console.error('[iAny] ocr failed', e)
+    } catch {
       setError(t('errorGeneric'))
-    } finally {
-      setOcr(null)
+      setReading(null)
+      return
     }
+    setReading(null)
+    if (skipped.length) setError(t('libraryFileSkipped').replace('{files}', skipped.join(', ')))
+    if (inputs.length) void feed(inputs)
   }
 
-  const busy = progress !== null || ocr !== null
+  const busy = progress !== null || reading !== null
   const embedderLoading = status.embedder.status === 'loading'
 
   return (
@@ -105,7 +108,7 @@ export function LibraryView() {
             {t('libraryAddFile')}
             <input
               type="file"
-              accept=".txt,.md,.markdown,text/plain,text/markdown"
+              accept={fileAcceptAttribute()}
               multiple
               hidden
               disabled={busy}
@@ -115,45 +118,13 @@ export function LibraryView() {
               }}
             />
           </label>
-          <label className="filepick">
-            📷 {t('libraryAddPhoto')}
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              hidden
-              disabled={busy}
-              onChange={(e) => {
-                void onPhoto(e.target.files?.[0] ?? null)
-                e.target.value = ''
-              }}
-            />
-          </label>
         </div>
-        <div className="row ocr-langs">
-          <span className="hint">{t('libraryOcrLang')}</span>
-          {(
-            [
-              { value: 'khm', label: 'ខ្មែរ' },
-              { value: 'eng', label: 'English' },
-              { value: 'khm+eng', label: t('libraryOcrLangBoth') },
-            ] as const
-          ).map((o) => (
-            <button
-              key={o.value}
-              className={ocrLang === o.value ? 'primary chip' : 'chip'}
-              disabled={busy}
-              onClick={() => setOcrLang(o.value)}
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
-        {ocr && (
+        <p className="hint">{t('libraryFileTypes')}</p>
+        {reading && (
           <div className="notice">
-            <progress value={ocr.progress} max={1} />
+            <progress />
             <p className="hint">
-              {ocr.stage === 'recognizing' ? t('libraryOcrReading') : t('libraryOcrPreparing')}
+              {t('libraryReadingFile')} {reading}
             </p>
           </div>
         )}
