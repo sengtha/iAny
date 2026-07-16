@@ -81,6 +81,49 @@ export function intToKhmer(n: number): string {
 }
 
 /**
+ * Split text into short chunks for streaming TTS. Sentence boundaries (។ ! ? .)
+ * are hard breaks; any sentence longer than `maxChars` is further split at word
+ * spaces (present after segmentKhmer) so each synth stays fast and audio starts
+ * quickly. A single space-less run longer than the limit (unsegmented text) is
+ * hard-split by characters as a last resort, so a chunk is never huge — that's
+ * what made a long news body appear to hang.
+ */
+export function splitForSpeech(text: string, maxChars = 55): string[] {
+  const chunks: string[] = []
+  const push = (s: string) => {
+    const t = s.trim()
+    if (t) chunks.push(t)
+  }
+  for (const sentence of splitSentences(text)) {
+    if (sentence.length <= maxChars) {
+      push(sentence)
+      continue
+    }
+    let cur = ''
+    for (const word of sentence.split(/\s+/).filter(Boolean)) {
+      if (word.length > maxChars) {
+        // No space to break on (unsegmented) — hard-split by characters.
+        if (cur) {
+          push(cur)
+          cur = ''
+        }
+        for (let i = 0; i < word.length; i += maxChars) push(word.slice(i, i + maxChars))
+        continue
+      }
+      const cand = cur ? `${cur} ${word}` : word
+      if (cur && cand.length > maxChars) {
+        push(cur)
+        cur = word
+      } else {
+        cur = cand
+      }
+    }
+    push(cur)
+  }
+  return chunks
+}
+
+/**
  * Insert word boundaries into Khmer text (which is written without spaces).
  * The TTS voice was trained on text WITH spaces, so segmenting into words makes
  * it read with correct pronunciation + prosody. Uses the platform's ICU word

@@ -1,4 +1,4 @@
-import { normalizeNumbers, splitSentences, type RadioTts } from '@iany/core'
+import { normalizeNumbers, splitForSpeech, type RadioTts } from '@iany/core'
 
 /**
  * The trained iAny Khmer voice (VITS → ONNX) in the browser — the SAME model
@@ -172,7 +172,7 @@ class KhmerOnnxTts implements RadioTts {
     const myId = ++this.speakId
     if (!this.ctx) this.ctx = new AudioContext()
     await this.ctx.resume().catch(() => {})
-    const sentences = splitSentences(text)
+    const sentences = splitForSpeech(text)
       .map((s) => this.textToIds(s))
       .filter((a) => a.length > 0)
     if (sentences.length === 0) return

@@ -1,7 +1,7 @@
 import * as FileSystem from 'expo-file-system'
 import { Audio } from 'expo-av'
 import { InferenceSession, Tensor } from 'onnxruntime-react-native'
-import { normalizeNumbers, splitSentences } from '@iany/core'
+import { normalizeNumbers, splitForSpeech } from '@iany/core'
 import { TTS_META_FILE, TTS_MODEL_REPO, TTS_ONNX_FILE } from '../domain/types'
 import { ensureFile, errStr, fetchModelJson } from './modelFile'
 
@@ -133,7 +133,7 @@ class KhmerTts {
     if (!this.session || !this.meta) throw new Error('TTS not ready')
     const myId = ++this.speakId
     await this.stop()
-    const sentences = splitSentences(text)
+    const sentences = splitForSpeech(text)
       .map((s) => this.textToIds(s))
       .filter((ids) => ids.length > 0)
     if (sentences.length === 0) return
