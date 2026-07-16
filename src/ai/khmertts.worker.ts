@@ -16,12 +16,7 @@ self.onmessage = async (e: MessageEvent) => {
   try {
     if (msg.type === 'init') {
       ort.env.wasm.wasmPaths = `${self.location.origin}/ort/`
-      // Multi-threaded wasm is ~3× faster, but needs SharedArrayBuffer, which
-      // needs cross-origin isolation (public/_headers). Fall back to 1 thread
-      // when isolation isn't active so it still works everywhere.
-      const cores = (self as unknown as { navigator?: { hardwareConcurrency?: number } }).navigator
-        ?.hardwareConcurrency
-      ort.env.wasm.numThreads = self.crossOriginIsolated ? Math.min(4, cores || 4) : 1
+      ort.env.wasm.numThreads = 1
       session = await ort.InferenceSession.create(new Uint8Array(msg.bytes), {
         executionProviders: ['wasm'],
       })
