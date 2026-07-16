@@ -18,7 +18,7 @@ import { radio } from './radio/player'
  * PWA player: deep-indigo stage, spinning monogram disc, animated equalizer,
  * blinking ON AIR badge, circular transport controls.
  */
-export function RadioScreen({ onClose }: { onClose: () => void }) {
+export function RadioScreen({ onClose }: { onClose?: () => void }) {
   useSyncExternalStore(
     radio.subscribe,
     () => `${radio.state}|${radio.current?.id ?? ''}|${radio.error}|${radio.todayItems.length}`,
@@ -105,9 +105,11 @@ export function RadioScreen({ onClose }: { onClose: () => void }) {
             />
             <Text style={[styles.liveText, playing && styles.liveTextOn]}>{liveLabel}</Text>
           </View>
-          <Pressable onPress={onClose} hitSlop={10}>
-            <Text style={styles.close}>✕</Text>
-          </Pressable>
+          {onClose ? (
+            <Pressable onPress={onClose} hitSlop={10}>
+              <Text style={styles.close}>✕</Text>
+            </Pressable>
+          ) : null}
         </View>
       </View>
 

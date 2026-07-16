@@ -24,7 +24,7 @@ import { tts } from './ai/tts'
  * file to the OS sheet (Bluetooth / Nearby / Quick Share) so a second phone can
  * receive it and Import it — no re-download.
  */
-export function ModelsScreen({ onClose }: { onClose: () => void }) {
+export function ModelsScreen({ onClose }: { onClose?: () => void }) {
   const [states, setStates] = useState<Record<string, ModelState>>({})
   const [activeGen, setActiveGen] = useState('')
   const [progress, setProgress] = useState<Record<string, number>>({})
@@ -93,9 +93,11 @@ export function ModelsScreen({ onClose }: { onClose: () => void }) {
     <View style={styles.card}>
       <View style={styles.header}>
         <Text style={styles.title}>⚙ Models</Text>
-        <Pressable onPress={onClose} hitSlop={8}>
-          <Text style={styles.close}>✕</Text>
-        </Pressable>
+        {onClose ? (
+          <Pressable onPress={onClose} hitSlop={8}>
+            <Text style={styles.close}>✕</Text>
+          </Pressable>
+        ) : null}
       </View>
       <Text style={styles.hint}>
         Download once, then Share phone-to-phone (Bluetooth / Nearby) so others skip the download.

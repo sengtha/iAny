@@ -17,7 +17,13 @@ import { exportAndSharePack, importPackFromFile } from './packs/packs'
  * (Bluetooth / Nearby / Quick Share); Import loads a received pack. Same
  * iany-pack/1 format as the PWA.
  */
-export function PacksScreen({ onClose, onChanged }: { onClose: () => void; onChanged: () => void }) {
+export function PacksScreen({
+  onClose,
+  onChanged,
+}: {
+  onClose?: () => void
+  onChanged: () => void
+}) {
   const [name, setName] = useState('My knowledge')
   const [packs, setPacks] = useState<PackSummary[]>([])
   const [busy, setBusy] = useState<string | null>(null)
@@ -76,9 +82,11 @@ export function PacksScreen({ onClose, onChanged }: { onClose: () => void; onCha
     <View style={styles.card}>
       <View style={styles.header}>
         <Text style={styles.title}>📦 Knowledge packs</Text>
-        <Pressable onPress={onClose} hitSlop={8}>
-          <Text style={styles.close}>✕</Text>
-        </Pressable>
+        {onClose ? (
+          <Pressable onPress={onClose} hitSlop={8}>
+            <Text style={styles.close}>✕</Text>
+          </Pressable>
+        ) : null}
       </View>
       <Text style={styles.hint}>
         Bundle your notes (with embeddings) into one file and share it phone-to-phone — the other
