@@ -1,6 +1,7 @@
 import * as DocumentPicker from 'expo-document-picker'
 import * as FileSystem from 'expo-file-system'
 import { classifyDoc, extractTextFromString, titleFromFilename } from '@iany/core'
+import { extractPdfText, pdfSupported } from './pdf'
 
 export interface ImportedDoc {
   title: string
@@ -12,18 +13,15 @@ export interface ImportResult {
   docs: ImportedDoc[]
   /** Names we couldn't read (unsupported type, or empty after extraction). */
   skipped: string[]
-  /** PDFs, called out separately — supported on the web app, not on-device yet. */
-  pdfSkipped: string[]
+  /** PDFs skipped only because this build lacks the native extractor (Expo Go). */
+  pdfUnavailable: string[]
 }
 
 /**
  * Open the system file picker and turn each chosen file into ingestable text.
  * Text-family files (txt/md/csv/json/html/xml/rtf/…) are decoded via the shared
- * core extractor, so the PWA and mobile treat them identically.
- *
- * PDFs are reported separately: reliable offline PDF text extraction needs a
- * native module we don't ship yet, so on mobile the supported route is to
- * import the PDF on the web app and share the resulting knowledge pack here.
+ * core extractor, so the PWA and mobile treat them identically; PDFs go through
+ * the native text-layer extractor (Apache PDFBox / PDFKit), fully offline.
  */
 export async function pickAndReadDocuments(): Promise<ImportResult | null> {
   const res = await DocumentPicker.getDocumentAsync({
@@ -36,30 +34,35 @@ export async function pickAndReadDocuments(): Promise<ImportResult | null> {
 
   const docs: ImportedDoc[] = []
   const skipped: string[] = []
-  const pdfSkipped: string[] = []
+  const pdfUnavailable: string[] = []
+  const canPdf = pdfSupported()
 
   for (const asset of res.assets) {
     const name = asset.name || 'document'
     const kind = classifyDoc(name, asset.mimeType ?? undefined)
-    if (kind === 'pdf') {
-      pdfSkipped.push(name)
-      continue
-    }
-    if (kind !== 'text') {
-      skipped.push(name)
-      continue
-    }
     try {
-      const raw = await FileSystem.readAsStringAsync(asset.uri, {
-        encoding: FileSystem.EncodingType.UTF8,
-      })
-      const content = extractTextFromString(name, raw)
-      if (content.trim()) docs.push({ title: titleFromFilename(name), content, sourceType: 'file' })
-      else skipped.push(name)
+      if (kind === 'pdf') {
+        if (!canPdf) {
+          pdfUnavailable.push(name)
+          continue
+        }
+        const content = await extractPdfText(asset.uri)
+        if (content.trim()) docs.push({ title: titleFromFilename(name), content, sourceType: 'pdf' })
+        else skipped.push(name)
+      } else if (kind === 'text') {
+        const raw = await FileSystem.readAsStringAsync(asset.uri, {
+          encoding: FileSystem.EncodingType.UTF8,
+        })
+        const content = extractTextFromString(name, raw)
+        if (content.trim()) docs.push({ title: titleFromFilename(name), content, sourceType: 'file' })
+        else skipped.push(name)
+      } else {
+        skipped.push(name)
+      }
     } catch {
       skipped.push(name)
     }
   }
 
-  return { docs, skipped, pdfSkipped }
+  return { docs, skipped, pdfUnavailable }
 }

@@ -71,8 +71,8 @@ export function LibraryScreen() {
       }
       refresh()
       const notes: string[] = []
-      if (res.pdfSkipped.length)
-        notes.push('PDFs import on the web app — share the knowledge pack to this phone.')
+      if (res.pdfUnavailable.length)
+        notes.push('PDF import needs the full app build (not Expo Go).')
       if (res.skipped.length) notes.push(`Skipped (unsupported): ${res.skipped.join(', ')}`)
       if (notes.length) setError(notes.join('\n'))
     } catch (e) {
@@ -135,7 +135,7 @@ export function LibraryScreen() {
               <Text style={styles.btnOutlineText}>📎 Import file</Text>
             </Pressable>
           </View>
-          <Text style={styles.typesHint}>TXT, Markdown, HTML, CSV, JSON, RTF & more</Text>
+          <Text style={styles.typesHint}>PDF, TXT, Markdown, HTML, CSV, JSON, RTF & more</Text>
           {error ? <Text style={styles.err}>⚠️ {error}</Text> : null}
         </View>
 
