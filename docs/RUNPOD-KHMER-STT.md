@@ -51,12 +51,24 @@ pip install -U "transformers>=4.44" datasets accelerate evaluate jiwer librosa s
 
 ---
 
-## 2. Build the training subset (stream from DDD)
+## 2. Build the training subset (multi-corpus, license-clean)
 
-Streams DDD, decodes + resamples each clip to **16 kHz mono**, writes WAVs, and
-saves a ready-to-train `datasets` dataset. It **shuffles** the stream so the
-subset spans many speakers/topics (not one block), and caps at `TARGET_HOURS`.
-Writing WAVs to disk (not RAM) keeps it memory-safe.
+More diverse speech = **the** fix for a tiny model's hallucination / repetition
+and its real-world CER — more than any decode-param tweak. So we combine several
+**compatibly-licensed** Khmer corpora, not just DDD.
+
+> **⚠️ Licensing is a hard gate.** A dataset with **no license** on Hugging Face
+> is *all rights reserved* — publicly downloadable ≠ permission to train a model
+> you release. Only include sources with a clear, compatible license. Your model
+> stays **CC-BY-SA-4.0** (from DDD); CC-BY / CC0 / Apache / MIT all combine into
+> it. **Exclude** NonCommercial (CC-BY-NC) and unlicensed sets. Credit every
+> source in the model card.
+
+`SOURCES` below is the license-clean pool — edit it. Each source streams,
+decodes + resamples to **16 kHz mono**, is shuffled, and capped at `hours` so no
+single corpus dominates (balance matters). The transcript column is
+auto-detected (`transcript` / `sentence` / `text` / `transcription`), since it
+differs per dataset.
 
 ```python
 # build_ds.py  — run in the pod
@@ -66,42 +78,71 @@ from huggingface_hub import login
 from getpass import getpass
 
 login(getpass("HF token: "))            # typed at the prompt, not stored in code
-REPO = "DDD-Cambodia/khmer-speech-dataset"
+
+# repo, split, hours cap, license (for the model card credits).
+# ONLY clearly + compatibly licensed sets. Verify each before adding.
+SOURCES = [
+    ("DDD-Cambodia/khmer-speech-dataset", "train", 80,  "CC-BY-SA-4.0"),
+    ("seanghay/km-speech-corpus",         "train", 40,  "CC-BY-4.0"),
+    # ("google/fleurs",                   "train", 10,  "CC-BY-4.0"),  # config 'km_kh'
+    # ("openslr/slr42" or your mirror,    "train", 4,   "CC-BY-SA-4.0"),
+    # ("mozilla-foundation/common_voice_17_0", "train", 5, "CC0-1.0"),  # config 'km'
+    # your own consented classroom voices: fold in via scripts/export-voice.mjs
+]
 OUT = "/workspace/clips"; os.makedirs(OUT, exist_ok=True)
-TARGET_HOURS = 80        # plenty for whisper-tiny; raise for lower CER
 MIN_SEC, MAX_SEC = 0.5, 20
+TEXT_KEYS = ("transcript", "sentence", "text", "transcription")
 
-raw = (load_dataset(REPO, split="train", streaming=True)
-       .cast_column("audio", Audio(decode=False))      # sidestep the audio-codec dep
-       .shuffle(seed=42, buffer_size=10000))            # mix speakers/topics
+def text_of(ex):
+    for k in TEXT_KEYS:
+        v = ex.get(k)
+        if isinstance(v, str) and v.strip():
+            return v.strip()
+    return ""
 
-meta, total, i = [], 0.0, 0
-for ex in raw:
-    a = ex["audio"]
-    b = a["bytes"] if a.get("bytes") else open(a["path"], "rb").read()
-    y, sr = sf.read(io.BytesIO(b), dtype="float32")
-    if y.ndim > 1: y = y.mean(1)                        # to mono
-    if sr != 16000: y = librosa.resample(y, orig_sr=sr, target_sr=16000); sr = 16000
-    dur = len(y) / sr
-    if not (MIN_SEC <= dur <= MAX_SEC): continue
-    txt = (ex.get("transcript") or "").strip()
-    if not txt: continue
-    p = f"{OUT}/{i:06d}.wav"; sf.write(p, y, sr)
-    meta.append({"path": p, "sentence": txt})
-    total += dur; i += 1
-    if i % 2000 == 0: print(f"{i} clips, {total/3600:.1f} h", flush=True)
-    if total >= TARGET_HOURS * 3600: break
+meta, i = [], 0
+for repo, split, hours, lic in SOURCES:
+    sub = os.path.join(OUT, repo.replace("/", "_")); os.makedirs(sub, exist_ok=True)
+    raw = (load_dataset(repo, split=split, streaming=True)
+           .cast_column("audio", Audio(decode=False))     # sidestep the audio-codec dep
+           .shuffle(seed=42, buffer_size=10000))
+    got = 0.0
+    for ex in raw:
+        a = ex["audio"]
+        try:
+            b = a["bytes"] if a.get("bytes") else open(a["path"], "rb").read()
+            y, sr = sf.read(io.BytesIO(b), dtype="float32")
+        except Exception:
+            continue
+        if y.ndim > 1: y = y.mean(1)                       # to mono
+        if sr != 16000: y = librosa.resample(y, orig_sr=sr, target_sr=16000); sr = 16000
+        dur = len(y) / sr
+        if not (MIN_SEC <= dur <= MAX_SEC): continue
+        txt = text_of(ex)
+        if not txt: continue
+        p = f"{sub}/{i:06d}.wav"; sf.write(p, y, sr)
+        meta.append({"path": p, "sentence": txt, "source": repo})
+        got += dur; i += 1
+        if i % 2000 == 0: print(f"[{repo}] {got/3600:.1f}h  total {i} clips", flush=True)
+        if got >= hours * 3600: break
+    print(f"DONE {repo}: {got/3600:.1f} h ({lic})", flush=True)
 
 ds = (Dataset.from_list(meta)
         .cast_column("path", Audio(sampling_rate=16000))
         .rename_column("path", "audio"))
-ds = ds.train_test_split(test_size=0.01, seed=42)       # ~1% held out for eval
+ds = ds.train_test_split(test_size=0.01, seed=42)          # ~1% held out for eval
 ds.save_to_disk("/workspace/ds")
 print(ds)
 ```
 
-~80 h ≈ 50–60k clips ≈ ~9 GB on disk. Want more speaker/noise variety? Also fold in
-**OpenSLR SLR42** / **Common Voice** Khmer the same way (append to `meta`).
+This yields a diverse, license-clean set (DDD + km-speech-corpus ≈ 120 h here).
+Fold in your **`/voice`** classroom clips too — export them with
+`scripts/export-voice.mjs`, then append their `(path, sentence)` rows to `meta`
+(they're already 16 kHz WAV). With more data, consider training **whisper-base**
+(§3, just change `BASE`) — base + more data is the real quality jump.
+
+**Credits:** list every `SOURCES` entry + its license in the model README, and
+keep the release **CC-BY-SA-4.0**.
 
 ---
 
