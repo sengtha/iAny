@@ -72,22 +72,27 @@ differs per dataset.
 
 ```python
 # build_ds.py  — run in the pod
-import os, io, soundfile as sf, librosa
+import os, io, tempfile, soundfile as sf, librosa
 from datasets import load_dataset, Dataset, Audio
 from huggingface_hub import login
 from getpass import getpass
 
 login(getpass("HF token: "))            # typed at the prompt, not stored in code
 
-# repo, split, hours cap, license (for the model card credits).
+# Each source: repo, optional config, split, hours cap, license (for credits).
 # ONLY clearly + compatibly licensed sets. Verify each before adding.
 SOURCES = [
-    ("DDD-Cambodia/khmer-speech-dataset", "train", 80,  "CC-BY-SA-4.0"),
-    ("seanghay/km-speech-corpus",         "train", 40,  "CC-BY-4.0"),
-    # ("google/fleurs",                   "train", 10,  "CC-BY-4.0"),  # config 'km_kh'
-    # ("openslr/slr42" or your mirror,    "train", 4,   "CC-BY-SA-4.0"),
-    # ("mozilla-foundation/common_voice_17_0", "train", 5, "CC0-1.0"),  # config 'km'
-    # your own consented classroom voices: fold in via scripts/export-voice.mjs
+    {"repo": "DDD-Cambodia/khmer-speech-dataset", "split": "train", "hours": 80, "license": "CC-BY-SA-4.0"},
+    {"repo": "seanghay/km-speech-corpus",         "split": "train", "hours": 40, "license": "CC-BY-4.0"},
+    {"repo": "google/fleurs", "config": "km_kh",  "split": "train", "hours": 12, "license": "CC-BY-4.0"},
+    # Common Voice Khmer — CC0, real crowd voices (great diversity). GATED:
+    # accept the terms on the dataset page first + be logged in. mp3 audio is
+    # handled by load16k() below.
+    {"repo": "mozilla-foundation/common_voice_17_0", "config": "km", "split": "train", "hours": 8, "license": "CC0-1.0"},
+    # OpenSLR SLR42 (Google Khmer): CC-BY-SA-4.0. Script-based loader — needs
+    # trust_remote_code (already passed). Enable if it resolves for you.
+    # {"repo": "openslr/openslr", "config": "SLR42", "split": "train", "hours": 6, "license": "CC-BY-SA-4.0"},
+    # Your consented /voice classroom clips: fold in later (already 16 kHz WAV).
 ]
 OUT = "/workspace/clips"; os.makedirs(OUT, exist_ok=True)
 MIN_SEC, MAX_SEC = 0.5, 20
@@ -100,32 +105,45 @@ def text_of(ex):
             return v.strip()
     return ""
 
+def load16k(a):
+    """Decode any clip → 16 kHz mono float. soundfile handles wav/flac;
+    librosa (ffmpeg) handles mp3 (Common Voice) as a fallback."""
+    b = a["bytes"] if a.get("bytes") else open(a["path"], "rb").read()
+    try:
+        y, sr = sf.read(io.BytesIO(b), dtype="float32")
+        if y.ndim > 1: y = y.mean(1)
+        if sr != 16000: y = librosa.resample(y, orig_sr=sr, target_sr=16000)
+        return y
+    except Exception:
+        with tempfile.NamedTemporaryFile(suffix=".m", delete=True) as tf:
+            tf.write(b); tf.flush()
+            y, _ = librosa.load(tf.name, sr=16000, mono=True)   # decodes mp3 too
+            return y
+
 meta, i = [], 0
-for repo, split, hours, lic in SOURCES:
+for s in SOURCES:
+    repo = s["repo"]
     sub = os.path.join(OUT, repo.replace("/", "_")); os.makedirs(sub, exist_ok=True)
-    raw = (load_dataset(repo, split=split, streaming=True)
+    raw = (load_dataset(repo, s.get("config"), split=s["split"],
+                        streaming=True, trust_remote_code=True)
            .cast_column("audio", Audio(decode=False))     # sidestep the audio-codec dep
            .shuffle(seed=42, buffer_size=10000))
     got = 0.0
     for ex in raw:
-        a = ex["audio"]
         try:
-            b = a["bytes"] if a.get("bytes") else open(a["path"], "rb").read()
-            y, sr = sf.read(io.BytesIO(b), dtype="float32")
+            y = load16k(ex["audio"])
         except Exception:
             continue
-        if y.ndim > 1: y = y.mean(1)                       # to mono
-        if sr != 16000: y = librosa.resample(y, orig_sr=sr, target_sr=16000); sr = 16000
-        dur = len(y) / sr
+        dur = len(y) / 16000
         if not (MIN_SEC <= dur <= MAX_SEC): continue
         txt = text_of(ex)
         if not txt: continue
-        p = f"{sub}/{i:06d}.wav"; sf.write(p, y, sr)
+        p = f"{sub}/{i:06d}.wav"; sf.write(p, y, 16000)
         meta.append({"path": p, "sentence": txt, "source": repo})
         got += dur; i += 1
         if i % 2000 == 0: print(f"[{repo}] {got/3600:.1f}h  total {i} clips", flush=True)
-        if got >= hours * 3600: break
-    print(f"DONE {repo}: {got/3600:.1f} h ({lic})", flush=True)
+        if got >= s["hours"] * 3600: break
+    print(f"DONE {repo}: {got/3600:.1f} h ({s['license']})", flush=True)
 
 ds = (Dataset.from_list(meta)
         .cast_column("path", Audio(sampling_rate=16000))
@@ -135,7 +153,8 @@ ds.save_to_disk("/workspace/ds")
 print(ds)
 ```
 
-This yields a diverse, license-clean set (DDD + km-speech-corpus ≈ 120 h here).
+This yields a diverse, license-clean set (DDD + km-speech-corpus + FLEURS +
+Common Voice ≈ 130–140 h — read + crowd + multi-domain voices).
 Fold in your **`/voice`** classroom clips too — export them with
 `scripts/export-voice.mjs`, then append their `(path, sentence)` rows to `meta`
 (they're already 16 kHz WAV). With more data, consider training **whisper-base**
