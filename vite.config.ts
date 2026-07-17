@@ -62,6 +62,9 @@ export default defineConfig({
         globIgnores: ['ort/**', '**/ort-wasm*'],
         maximumFileSizeToCacheInBytes: 30 * 1024 * 1024,
         navigateFallback: 'index.html',
+        // The standalone /voice page is a separate app; don't let the iAny
+        // service worker answer its navigations with the iAny shell.
+        navigateFallbackDenylist: [/^\/voice(\/|\.html|$)/],
         runtimeCaching: [
           {
             urlPattern: ({ url }) => url.pathname.startsWith('/ort/'),
@@ -98,5 +101,13 @@ export default defineConfig({
   },
   build: {
     target: 'es2022',
+    rollupOptions: {
+      // Two HTML entries: the iAny app (index.html) and the standalone Khmer
+      // Voice collection page (voice.html, served at /voice).
+      input: {
+        main: path.resolve(root, 'index.html'),
+        voice: path.resolve(root, 'voice.html'),
+      },
+    },
   },
 })

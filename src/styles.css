@@ -1319,3 +1319,70 @@ progress {
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
+
+/* Standalone Khmer Voice page shell (/voice) — deliberately unlike the iAny
+   app chrome so the two aren't confused. */
+.voice-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  max-width: 720px;
+  margin: 0 auto;
+}
+.voice-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: calc(12px + env(safe-area-inset-top)) 18px 12px;
+  border-bottom: 1px solid var(--bg-softer);
+}
+.voice-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.voice-brand > span {
+  font-size: 1.7rem;
+}
+.voice-brand h1 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.voice-brand p {
+  margin: 0;
+  font-size: 0.76rem;
+  color: var(--fg-muted);
+}
+.voice-lang {
+  border: 1px solid var(--bg-softer);
+  background: var(--bg-soft);
+  color: var(--fg);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  min-height: 0;
+  cursor: pointer;
+}
+.voice-main {
+  flex: 1;
+  min-height: 0;
+  padding: 16px;
+  padding-left: calc(16px + env(safe-area-inset-left));
+  padding-right: calc(16px + env(safe-area-inset-right));
+}
+.voice-footer {
+  text-align: center;
+  padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+  border-top: 1px solid var(--bg-softer);
+}
+.voice-footer a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}

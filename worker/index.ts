@@ -83,8 +83,14 @@ export default {
     if (url.pathname.startsWith('/radio/')) {
       return serveRadio(url, request, env)
     }
-    if (url.pathname.startsWith('/voice/')) {
+    if (url.pathname.startsWith('/api/voice/')) {
       return serveVoice(url, request, env)
+    }
+    // Standalone "Contribute your voice" page — a separate route from the iAny
+    // app so the two never get confused. Serve its own HTML entry (the SPA
+    // not-found handler would otherwise return the iAny shell).
+    if (url.pathname === '/voice' || url.pathname === '/voice/') {
+      return env.ASSETS.fetch(new Request(new URL('/voice.html', url.origin), request))
     }
     // Static assets: cross-origin isolation headers come from public/_headers
     // (asset requests bypass this worker via run_worker_first). That
@@ -389,11 +395,12 @@ async function adminDeleteNews(id: string, env: Env): Promise<Response> {
 }
 
 /* ------------------------------------------------------------------ *
- * Contribute your voice — the app POSTs (audio, sentence) pairs which  *
- * become an OPEN Khmer STT training set. Audio → R2 (voice/…), metadata *
- * → D1 (voice_clips). Public: submit a clip + aggregate stats. Admin    *
- * (RADIO_ADMIN_TOKEN): list / download / delete for export. See         *
- * docs/VOICE-COLLECTION.md.                                             *
+ * Contribute your voice — the standalone /voice page POSTs             *
+ * (audio, sentence) pairs that become an OPEN Khmer STT training set.  *
+ * Served under /api/voice/* (a separate route from the iAny app).      *
+ * Audio → R2 (voice/…), metadata → D1 (voice_clips). Public: submit a  *
+ * clip + aggregate stats. Admin (RADIO_ADMIN_TOKEN): list / download / *
+ * delete for export. See docs/VOICE-COLLECTION.md.                     *
  * ------------------------------------------------------------------ */
 
 const VOICE_MAX_BYTES = 5 * 1024 * 1024 // ~5 MB WAV — a spoken sentence is tiny
@@ -401,7 +408,7 @@ const VOICE_SENTENCE_MAX = 400
 const VOICE_SPEAKER_RE = /^s-[0-9a-z]{6,16}$/
 
 async function serveVoice(url: URL, request: Request, env: Env): Promise<Response> {
-  const path = url.pathname.slice('/voice/'.length)
+  const path = url.pathname.slice('/api/voice/'.length)
   if (request.method === 'OPTIONS') {
     return new Response(null, {
       headers: { ...JSON_HEADERS, 'access-control-allow-methods': 'GET,POST,DELETE,OPTIONS',

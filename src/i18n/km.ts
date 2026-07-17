@@ -6,7 +6,6 @@ export const km: Translation = {
   navRadio: 'វិទ្យុ',
   navLibrary: 'បណ្ណាល័យ',
   navPacks: 'កញ្ចប់ចំណេះ',
-  navVoice: 'សំឡេង',
   navSettings: 'ការកំណត់',
 
   chatPlaceholder: 'សួរសំណួរ…',

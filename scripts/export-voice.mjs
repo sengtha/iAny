@@ -51,7 +51,7 @@ async function main() {
   let hours = 0
 
   for (;;) {
-    const url = `${BASE}/voice/admin/clips?limit=300${after ? `&after=${encodeURIComponent(after)}` : ''}`
+    const url = `${BASE}/api/voice/admin/clips?limit=300${after ? `&after=${encodeURIComponent(after)}` : ''}`
     const res = await fetch(url, { headers: auth })
     if (!res.ok) throw new Error(`list failed ${res.status}: ${await res.text()}`)
     const { clips, next } = await res.json()
@@ -63,7 +63,7 @@ async function main() {
       const rel = path.join('clips', path.basename(dir), `${c.id}.wav`)
       const dest = path.join(OUT, rel)
 
-      const a = await fetch(`${BASE}/voice/admin/clip/${c.id}`, { headers: auth })
+      const a = await fetch(`${BASE}/api/voice/admin/clip/${c.id}`, { headers: auth })
       if (!a.ok) {
         console.warn(`  skip ${c.id}: audio ${a.status}`)
         continue

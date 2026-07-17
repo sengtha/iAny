@@ -1,8 +1,10 @@
 # Contribute your voice — classroom Khmer speech collection
 
 A teacher-run way to build an **open Khmer speech-to-text (STT) dataset** with
-your students, right inside the iAny PWA. Students read short Khmer sentences
-aloud; each recording + its exact text becomes one `(audio, transcript)` pair.
+your students. It lives on its **own page — `https://<your-domain>/voice`** —
+separate from the iAny app so the two are never confused. Students read short
+Khmer sentences aloud; each recording + its exact text becomes one
+`(audio, transcript)` pair.
 Feed those pairs into the STT fine-tune (`docs/RUNPOD-KHMER-STT.md`) and the
 model understands real Cambodian voices — not just one studio speaker.
 
@@ -20,7 +22,8 @@ model understands real Cambodian voices — not just one studio speaker.
 
 ## For students — how it works
 
-1. Open iAny → **🎤 Voice** tab.
+1. Open the **Khmer Voice** page: **`https://<your-domain>/voice`** (share this
+   link, a QR code, or a bookmark — it's not inside the iAny app).
 2. Fill the short form (all optional except consent): a **credit name** if you
    want to be listed, class/group, age, voice, province.
 3. Tick the consent box and tap **Start recording**.
@@ -36,8 +39,9 @@ per recording. The app records **16 kHz mono** and trims silence automatically.
 
 ## For teachers — setup & privacy
 
-**No setup in the app** — the Voice tab is built in. Recordings upload to your
-Cloudflare Worker (`/voice/clip` → R2 + D1). Make sure the DB has the table:
+**No extra setup** — the `/voice` page is part of the same deploy. Recordings
+upload to your Cloudflare Worker (`/api/voice/clip` → R2 + D1). Make sure the DB
+has the table:
 
 ```bash
 npx wrangler d1 execute iany-radio --remote --file worker/schema.sql
@@ -52,7 +56,7 @@ npx wrangler deploy
   `s-3f9a2c71`) — never a name. A real name is stored **only** if the student
   opts in to the credit field.
 - No emails, phone numbers, or logins are collected.
-- You can delete any clip: `DELETE /voice/admin/clip/<id>` with the admin token.
+- You can delete any clip: `DELETE /api/voice/admin/clip/<id>` with the admin token.
 
 **Sentences:** the starter set (~150 sentences covering greetings, school,
 numbers, places, health, nature, food, family, questions, and full Khmer script

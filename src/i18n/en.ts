@@ -4,7 +4,6 @@ export const en = {
   navLibrary: 'Library',
   navPacks: 'Packs',
   navRadio: 'Radio',
-  navVoice: 'Voice',
   navSettings: 'Settings',
 
   chatPlaceholder: 'Ask a question…',

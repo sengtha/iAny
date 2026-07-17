@@ -4,17 +4,15 @@ import { ChatView } from './views/ChatView'
 import { LibraryView } from './views/LibraryView'
 import { PacksView } from './views/PacksView'
 import { RadioView } from './views/RadioView'
-import { ContributeView } from './views/ContributeView'
 import { SettingsView } from './views/SettingsView'
 
-type Tab = 'chat' | 'library' | 'packs' | 'radio' | 'voice' | 'settings'
+type Tab = 'chat' | 'library' | 'packs' | 'radio' | 'settings'
 
 const TAB_ICONS: Record<Tab, string> = {
   chat: '💬',
   library: '📚',
   packs: '📦',
   radio: '📻',
-  voice: '🎤',
   settings: '⚙️',
 }
 
@@ -27,7 +25,6 @@ export default function App() {
     library: t('navLibrary'),
     packs: t('navPacks'),
     radio: t('navRadio'),
-    voice: t('navVoice'),
     settings: t('navSettings'),
   }
 
@@ -48,7 +45,6 @@ export default function App() {
         {tab === 'library' && <LibraryView />}
         {tab === 'packs' && <PacksView />}
         {tab === 'radio' && <RadioView />}
-        {tab === 'voice' && <ContributeView />}
         {tab === 'settings' && <SettingsView />}
       </main>
 

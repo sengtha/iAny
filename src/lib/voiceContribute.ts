@@ -1,7 +1,7 @@
 /**
  * Client for the "Contribute your voice" flow: a stable anonymous speaker id,
  * the consenting contributor's identity (kept locally + sent with each clip),
- * and the upload to the Worker (`POST /voice/clip` → R2 + D1).
+ * and the upload to the Worker (`POST /api/voice/clip` → R2 + D1).
  *
  * Privacy: the speaker id is a random token, never a name. A real name is sent
  * ONLY as an opt-in `creditName` when the contributor asked to be credited in
@@ -83,7 +83,7 @@ export async function uploadClip(clip: UploadClip, profile: VoiceProfile): Promi
   if (profile.ageBand) form.set('ageBand', profile.ageBand)
   if (profile.region.trim()) form.set('region', profile.region.trim())
 
-  const res = await fetch('/voice/clip', { method: 'POST', body: form })
+  const res = await fetch('/api/voice/clip', { method: 'POST', body: form })
   if (!res.ok) {
     const msg = await res.text().catch(() => '')
     throw new Error(msg || `upload failed (${res.status})`)
@@ -101,7 +101,7 @@ export interface VoiceStats {
 /** Aggregate, non-identifying counts to motivate a class ("1,234 clips!"). */
 export async function fetchStats(): Promise<VoiceStats | null> {
   try {
-    const res = await fetch('/voice/stats')
+    const res = await fetch('/api/voice/stats')
     if (!res.ok) return null
     return (await res.json()) as VoiceStats
   } catch {
