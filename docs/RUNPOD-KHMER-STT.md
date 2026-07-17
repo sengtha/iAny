@@ -85,10 +85,7 @@ SOURCES = [
     {"repo": "DDD-Cambodia/khmer-speech-dataset", "split": "train", "hours": 80, "license": "CC-BY-SA-4.0"},
     {"repo": "seanghay/km-speech-corpus",         "split": "train", "hours": 40, "license": "CC-BY-4.0"},
     {"repo": "google/fleurs", "config": "km_kh",  "split": "train", "hours": 12, "license": "CC-BY-4.0"},
-    # Common Voice Khmer — CC0, real crowd voices (great diversity). GATED:
-    # accept the terms on the dataset page first + be logged in. mp3 audio is
-    # handled by load16k() below.
-    {"repo": "mozilla-foundation/common_voice_17_0", "config": "km", "split": "train", "hours": 8, "license": "CC0-1.0"},
+    # NOTE: Common Voice has NO Khmer set on HF, so it's not usable here.
     # OpenSLR SLR42 (Google Khmer): CC-BY-SA-4.0. Script-based loader — needs
     # trust_remote_code (already passed). Enable if it resolves for you.
     # {"repo": "openslr/openslr", "config": "SLR42", "split": "train", "hours": 6, "license": "CC-BY-SA-4.0"},
@@ -153,8 +150,9 @@ ds.save_to_disk("/workspace/ds")
 print(ds)
 ```
 
-This yields a diverse, license-clean set (DDD + km-speech-corpus + FLEURS +
-Common Voice ≈ 130–140 h — read + crowd + multi-domain voices).
+This yields a diverse, license-clean set (DDD + km-speech-corpus + FLEURS ≈
+110–115 h — read + multi-domain, many speakers). The mp3 fallback in `load16k`
+stays harmless and ready for any future mp3-based source.
 Fold in your **`/voice`** classroom clips too — export them with
 `scripts/export-voice.mjs`, then append their `(path, sentence)` rows to `meta`
 (they're already 16 kHz WAV). With more data, consider training **whisper-base**
