@@ -124,18 +124,33 @@ class Stt {
     return {
       stop: async () => {
         await stop()
-        // Final accurate pass over the recorded WAV (realtime partials can be
-        // partial/rough). Falls back to the last live partial if it fails.
         onProgress?.({ status: 'transcribing' })
-        try {
+        // abortTranscribe() returns before the realtime thread flushes the WAV,
+        // so wait for the file to exist AND stop growing before transcribing —
+        // otherwise we'd read a missing/half-written file (the "no result" case).
+        let size = -1
+        for (let i = 0; i < 25; i++) {
           const info = await FileSystem.getInfoAsync(wavUri)
-          if (info.exists && (info.size ?? 0) > 4000) {
-            const res = await ctx.transcribe(wavUri, { language: 'km' }).promise
+          const s = info.exists ? (info.size ?? 0) : 0
+          if (s > 4000 && s === size) break // stable
+          size = s
+          await new Promise((r) => setTimeout(r, 120))
+        }
+        try {
+          if (size > 4000) {
+            // One clean pass over the recorded audio. Explicit language + task
+            // keeps Whisper from language-detecting/translating (a hallucination
+            // source). translate:false = keep Khmer, don't render to English.
+            const res = await ctx.transcribe(wavUri, {
+              language: 'km',
+              translate: false,
+              maxThreads: 4, // use several S10 cores → faster single pass
+            }).promise
             const finalText = (res?.result ?? '').trim()
             if (finalText) latest = finalText
           }
         } catch {
-          /* keep the live partial */
+          /* keep the live partial, if any */
         }
         onProgress?.({ status: 'idle' })
         return latest
