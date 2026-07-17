@@ -669,3 +669,43 @@ reclaim. You can walk away and let it run to ~200k.
 - **Untested end-to-end here** (I can't run RunPod from this env) — expect a
   couple of small fixes at first run, like we did on Kaggle. Paste errors and
   I'll fix fast.
+
+---
+
+## 9. Male voice — a pair for the female (same recipe, 3 changes)
+
+DDD-Cambodia has **male speakers** too (`m-…` ids alongside `f-…`), so a male
+voice is this exact pipeline with the speaker selection flipped. Same corpus,
+same **CC-BY-SA-4.0**, same VITS config, same ONNX export.
+
+**Only these change:**
+
+1. **§2 (find speakers)** — filter male instead of female:
+   ```python
+   if GENDER and not str(ex[GENDER]).lower().startswith("m"): continue   # was "f"
+   ```
+2. **§3a (pick one)** — choose the **male (`m-…`) with the most hours** (needs
+   ≥ ~15 h for best quality; ~8–10 h still trains a usable voice, just less
+   robust). If no male has enough, record a donor speaker or combine later.
+3. **§3b + outputs** — point everything at the male:
+   ```python
+   CHOSEN_SPK = "m-adt2-XXXX"          # the male id from §3a
+   ```
+   and rename the run + repo so it doesn't clobber the female:
+   - `run_name="khm_male_vits"` (§4)
+   - `REPO_OUT = "sengtha/khmer-tts-male-v1"` (§5), ONNX filename e.g.
+     `khmer_tts_male_v1.onnx` (§7).
+
+Everything else (VITS config, training, ONNX export, rate fix) is **identical** —
+the model is single-speaker, so nothing about the architecture changes; you're
+just feeding it a different single speaker.
+
+### App side (after it's trained)
+The app currently loads one voice (`sengtha/khmer-tts-female-v2`). To offer both:
+- add a second TTS model entry (male) in the model registry (mobile
+  `domain/types.ts`, PWA `types.ts`),
+- add a **voice selector** (female / male) in Settings (and let Radio use it),
+- the TTS loader picks the active voice's repo/onnx.
+
+Tell me when the male voice is on HF and I'll wire the selector into both apps
+(and the Radio) — it's a small, additive change.
