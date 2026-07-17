@@ -692,7 +692,8 @@ progress {
   .chat,
   .library,
   .packs,
-  .settings {
+  .settings,
+  .contribute {
     width: 100%;
     max-width: 860px;
     margin-inline: auto;
@@ -1066,4 +1067,255 @@ progress {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ------------------------------------------------------------------ *
+ * Contribute your voice — classroom Khmer STT data collection.        *
+ * ------------------------------------------------------------------ */
+.contribute {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 4px 2px 24px;
+}
+.contribute-title {
+  font-size: 1.3rem;
+  margin: 4px 0 0;
+}
+.contribute-lead {
+  color: var(--fg-muted);
+  line-height: 1.5;
+  margin: 0;
+}
+.voice-stats {
+  background: var(--accent-weak);
+  border: 1px solid var(--bg-softer);
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 0.95rem;
+}
+.voice-stats b {
+  color: var(--accent);
+}
+.voice-openbox {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--bg-soft);
+  border: 1px solid var(--bg-softer);
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+.voice-openrow {
+  line-height: 1.45;
+  font-size: 0.95rem;
+}
+.voice-fields {
+  border: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.voice-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+}
+.voice-field > span {
+  font-size: 0.85rem;
+  color: var(--fg-muted);
+}
+.voice-field small {
+  font-size: 0.78rem;
+  color: var(--fg-muted);
+}
+.voice-field input,
+.voice-field select {
+  border: 1px solid var(--bg-softer);
+  background: var(--bg-soft);
+  color: var(--fg);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 1rem;
+}
+.voice-field-row {
+  display: flex;
+  gap: 12px;
+}
+.voice-consent {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  background: var(--bg-soft);
+  border: 1px solid var(--bg-softer);
+  border-radius: 12px;
+  padding: 12px 14px;
+  line-height: 1.45;
+  cursor: pointer;
+}
+.voice-consent input {
+  margin-top: 3px;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+.voice-minor-note {
+  font-size: 0.82rem;
+  color: var(--fg-muted);
+  line-height: 1.45;
+  margin: 0;
+}
+.voice-anon {
+  font-size: 0.78rem;
+  color: var(--fg-muted);
+  text-align: center;
+  margin: 2px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+.voice-primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border: none;
+  border-radius: 12px;
+  padding: 14px 18px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.voice-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.voice-primary.big,
+.voice-stop.big {
+  flex: 1;
+}
+.voice-stop {
+  background: #ef4444;
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 14px 18px;
+  font-size: 1.05rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.voice-ghost {
+  background: var(--bg-soft);
+  color: var(--fg);
+  border: 1px solid var(--bg-softer);
+  border-radius: 12px;
+  padding: 14px 18px;
+  font-size: 1rem;
+  cursor: pointer;
+}
+/* Recorder */
+.voice-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.voice-progress-bar {
+  flex: 1;
+  height: 8px;
+  background: var(--bg-softer);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.voice-progress-bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+.voice-progress-num {
+  font-size: 0.85rem;
+  color: var(--fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+.voice-card {
+  background: var(--bg-soft);
+  border: 1px solid var(--bg-softer);
+  border-radius: 18px;
+  padding: 22px 20px;
+  text-align: center;
+  min-height: 140px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+}
+.voice-card-label {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--fg-muted);
+}
+.voice-sentence {
+  font-size: 1.6rem;
+  line-height: 1.7;
+  margin: 0;
+  font-weight: 500;
+}
+.voice-meter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 44px;
+  opacity: 0.35;
+}
+.voice-meter.on {
+  opacity: 1;
+}
+.voice-meter span {
+  width: 8px;
+  height: 40px;
+  background: var(--accent);
+  border-radius: 999px;
+  transform: scaleY(0.15);
+  transform-origin: center;
+  transition: transform 0.08s linear;
+}
+.voice-audio {
+  width: 100%;
+}
+.voice-controls {
+  display: flex;
+  gap: 10px;
+}
+.voice-uploading {
+  flex: 1;
+  text-align: center;
+  padding: 14px;
+  color: var(--fg-muted);
+}
+.voice-tip {
+  font-size: 0.82rem;
+  color: var(--fg-muted);
+  text-align: center;
+  line-height: 1.45;
+  margin: 0;
+}
+.voice-warn {
+  color: #f59e0b;
+  font-size: 0.9rem;
+  margin: 0;
+  text-align: center;
+}
+.voice-error {
+  color: #ef4444;
+  font-size: 0.9rem;
+  margin: 0;
+  text-align: center;
+}
+.voice-progress-big {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--accent);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }

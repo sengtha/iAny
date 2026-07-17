@@ -30,3 +30,26 @@ CREATE TABLE IF NOT EXISTS news (
 --   ALTER TABLE news ADD COLUMN tts_body  TEXT;
 CREATE INDEX IF NOT EXISTS idx_news_created ON news (created_at);
 CREATE INDEX IF NOT EXISTS idx_news_expires ON news (expires_at);
+
+-- Crowd-sourced Khmer speech (the "Contribute your voice" screen). Each row is
+-- one (audio, transcript) pair for training an open Khmer STT model; the WAV
+-- lives in R2 at r2_key. speaker is an anonymous device id (never a name).
+-- credit_name is opt-in, for the released dataset's contributor credits.
+CREATE TABLE IF NOT EXISTS voice_clips (
+  id          TEXT PRIMARY KEY,
+  r2_key      TEXT NOT NULL,          -- R2 object key: voice/<yyyymmdd>/<id>.wav
+  speaker     TEXT NOT NULL,          -- anonymous per-device id, e.g. s-3f9a2c71
+  sentence    TEXT NOT NULL,          -- the exact prompt that was read
+  sentence_id TEXT,                   -- prompt id from the bundled set
+  lang        TEXT NOT NULL DEFAULT 'km',
+  credit_name TEXT,                   -- opt-in public credit (dataset contributors)
+  class_label TEXT,                   -- optional, e.g. "6A" (no personal names)
+  gender      TEXT,                   -- optional, self-reported
+  age_band    TEXT,                   -- optional
+  region      TEXT,                   -- optional province/dialect
+  duration_ms INTEGER,
+  bytes       INTEGER,
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_voice_created ON voice_clips (created_at);
+CREATE INDEX IF NOT EXISTS idx_voice_speaker ON voice_clips (speaker);

@@ -4,6 +4,7 @@ export const en = {
   navLibrary: 'Library',
   navPacks: 'Packs',
   navRadio: 'Radio',
+  navVoice: 'Voice',
   navSettings: 'Settings',
 
   chatPlaceholder: 'Ask a question…',
@@ -136,6 +137,53 @@ export const en = {
     'Delete the local knowledge base storage and restart? Local documents are lost (AI models and cloud backups are not affected).',
 
   errorGeneric: 'Something went wrong. Please try again.',
+
+  // Contribute your voice (classroom Khmer STT data collection)
+  voiceTitle: 'Contribute your voice',
+  voiceLead:
+    'Read short Khmer sentences aloud. Each recording helps teach a Khmer speech-to-text model — the more voices, the better it understands everyone.',
+  voiceStatClips: 'recordings',
+  voiceStatVoices: 'voices',
+  voiceStatHours: 'hours',
+  voiceOpenData: 'Recordings are released as an open, free dataset for anyone to use.',
+  voiceOpenCredit: 'Everyone who contributes is credited by name in the dataset (if you add one below).',
+  voiceOpenModel: 'The speech-to-text model built from it is released free for everyone.',
+  voiceCreditName: 'Your name for the credits (optional)',
+  voiceCreditPlaceholder: 'e.g. Sok Dara',
+  voiceCreditHint: 'Shown in the public dataset credits. Leave blank to stay anonymous.',
+  voiceClass: 'Class / group (optional)',
+  voiceClassPlaceholder: 'e.g. 6A',
+  voiceAge: 'Age',
+  voiceAgeUnder12: 'Under 12',
+  voiceAgeAdult: 'Adult',
+  voiceGender: 'Voice',
+  voiceGenderF: 'Female',
+  voiceGenderM: 'Male',
+  voiceGenderO: 'Other',
+  voiceRegion: 'Province (optional)',
+  voiceRegionPlaceholder: 'e.g. Siem Reap',
+  voiceConsent:
+    'I agree that my recordings can be released as an open dataset and used to train and share a free speech-to-text model.',
+  voiceMinorNote:
+    'For students under 18: please record only with a parent or guardian’s permission. No personal information beyond an optional credit name is collected.',
+  voiceUnsupported: 'This browser cannot record audio. Try Chrome on Android or a laptop.',
+  voiceStart: 'Start recording',
+  voiceAnon: 'Your anonymous voice id',
+  voiceReadAloud: 'Read this aloud, clearly',
+  voiceRecord: 'Record',
+  voiceStop: 'Stop',
+  voiceRedo: 'Re-record',
+  voiceKeep: 'Keep & next',
+  voiceSkip: 'Skip',
+  voiceUploading: 'Saving',
+  voiceTooQuiet: 'That was very quiet — move closer to the mic and try again.',
+  voiceMicDenied: 'Microphone blocked. Allow mic access in your browser and try again.',
+  voiceRecFailed: 'Recording failed. Please try again.',
+  voiceUploadFailed: 'Could not save. Check your connection and try again.',
+  voiceTip: 'Tip: record in a quiet room, hold the phone a hand’s width away, read at a natural pace.',
+  voiceAllDoneTitle: 'You read them all — thank you!',
+  voiceAllDoneBody:
+    'Your voice is now part of an open dataset that will teach a free Khmer speech-to-text model. Hand the device to the next reader, or check back for more sentences.',
 }
 
 export type Translation = typeof en

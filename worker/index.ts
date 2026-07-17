@@ -83,6 +83,9 @@ export default {
     if (url.pathname.startsWith('/radio/')) {
       return serveRadio(url, request, env)
     }
+    if (url.pathname.startsWith('/voice/')) {
+      return serveVoice(url, request, env)
+    }
     // Static assets: cross-origin isolation headers come from public/_headers
     // (asset requests bypass this worker via run_worker_first). That
     // isolation lets onnxruntime-web use multiple WASM threads — 2-4x faster
@@ -382,6 +385,155 @@ async function adminListNews(env: Env): Promise<Response> {
 async function adminDeleteNews(id: string, env: Env): Promise<Response> {
   const r = await env.DB.prepare('DELETE FROM news WHERE id = ?').bind(id).run()
   if (!r.meta.changes) return json({ error: 'news not found' }, 404)
+  return json({ id, deleted: true })
+}
+
+/* ------------------------------------------------------------------ *
+ * Contribute your voice — the app POSTs (audio, sentence) pairs which  *
+ * become an OPEN Khmer STT training set. Audio → R2 (voice/…), metadata *
+ * → D1 (voice_clips). Public: submit a clip + aggregate stats. Admin    *
+ * (RADIO_ADMIN_TOKEN): list / download / delete for export. See         *
+ * docs/VOICE-COLLECTION.md.                                             *
+ * ------------------------------------------------------------------ */
+
+const VOICE_MAX_BYTES = 5 * 1024 * 1024 // ~5 MB WAV — a spoken sentence is tiny
+const VOICE_SENTENCE_MAX = 400
+const VOICE_SPEAKER_RE = /^s-[0-9a-z]{6,16}$/
+
+async function serveVoice(url: URL, request: Request, env: Env): Promise<Response> {
+  const path = url.pathname.slice('/voice/'.length)
+  if (request.method === 'OPTIONS') {
+    return new Response(null, {
+      headers: { ...JSON_HEADERS, 'access-control-allow-methods': 'GET,POST,DELETE,OPTIONS',
+        'access-control-allow-headers': 'authorization,content-type' },
+    })
+  }
+  if (path === 'clip' && request.method === 'POST') return voicePostClip(request, env)
+  if (path === 'stats' && request.method === 'GET') return voiceStats(env)
+  if (path === 'admin' || path.startsWith('admin/')) return serveVoiceAdmin(path, request, env)
+  return json({ error: 'not found' }, 404)
+}
+
+// Public: accept one recording. multipart/form-data with `audio` + metadata.
+async function voicePostClip(request: Request, env: Env): Promise<Response> {
+  let form: FormData
+  try {
+    form = await request.formData()
+  } catch {
+    return json({ error: 'expected multipart form' }, 400)
+  }
+  const entry = form.get('audio') as unknown
+  const sentence = String(form.get('sentence') ?? '').trim()
+  const speaker = String(form.get('speaker') ?? '').trim()
+  const consent = String(form.get('consent') ?? '') === '1'
+
+  // A form entry is a File (a Blob) or a string; anything non-string is audio.
+  if (!entry || typeof entry === 'string') return json({ error: 'audio required' }, 400)
+  const audio = entry as Blob
+  if (!consent) return json({ error: 'consent required' }, 403)
+  if (!sentence || sentence.length > VOICE_SENTENCE_MAX) return json({ error: 'bad sentence' }, 400)
+  if (!VOICE_SPEAKER_RE.test(speaker)) return json({ error: 'bad speaker id' }, 400)
+  const size = audio.size
+  if (!size || size > VOICE_MAX_BYTES) return json({ error: 'audio too large or empty' }, 413)
+
+  const id = crypto.randomUUID()
+  const now = new Date()
+  const day = now.toISOString().slice(0, 10).replace(/-/g, '')
+  const r2Key = `voice/${day}/${id}.wav`
+  await env.MODELS.put(r2Key, await audio.arrayBuffer(), {
+    httpMetadata: { contentType: 'audio/wav' },
+    customMetadata: { speaker, sentenceId: String(form.get('sentenceId') ?? '') },
+  })
+
+  const trim = (k: string, max: number): string | null => {
+    const v = String(form.get(k) ?? '').trim()
+    return v ? v.slice(0, max) : null
+  }
+  const durationMs = Number(form.get('durationMs') ?? 0) || null
+  await env.DB.prepare(
+    `INSERT INTO voice_clips
+       (id, r2_key, speaker, sentence, sentence_id, lang, credit_name,
+        class_label, gender, age_band, region, duration_ms, bytes, created_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+  ).bind(
+    id, r2Key, speaker, sentence, trim('sentenceId', 40), 'km', trim('creditName', 60),
+    trim('classLabel', 24), trim('gender', 10), trim('ageBand', 10), trim('region', 40),
+    durationMs, size, now.toISOString(),
+  ).run()
+  return json({ id })
+}
+
+// Public, aggregate only (no PII) — motivates a class with live totals.
+async function voiceStats(env: Env): Promise<Response> {
+  const row = await env.DB.prepare(
+    `SELECT COUNT(*) AS clips, COUNT(DISTINCT speaker) AS speakers,
+            COALESCE(SUM(duration_ms), 0) AS ms FROM voice_clips`,
+  ).first<{ clips: number; speakers: number; ms: number }>()
+  return new Response(
+    JSON.stringify({
+      clips: row?.clips ?? 0,
+      speakers: row?.speakers ?? 0,
+      hours: Math.round(((row?.ms ?? 0) / 3600000) * 10) / 10,
+    }),
+    { headers: { ...JSON_HEADERS, 'cache-control': 'public, max-age=30' } },
+  )
+}
+
+// Admin (RADIO_ADMIN_TOKEN): paginated list, single-clip download, delete —
+// the export script (scripts/export-voice.mjs) uses list + clip.
+async function serveVoiceAdmin(path: string, request: Request, env: Env): Promise<Response> {
+  if (!env.RADIO_ADMIN_TOKEN || bearer(request) !== env.RADIO_ADMIN_TOKEN) {
+    return json({ error: 'unauthorized' }, 401)
+  }
+  const seg = path.split('/') // ['admin', kind, id?]
+  const kind = seg[1]
+  const id = seg[2]
+  const m = request.method
+  if (kind === 'clips' && m === 'GET') return voiceAdminList(request, env)
+  if (kind === 'clip' && id && m === 'GET') return voiceAdminGet(id, env)
+  if (kind === 'clip' && id && m === 'DELETE') return voiceAdminDelete(id, env)
+  return json({ error: 'not found' }, 404)
+}
+
+// Page through clips oldest-first (stable for export). ?after=<created_at,id>.
+async function voiceAdminList(request: Request, env: Env): Promise<Response> {
+  const url = new URL(request.url)
+  const after = url.searchParams.get('after') ?? ''
+  const limit = Math.min(500, Math.max(1, Number(url.searchParams.get('limit') ?? 200)))
+  const { results } = await env.DB.prepare(
+    `SELECT id, r2_key AS r2Key, speaker, sentence, sentence_id AS sentenceId, lang,
+            credit_name AS creditName, class_label AS classLabel, gender,
+            age_band AS ageBand, region, duration_ms AS durationMs, bytes,
+            created_at AS createdAt
+       FROM voice_clips
+      WHERE (created_at || '|' || id) > ?
+      ORDER BY created_at ASC, id ASC LIMIT ?`,
+  ).bind(after, limit).all()
+  const items = results ?? []
+  const last = items.length
+    ? (items[items.length - 1] as { createdAt: string; id: string })
+    : null
+  return json({ clips: items, next: last ? `${last.createdAt}|${last.id}` : null })
+}
+
+async function voiceAdminGet(id: string, env: Env): Promise<Response> {
+  const row = await env.DB.prepare('SELECT r2_key AS r2Key FROM voice_clips WHERE id = ?')
+    .bind(id).first<{ r2Key: string }>()
+  if (!row) return json({ error: 'not found' }, 404)
+  const obj = await env.MODELS.get(row.r2Key)
+  if (!obj) return json({ error: 'audio missing' }, 404)
+  return new Response(obj.body, {
+    headers: { 'content-type': 'audio/wav', 'content-length': String(obj.size),
+      'access-control-allow-origin': '*' },
+  })
+}
+
+async function voiceAdminDelete(id: string, env: Env): Promise<Response> {
+  const row = await env.DB.prepare('SELECT r2_key AS r2Key FROM voice_clips WHERE id = ?')
+    .bind(id).first<{ r2Key: string }>()
+  if (!row) return json({ error: 'not found' }, 404)
+  await env.MODELS.delete(row.r2Key)
+  await env.DB.prepare('DELETE FROM voice_clips WHERE id = ?').bind(id).run()
   return json({ id, deleted: true })
 }
 
