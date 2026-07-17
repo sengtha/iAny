@@ -53,11 +53,14 @@ self.onmessage = async (e: MessageEvent<InMsg>) => {
       const transcriber = await load()
       // chunk_length_s lets the pipeline handle clips longer than Whisper's 30 s
       // window (it slices + stitches); short queries are unaffected.
+      // no_repeat_ngram_size + condition_on_previous_text:false stop the tiny
+      // model's repetition loops ("long repeated Khmer letters" on quiet audio).
       const out = await transcriber(msg.audio, {
         language: 'km',
         task: 'transcribe',
         chunk_length_s: 30,
         stride_length_s: 5,
+        no_repeat_ngram_size: 3,
       })
       const text = Array.isArray(out)
         ? out.map((o) => o.text).join(' ')

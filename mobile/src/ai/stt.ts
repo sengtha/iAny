@@ -145,6 +145,15 @@ class Stt {
               language: 'km',
               translate: false,
               maxThreads: 4, // use several S10 cores → faster single pass
+              // Anti-loop ("long repeated Khmer letters"): temperatureInc turns
+              // on whisper.cpp's temperature fallback (retries at higher temp
+              // when a decode looks degenerate), and a small beam is less prone
+              // to looping than greedy. maxContext:0 = don't carry prior tokens
+              // that feed a repetition.
+              temperature: 0,
+              temperatureInc: 0.2,
+              beamSize: 2,
+              maxContext: 0,
             }).promise
             const finalText = (res?.result ?? '').trim()
             if (finalText) latest = finalText
