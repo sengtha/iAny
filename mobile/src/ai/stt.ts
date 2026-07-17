@@ -1,3 +1,4 @@
+import * as FileSystem from 'expo-file-system'
 import { initWhisper, type WhisperContext } from 'whisper.rn'
 import { ensureFile, errStr } from './modelFile'
 import { STT_MODEL_FILE, STT_MODEL_REPO } from '../domain/types'
@@ -13,7 +14,13 @@ import { STT_MODEL_FILE, STT_MODEL_REPO } from '../domain/types'
  * wrangling on our side.
  */
 
-export type SttStatus = 'idle' | 'downloading' | 'loading' | 'listening' | 'error'
+export type SttStatus =
+  | 'idle'
+  | 'downloading'
+  | 'loading'
+  | 'listening'
+  | 'transcribing'
+  | 'error'
 
 export interface SttProgress {
   status: SttStatus
@@ -73,13 +80,16 @@ class Stt {
     onPartial: (text: string) => void,
     onProgress?: (p: SttProgress) => void,
   ): Promise<SttSession> {
-    // realtimeAudioSec 30 = whisper's hard chunk limit; useVad trims silence so
-    // short utterances finish quickly. Khmer language is forced.
+    // NO VAD: VAD gating often never triggers on a phone mic, so nothing gets
+    // transcribed. Instead transcribe continuously (live partials) AND save the
+    // audio to a WAV, so on stop we can do one clean file-based pass for the
+    // final text — the reliable result.
+    const wavUri = `${FileSystem.cacheDirectory ?? ''}iany-stt.wav`
+    const wavPath = wavUri.replace('file://', '')
     const opts = {
       language: 'km',
-      realtimeAudioSec: 30,
-      realtimeAudioSliceSec: 25,
-      useVad: true,
+      realtimeAudioSec: 30, // whisper's hard 30 s window
+      audioOutputPath: wavPath,
     }
     let ctx = await this.init(onProgress)
     let realtime: Awaited<ReturnType<WhisperContext['transcribeRealtime']>>
@@ -87,8 +97,8 @@ class Stt {
       realtime = await ctx.transcribeRealtime(opts)
     } catch {
       // whisper.rn returns state -100 when a previous realtime session is still
-      // capturing (e.g. a start/stop race left it stuck). Release the native
-      // context to clear that state, then re-init and try once more.
+      // capturing (a start/stop race left it stuck). Release the native context
+      // to clear that state, then re-init and try once more.
       await this.reset()
       ctx = await this.init(onProgress)
       realtime = await ctx.transcribeRealtime(opts)
@@ -97,24 +107,32 @@ class Stt {
     onProgress?.({ status: 'listening' })
 
     let latest = ''
-    let resolveFinal!: (t: string) => void
-    const finalText = new Promise<string>((res) => {
-      resolveFinal = res
-    })
     subscribe((evt) => {
       const t = (evt.data?.result ?? '').trim()
       if (t) {
         latest = t
-        onPartial(t)
+        onPartial(t) // live feedback in the composer
       }
-      if (!evt.isCapturing) resolveFinal(latest)
     })
 
     return {
       stop: async () => {
         await stop()
+        // Final accurate pass over the recorded WAV (realtime partials can be
+        // partial/rough). Falls back to the last live partial if it fails.
+        onProgress?.({ status: 'transcribing' })
+        try {
+          const info = await FileSystem.getInfoAsync(wavUri)
+          if (info.exists && (info.size ?? 0) > 4000) {
+            const res = await ctx.transcribe(wavUri, { language: 'km' }).promise
+            const finalText = (res?.result ?? '').trim()
+            if (finalText) latest = finalText
+          }
+        } catch {
+          /* keep the live partial */
+        }
         onProgress?.({ status: 'idle' })
-        return finalText
+        return latest
       },
     }
   }

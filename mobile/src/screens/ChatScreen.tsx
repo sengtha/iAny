@@ -90,7 +90,10 @@ export function ChatScreen() {
   // Voice input: tap to record, tap again to stop. Partial transcription fills
   // the composer live; the final text stays there for the user to review/send.
   const micActive = sttProg.status === 'listening'
-  const micBusy = sttProg.status === 'downloading' || sttProg.status === 'loading'
+  const micBusy =
+    sttProg.status === 'downloading' ||
+    sttProg.status === 'loading' ||
+    sttProg.status === 'transcribing'
 
   const toggleMic = async () => {
     // Stop an active session.
@@ -133,9 +136,11 @@ export function ChatScreen() {
       ? `Downloading voice input… ${Math.round((sttProg.progress ?? 0) * 100)}%`
       : sttProg.status === 'loading'
         ? 'Preparing voice input…'
-        : micActive
-          ? '🎙️ Listening… tap the mic to stop'
-          : sttProg.status === 'error'
+        : sttProg.status === 'transcribing'
+          ? 'Transcribing…'
+          : micActive
+            ? '🎙️ Listening… tap the mic to stop'
+            : sttProg.status === 'error'
             ? `⚠️ Voice input: ${sttProg.error ?? 'failed'}`
             : ''
 
