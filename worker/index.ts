@@ -86,12 +86,10 @@ export default {
     if (url.pathname.startsWith('/api/voice/')) {
       return serveVoice(url, request, env)
     }
-    // Standalone "Contribute your voice" page — a separate route from the iAny
-    // app so the two never get confused. Serve its own HTML entry (the SPA
-    // not-found handler would otherwise return the iAny shell).
-    if (url.pathname === '/voice' || url.pathname === '/voice/') {
-      return env.ASSETS.fetch(new Request(new URL('/voice.html', url.origin), request))
-    }
+    // The standalone "Contribute your voice" page (voice.html) is served
+    // directly by the asset layer at the clean URL /voice — Cloudflare maps
+    // /voice → voice.html natively, so the worker must NOT intercept it (doing
+    // so causes an /voice ↔ /voice.html redirect loop).
     // Static assets: cross-origin isolation headers come from public/_headers
     // (asset requests bypass this worker via run_worker_first). That
     // isolation lets onnxruntime-web use multiple WASM threads — 2-4x faster

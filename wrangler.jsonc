@@ -9,10 +9,11 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    // Model mirror, API, Radio, and the standalone /voice page must reach the
-    // worker; everything else is served directly as static assets. (The voice
-    // API lives under /api/voice/*, already covered by /api/*.)
-    "run_worker_first": ["/models/*", "/api/*", "/hf-api/*", "/radio/*", "/voice"]
+    // Model mirror, API, and Radio requests must reach the worker; everything
+    // else (including the standalone /voice page → voice.html) is served
+    // directly as static assets. The voice API lives under /api/voice/*,
+    // already covered by /api/*.
+    "run_worker_first": ["/models/*", "/api/*", "/hf-api/*", "/radio/*"]
   },
   "r2_buckets": [
     {
