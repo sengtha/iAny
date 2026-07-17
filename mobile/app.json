@@ -10,10 +10,14 @@
     "scheme": "iany",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.iany.app"
+      "bundleIdentifier": "com.iany.app",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "iAny transcribes your spoken Khmer question on-device."
+      }
     },
     "android": {
-      "package": "com.iany.app"
+      "package": "com.iany.app",
+      "permissions": ["android.permission.RECORD_AUDIO"]
     },
     "plugins": [
       "expo-dev-client",

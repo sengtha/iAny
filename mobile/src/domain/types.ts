@@ -85,6 +85,15 @@ export const TTS_META_FILE = 'tts_meta.json'
 export const OCR_MODEL_REPO = 'sengtha/khmer-ocr'
 export const OCR_MODEL_FILES = ['det.onnx', 'rec.onnx'] as const
 
+/**
+ * On-device Khmer STT: whisper-tiny fine-tuned on the DDD-Cambodia corpus
+ * (~21% CER), converted to GGML and quantized to q5_1 (~31 MB) so it runs
+ * offline via whisper.rn / whisper.cpp on a 2019 phone. Voice input for Chat:
+ * speak → transcribe → RAG. CC-BY-SA-4.0 (credits DDD-Cambodia).
+ */
+export const STT_MODEL_REPO = 'sengtha/whisper-tiny-khmer'
+export const STT_MODEL_FILE = 'ggml-tiny-khmer-q5_1.bin'
+
 /** iAny model mirror (Cloudflare worker pull-through cache). */
 export const MODEL_MIRROR = 'https://iany.sengtha.workers.dev/models'
 /** Read-only HF metadata proxy on the same worker (repo file lists), so the

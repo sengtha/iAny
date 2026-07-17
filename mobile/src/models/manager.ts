@@ -8,6 +8,8 @@ import {
   GEN_MODEL_REPO,
   OCR_MODEL_FILES,
   OCR_MODEL_REPO,
+  STT_MODEL_FILE,
+  STT_MODEL_REPO,
   TTS_MODEL_REPO,
   TTS_ONNX_FILE,
 } from '../domain/types'
@@ -28,7 +30,7 @@ import {
  * iAny's offline, low-data context.
  */
 
-export type ModelKind = 'generation' | 'embedding' | 'voice' | 'ocr'
+export type ModelKind = 'generation' | 'embedding' | 'voice' | 'ocr' | 'stt'
 
 export interface ManagedModel {
   id: string
@@ -97,6 +99,15 @@ export const MODELS: ManagedModel[] = [
     files: [...OCR_MODEL_FILES],
     selectable: false,
     bundle: true,
+  },
+  {
+    id: 'stt',
+    kind: 'stt',
+    label: 'Khmer voice input',
+    note: 'On-device speech-to-text — speak your question in Chat (~31 MB).',
+    repo: STT_MODEL_REPO,
+    files: [STT_MODEL_FILE],
+    selectable: false,
   },
 ]
 

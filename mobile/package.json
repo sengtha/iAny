@@ -28,7 +28,8 @@
     "onnxruntime-react-native": "1.20.1",
     "react": "18.3.1",
     "react-native": "0.76.5",
-    "react-native-safe-area-context": "4.12.0"
+    "react-native-safe-area-context": "4.12.0",
+    "whisper.rn": "^0.4.3"
   },
   "devDependencies": {
     "@types/react": "~18.3.12",

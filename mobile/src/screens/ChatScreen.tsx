@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -10,9 +11,11 @@ import {
   TextInput,
   View,
 } from 'react-native'
+import { Audio } from 'expo-av'
 import { embedder } from '../ai/embedder'
 import { generator, type GenProgress } from '../ai/generator'
 import { ask } from '../ai/ask'
+import { stt, type SttProgress } from '../ai/stt'
 import type { ChunkHit } from '../domain/types'
 import { C, shadow } from '../theme'
 
@@ -27,6 +30,9 @@ export function ChatScreen() {
   const [speed, setSpeed] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [gen, setGen] = useState<GenProgress>({ status: generator.status })
+  const [listening, setListening] = useState(false)
+  const [sttProg, setSttProg] = useState<SttProgress>({ status: 'idle' })
+  const sttSession = useRef<Awaited<ReturnType<typeof stt.listen>> | null>(null)
   const scroll = useRef<ScrollView>(null)
 
   const genReady = gen.status === 'ready' || generator.ready
@@ -80,6 +86,50 @@ export function ChatScreen() {
       setBusy(false)
     }
   }
+
+  // Voice input: tap to record, tap again to stop. Partial transcription fills
+  // the composer live; the final text stays there for the user to review/send.
+  const toggleMic = async () => {
+    if (listening) {
+      const session = sttSession.current
+      sttSession.current = null
+      setListening(false)
+      try {
+        const text = (await session?.stop()) ?? ''
+        if (text) setQuery(text)
+      } catch {
+        /* ignore */
+      }
+      return
+    }
+    const perm = await Audio.requestPermissionsAsync()
+    if (!perm.granted) {
+      Alert.alert('Microphone needed', 'Allow microphone access to speak your question.')
+      return
+    }
+    setListening(true)
+    setQuery('')
+    try {
+      sttSession.current = await stt.listen(
+        (partial) => setQuery(partial),
+        (p) => setSttProg(p),
+      )
+    } catch (e) {
+      setListening(false)
+      setSttProg({ status: 'error', error: e instanceof Error ? e.message : String(e) })
+    }
+  }
+
+  const sttStatusText =
+    sttProg.status === 'downloading'
+      ? `Downloading voice input… ${Math.round((sttProg.progress ?? 0) * 100)}%`
+      : sttProg.status === 'loading'
+        ? 'Preparing voice input…'
+        : listening
+          ? '🎙️ Listening… tap the mic to stop'
+          : sttProg.status === 'error'
+            ? `⚠️ Voice input: ${sttProg.error ?? 'failed'}`
+            : ''
 
   const empty = !answer && !busy
 
@@ -158,7 +208,25 @@ export function ChatScreen() {
         ) : null}
       </ScrollView>
 
+      {sttStatusText ? (
+        <Text style={[styles.sttStatus, sttProg.status === 'error' && styles.sttErr]}>
+          {sttStatusText}
+        </Text>
+      ) : null}
+
       <View style={styles.composer}>
+        <Pressable
+          style={[styles.mic, listening && styles.micOn]}
+          onPress={toggleMic}
+          disabled={busy || sttProg.status === 'downloading' || sttProg.status === 'loading'}
+          accessibilityLabel={listening ? 'Stop recording' : 'Speak your question'}
+        >
+          {sttProg.status === 'downloading' || sttProg.status === 'loading' ? (
+            <ActivityIndicator size="small" color={C.accent} />
+          ) : (
+            <Text style={styles.micIcon}>{listening ? '⏹' : '🎤'}</Text>
+          )}
+        </Pressable>
         <TextInput
           style={styles.input}
           placeholder="Ask a question…"
@@ -167,12 +235,12 @@ export function ChatScreen() {
           onChangeText={setQuery}
           onSubmitEditing={onAsk}
           returnKeyType="send"
-          editable={!busy}
+          editable={!busy && !listening}
         />
         <Pressable
-          style={[styles.send, (busy || !query.trim()) && styles.sendDim]}
+          style={[styles.send, (busy || listening || !query.trim()) && styles.sendDim]}
           onPress={onAsk}
-          disabled={busy || !query.trim()}
+          disabled={busy || listening || !query.trim()}
         >
           <Text style={styles.sendText}>Send</Text>
         </Pressable>
@@ -268,4 +336,23 @@ const styles = StyleSheet.create({
   },
   sendDim: { backgroundColor: '#a5b4fc' },
   sendText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  mic: {
+    width: 44,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 12,
+    backgroundColor: C.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  micOn: { backgroundColor: C.dangerBg, borderColor: C.danger },
+  micIcon: { fontSize: 19 },
+  sttStatus: {
+    color: C.muted,
+    fontSize: 12.5,
+    paddingHorizontal: 14,
+    paddingBottom: 6,
+    textAlign: 'center',
+  },
+  sttErr: { color: C.danger },
 })
