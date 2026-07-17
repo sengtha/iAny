@@ -144,6 +144,23 @@ for s in SOURCES:
         if got >= s["hours"] * 3600: break
     print(f"DONE {repo}: {got/3600:.1f} h ({s['license']})", flush=True)
 
+# --- Your consented /voice classroom clips (the most valuable: real phones /
+# rooms). Export first with scripts/export-voice.mjs, upload out/ to the pod as
+# /workspace/voice/. This block is a no-op until that file exists, so the same
+# script runs before AND after you've collected voices.
+# VOICE_REPEAT oversamples them (they're few but high-value) so the model
+# weights real-world audio more heavily. 1 = no oversampling; 3 is a good start.
+import csv
+VOICE_CSV = "/workspace/voice/metadata.csv"
+VOICE_REPEAT = 3
+if os.path.exists(VOICE_CSV):
+    rows = list(csv.DictReader(open(VOICE_CSV, encoding="utf-8")))
+    for _ in range(VOICE_REPEAT):
+        for r in rows:
+            meta.append({"path": os.path.join("/workspace/voice", r["path"]),
+                         "sentence": r["sentence"], "source": "iany/voice"})
+    print(f"DONE iany/voice: {len(rows)} clips x{VOICE_REPEAT} (consented, CC-BY-SA-4.0)", flush=True)
+
 ds = (Dataset.from_list(meta)
         .cast_column("path", Audio(sampling_rate=16000))
         .rename_column("path", "audio"))
@@ -155,10 +172,18 @@ print(ds)
 This yields a diverse, license-clean set (DDD + km-speech-corpus + FLEURS +
 OpenSLR SLR42 ≈ 115–120 h — read + multi-domain, many speakers). The mp3
 fallback in `load16k` stays harmless and ready for any future mp3-based source.
-Fold in your **`/voice`** classroom clips too — export them with
-`scripts/export-voice.mjs`, then append their `(path, sentence)` rows to `meta`
-(they're already 16 kHz WAV). With more data, consider training **whisper-base**
-(§3, just change `BASE`) — base + more data is the real quality jump.
+
+**Adding your `/voice` classroom data later** (the block after the SOURCES loop):
+export it with `scripts/export-voice.mjs`, upload `out/` to the pod as
+`/workspace/voice/`, and rerun this script — the `/voice` block auto-detects the
+file and folds the clips in, oversampled `VOICE_REPEAT×` because real phone/room
+audio is your most valuable signal. Until that file exists the block is a no-op,
+so this same script runs fine now (public corpora only) and again after you've
+collected voices. No separate per-source training — you always build one
+combined set and train once.
+
+With this much data, train **whisper-base** (§3, just change `BASE`) — base +
+more data is the real quality jump over tiny.
 
 **Credits:** list every `SOURCES` entry + its license in the model README, and
 keep the release **CC-BY-SA-4.0**.
