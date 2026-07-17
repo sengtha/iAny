@@ -7,6 +7,8 @@ import {
   sortIntoLines,
   buildRecInput,
   ctcDecode,
+  hasKhmerLetter,
+  OCR_REC_MIN_CONFIDENCE,
   DET_SIZE,
   REC_HEIGHT,
   type OcrImage,
@@ -109,7 +111,12 @@ class KhmerOcrNative {
         const { input: ri, width: rw } = buildRecInput(img, b)
         const r = await this.rec!.run({ input: new Tensor('float32', ri, [1, 1, REC_HEIGHT, rw]) })
         const lg = r['logits'] ?? r[Object.keys(r)[0]]
-        parts.push(ctcDecode(lg.data as unknown as Float32Array, lg.dims[0] as number))
+        const dec = ctcDecode(lg.data as unknown as Float32Array, lg.dims[0] as number)
+        // Drop low-confidence noise, and non-Khmer lines unless very sure —
+        // removes the "unknown numbers" the recognizer invents on real photos.
+        if (dec.confidence < OCR_REC_MIN_CONFIDENCE) continue
+        if (!hasKhmerLetter(dec.text) && dec.confidence < 0.85) continue
+        parts.push(dec.text)
       }
       if (parts.length) out.push(parts.join(' '))
       onProgress?.({ status: 'reading', line: { done: i + 1, total: lines.length } })

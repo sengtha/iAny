@@ -6,6 +6,8 @@ import {
   sortIntoLines,
   buildRecInput,
   ctcDecode,
+  hasKhmerLetter,
+  OCR_REC_MIN_CONFIDENCE,
   DET_SIZE,
   REC_HEIGHT,
   type OcrImage,
@@ -56,7 +58,12 @@ self.onmessage = async (e: MessageEvent) => {
             input: new ort.Tensor('float32', ri, [1, 1, REC_HEIGHT, width]),
           })
           const lg = r['logits'] ?? r[Object.keys(r)[0]]
-          parts.push(ctcDecode(lg.data as Float32Array, lg.dims[0] as number))
+          const dec = ctcDecode(lg.data as Float32Array, lg.dims[0] as number)
+          // Drop low-confidence noise, and non-Khmer lines unless very sure —
+          // this removes the "unknown numbers" the recognizer invents on photos.
+          if (dec.confidence < OCR_REC_MIN_CONFIDENCE) continue
+          if (!hasKhmerLetter(dec.text) && dec.confidence < 0.85) continue
+          parts.push(dec.text)
         }
         if (parts.length) out.push(parts.join(' '))
         post({ type: 'progress', id: msg.id, done: li + 1, total: lines.length })

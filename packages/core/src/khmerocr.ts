@@ -186,17 +186,42 @@ export function buildRecInput(img: OcrImage, box: OcrBox): { input: Float32Array
 
 /* ---- Recognition output: greedy CTC decode -------------------------------- */
 
+/** Decoded line + how sure the recognizer was (mean softmax prob of emitted glyphs). */
+export interface OcrDecode {
+  text: string
+  confidence: number
+}
+
+/** Khmer consonants + independent vowels — a real Khmer line has at least one. */
+const KHMER_LETTER = /[ក-ឳ]/
+export function hasKhmerLetter(s: string): boolean {
+  return KHMER_LETTER.test(s)
+}
+
+/** Drop a recognized line whose mean confidence is below this — it's noise the
+ *  recognizer force-read into random glyphs/digits (the "unknown numbers"). */
+export const OCR_REC_MIN_CONFIDENCE = 0.5
+
 /**
  * Greedy CTC decode of the recognizer logits [seqLen, 1, REC_NUM_CLASSES]:
  * argmax per step, collapse repeats, drop blanks (class 0), map class→glyph.
+ * Also returns the mean softmax probability of the emitted glyphs, so callers
+ * can drop low-confidence lines (real-photo noise → garbage) instead of showing
+ * them.
  */
-export function ctcDecode(logits: Float32Array, seqLen: number, numClasses = REC_NUM_CLASSES): string {
+export function ctcDecode(
+  logits: Float32Array,
+  seqLen: number,
+  numClasses = REC_NUM_CLASSES,
+): OcrDecode {
   let out = ''
   let prev = -1
+  let confSum = 0
+  let confN = 0
   for (let t = 0; t < seqLen; t++) {
+    const base = t * numClasses
     let idx = 0
     let bestVal = -Infinity
-    const base = t * numClasses
     for (let c = 0; c < numClasses; c++) {
       const v = logits[base + c]
       if (v > bestVal) {
@@ -205,11 +230,18 @@ export function ctcDecode(logits: Float32Array, seqLen: number, numClasses = REC
       }
     }
     if (idx !== prev) {
-      if (idx >= 3 && idx - 3 < OCR_TOKENS.length) out += OCR_TOKENS[idx - 3]
+      if (idx >= 3 && idx - 3 < OCR_TOKENS.length) {
+        out += OCR_TOKENS[idx - 3]
+        // softmax prob of the chosen class = confidence at this step
+        let denom = 0
+        for (let c = 0; c < numClasses; c++) denom += Math.exp(logits[base + c] - bestVal)
+        confSum += 1 / denom
+        confN++
+      }
       prev = idx
     }
   }
-  return out
+  return { text: out, confidence: confN ? confSum / confN : 0 }
 }
 
 /* ---- helpers -------------------------------------------------------------- */
