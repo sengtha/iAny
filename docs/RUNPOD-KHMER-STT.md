@@ -85,10 +85,12 @@ SOURCES = [
     {"repo": "DDD-Cambodia/khmer-speech-dataset", "split": "train", "hours": 80, "license": "CC-BY-SA-4.0"},
     {"repo": "seanghay/km-speech-corpus",         "split": "train", "hours": 40, "license": "CC-BY-4.0"},
     {"repo": "google/fleurs", "config": "km_kh",  "split": "train", "hours": 12, "license": "CC-BY-4.0"},
+    # OpenSLR SLR42 (Google Khmer, ~3-4 h read speech): CC-BY-SA-4.0. Script-
+    # based HF loader — trust_remote_code is already passed. If it errors in your
+    # `datasets` version, download directly from https://www.openslr.org/42/
+    # (line_index.tsv + wavs) and append those rows to `meta` instead.
+    {"repo": "openslr/openslr", "config": "SLR42", "split": "train", "hours": 6, "license": "CC-BY-SA-4.0"},
     # NOTE: Common Voice has NO Khmer set on HF, so it's not usable here.
-    # OpenSLR SLR42 (Google Khmer): CC-BY-SA-4.0. Script-based loader — needs
-    # trust_remote_code (already passed). Enable if it resolves for you.
-    # {"repo": "openslr/openslr", "config": "SLR42", "split": "train", "hours": 6, "license": "CC-BY-SA-4.0"},
     # Your consented /voice classroom clips: fold in later (already 16 kHz WAV).
 ]
 OUT = "/workspace/clips"; os.makedirs(OUT, exist_ok=True)
@@ -150,9 +152,9 @@ ds.save_to_disk("/workspace/ds")
 print(ds)
 ```
 
-This yields a diverse, license-clean set (DDD + km-speech-corpus + FLEURS ≈
-110–115 h — read + multi-domain, many speakers). The mp3 fallback in `load16k`
-stays harmless and ready for any future mp3-based source.
+This yields a diverse, license-clean set (DDD + km-speech-corpus + FLEURS +
+OpenSLR SLR42 ≈ 115–120 h — read + multi-domain, many speakers). The mp3
+fallback in `load16k` stays harmless and ready for any future mp3-based source.
 Fold in your **`/voice`** classroom clips too — export them with
 `scripts/export-voice.mjs`, then append their `(path, sentence)` rows to `meta`
 (they're already 16 kHz WAV). With more data, consider training **whisper-base**
