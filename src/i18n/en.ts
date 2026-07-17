@@ -194,6 +194,32 @@ export const en = {
   voiceAllDoneTitle: 'You read them all — thank you!',
   voiceAllDoneBody:
     'Your voice is now part of an open dataset that will teach a free Khmer speech-to-text model. Hand the device to the next reader, or check back for more sentences.',
+
+  // Contribute Khmer text photos (OCR data collection)
+  ocrTitle: 'Contribute Khmer text photos',
+  ocrLead:
+    'Photograph any Khmer text — a sign, book, or screen. The app reads it, you fix any mistakes, and the pair helps train a free Khmer OCR that reads real photos.',
+  ocrStatSamples: 'photos',
+  ocrStatContributors: 'contributors',
+  ocrOpenData: 'Photos + text are released as an open, free dataset for anyone to use.',
+  ocrOpenModel: 'The Khmer OCR model built from them is released free for everyone.',
+  ocrConsent:
+    'I agree that my photos can be released as an open dataset and used to train and share a free OCR model. I will only photograph text I have the right to share (not private or copyrighted documents).',
+  ocrTip:
+    'Photograph public text (signs, printed books, screens). Please don’t submit private, personal, or copyrighted documents.',
+  ocrStart: 'Start',
+  ocrDoneCount: 'contributed',
+  ocrTake: '📷 Take or choose a photo',
+  ocrTakeSub: 'A clear, straight-on photo of Khmer text works best',
+  ocrCorrect: 'The exact Khmer text in the photo',
+  ocrCorrectHint: 'The app pre-filled what it read — fix any errors so the label is correct.',
+  ocrTypePlaceholder: 'Type the Khmer text you see…',
+  ocrRetake: 'Retake',
+  ocrSubmit: 'Submit & next',
+  ocrDownloading: 'Downloading OCR model (first time)…',
+  ocrReading: 'Reading text from the photo…',
+  ocrUploadFailed: 'Could not save. Check your connection and try again.',
+  ocrHint: 'Tip: crop close to the text, avoid glare and blur, keep the page flat.',
 }
 
 export type Translation = typeof en

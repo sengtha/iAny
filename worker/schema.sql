@@ -53,3 +53,23 @@ CREATE TABLE IF NOT EXISTS voice_clips (
 );
 CREATE INDEX IF NOT EXISTS idx_voice_created ON voice_clips (created_at);
 CREATE INDEX IF NOT EXISTS idx_voice_speaker ON voice_clips (speaker);
+
+-- Crowd-sourced Khmer OCR ("Contribute Khmer text photos", the /scan page).
+-- Each row is one (image, transcript) pair for training an open Khmer OCR model.
+-- The image lives in R2 at r2_key; `text` is the human-verified ground truth;
+-- `ocr_guess` is what the current model read (lets us measure its error and
+-- prioritise hard samples). credit_name is opt-in for the released credits.
+CREATE TABLE IF NOT EXISTS ocr_samples (
+  id          TEXT PRIMARY KEY,
+  r2_key      TEXT NOT NULL,          -- R2 object key: ocr/<yyyymmdd>/<id>.jpg
+  device      TEXT NOT NULL,          -- anonymous per-device id, e.g. d-3f9a2c71
+  text        TEXT NOT NULL,          -- human-verified Khmer transcript
+  ocr_guess   TEXT,                   -- what the on-device model read (may differ)
+  credit_name TEXT,                   -- opt-in public credit (dataset contributors)
+  region      TEXT,                   -- optional province/dialect
+  width       INTEGER,
+  height      INTEGER,
+  bytes       INTEGER,
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ocr_created ON ocr_samples (created_at);

@@ -87,6 +87,9 @@ export default {
     if (url.pathname.startsWith('/api/voice/')) {
       return serveVoice(url, request, env)
     }
+    if (url.pathname.startsWith('/api/ocr/')) {
+      return serveOcr(url, request, env)
+    }
     // The standalone "Contribute your voice" page (voice.html) is served
     // directly by the asset layer at the clean URL /voice — Cloudflare maps
     // /voice → voice.html natively, so the worker must NOT intercept it (doing
@@ -550,6 +553,154 @@ async function voiceAdminDelete(id: string, env: Env): Promise<Response> {
   if (!row) return json({ error: 'not found' }, 404)
   await env.MODELS.delete(row.r2Key)
   await env.DB.prepare('DELETE FROM voice_clips WHERE id = ?').bind(id).run()
+  return json({ id, deleted: true })
+}
+
+/* ------------------------------------------------------------------ *
+ * Contribute Khmer text photos — the standalone /scan page POSTs      *
+ * (image, transcript) pairs that become an OPEN Khmer OCR training    *
+ * set. Served under /api/ocr/* (a separate route from the iAny app).  *
+ * Image → R2 (ocr/…), metadata → D1 (ocr_samples). Public: submit a   *
+ * sample + aggregate stats. Admin (RADIO_ADMIN_TOKEN): list /         *
+ * download / delete for export. See docs/OCR-COLLECTION.md.           *
+ * ------------------------------------------------------------------ */
+
+const OCR_MAX_BYTES = 8 * 1024 * 1024 // ~8 MB image
+const OCR_TEXT_MAX = 2000
+const OCR_DEVICE_RE = /^d-[0-9a-z]{6,16}$/
+
+async function serveOcr(url: URL, request: Request, env: Env): Promise<Response> {
+  const path = url.pathname.slice('/api/ocr/'.length)
+  if (request.method === 'OPTIONS') {
+    return new Response(null, {
+      headers: { ...JSON_HEADERS, 'access-control-allow-methods': 'GET,POST,DELETE,OPTIONS',
+        'access-control-allow-headers': 'authorization,content-type' },
+    })
+  }
+  try {
+    if (path === 'sample' && request.method === 'POST') return await ocrPostSample(request, env)
+    if (path === 'stats' && request.method === 'GET') return await ocrStats(env)
+    if (path === 'admin' || path.startsWith('admin/')) return await serveOcrAdmin(path, request, env)
+    return json({ error: 'not found' }, 404)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    const hint = /no such table|ocr_samples/i.test(msg)
+      ? 'ocr storage not initialised — run the D1 schema migration (worker/schema.sql)'
+      : 'server error'
+    return json({ error: hint, detail: msg }, 500)
+  }
+}
+
+// Public: accept one (image, transcript) sample. multipart/form-data.
+async function ocrPostSample(request: Request, env: Env): Promise<Response> {
+  let form: FormData
+  try {
+    form = await request.formData()
+  } catch {
+    return json({ error: 'expected multipart form' }, 400)
+  }
+  const entry = form.get('image') as unknown
+  const text = String(form.get('text') ?? '').trim()
+  const device = String(form.get('device') ?? '').trim()
+  const consent = String(form.get('consent') ?? '') === '1'
+
+  if (!entry || typeof entry === 'string') return json({ error: 'image required' }, 400)
+  const image = entry as Blob
+  if (!consent) return json({ error: 'consent required' }, 403)
+  if (!text || text.length > OCR_TEXT_MAX) return json({ error: 'bad text' }, 400)
+  if (!OCR_DEVICE_RE.test(device)) return json({ error: 'bad device id' }, 400)
+  const size = image.size
+  if (!size || size > OCR_MAX_BYTES) return json({ error: 'image too large or empty' }, 413)
+
+  const id = crypto.randomUUID()
+  const now = new Date()
+  const day = now.toISOString().slice(0, 10).replace(/-/g, '')
+  const type = image.type === 'image/png' ? 'png' : 'jpg'
+  const r2Key = `ocr/${day}/${id}.${type}`
+  await env.MODELS.put(r2Key, await image.arrayBuffer(), {
+    httpMetadata: { contentType: image.type || 'image/jpeg' },
+    customMetadata: { device },
+  })
+
+  const trim = (k: string, max: number): string | null => {
+    const v = String(form.get(k) ?? '').trim()
+    return v ? v.slice(0, max) : null
+  }
+  const num = (k: string): number | null => {
+    const v = Number(form.get(k) ?? 0)
+    return Number.isFinite(v) && v > 0 ? Math.round(v) : null
+  }
+  await env.DB.prepare(
+    `INSERT INTO ocr_samples
+       (id, r2_key, device, text, ocr_guess, credit_name, region, width, height, bytes, created_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+  ).bind(
+    id, r2Key, device, text, trim('ocrGuess', OCR_TEXT_MAX), trim('creditName', 60),
+    trim('region', 40), num('width'), num('height'), size, now.toISOString(),
+  ).run()
+  return json({ id })
+}
+
+// Public, aggregate only — motivates contributors with live totals.
+async function ocrStats(env: Env): Promise<Response> {
+  const row = await env.DB.prepare(
+    `SELECT COUNT(*) AS samples, COUNT(DISTINCT device) AS devices FROM ocr_samples`,
+  ).first<{ samples: number; devices: number }>()
+  return new Response(
+    JSON.stringify({ samples: row?.samples ?? 0, devices: row?.devices ?? 0 }),
+    { headers: { ...JSON_HEADERS, 'cache-control': 'public, max-age=30' } },
+  )
+}
+
+// Admin (RADIO_ADMIN_TOKEN): paginated list, single-image download, delete.
+async function serveOcrAdmin(path: string, request: Request, env: Env): Promise<Response> {
+  if (!env.RADIO_ADMIN_TOKEN || bearer(request) !== env.RADIO_ADMIN_TOKEN) {
+    return json({ error: 'unauthorized' }, 401)
+  }
+  const seg = path.split('/') // ['admin', kind, id?]
+  const kind = seg[1]
+  const id = seg[2]
+  const m = request.method
+  if (kind === 'samples' && m === 'GET') return ocrAdminList(request, env)
+  if (kind === 'image' && id && m === 'GET') return ocrAdminGet(id, env)
+  if (kind === 'sample' && id && m === 'DELETE') return ocrAdminDelete(id, env)
+  return json({ error: 'not found' }, 404)
+}
+
+async function ocrAdminList(request: Request, env: Env): Promise<Response> {
+  const url = new URL(request.url)
+  const after = url.searchParams.get('after') ?? ''
+  const limit = Math.min(500, Math.max(1, Number(url.searchParams.get('limit') ?? 200)))
+  const { results } = await env.DB.prepare(
+    `SELECT id, r2_key AS r2Key, device, text, ocr_guess AS ocrGuess, credit_name AS creditName,
+            region, width, height, bytes, created_at AS createdAt
+       FROM ocr_samples
+      WHERE (created_at || '|' || id) > ?
+      ORDER BY created_at ASC, id ASC LIMIT ?`,
+  ).bind(after, limit).all()
+  const items = results ?? []
+  const last = items.length ? (items[items.length - 1] as { createdAt: string; id: string }) : null
+  return json({ samples: items, next: last ? `${last.createdAt}|${last.id}` : null })
+}
+
+async function ocrAdminGet(id: string, env: Env): Promise<Response> {
+  const row = await env.DB.prepare('SELECT r2_key AS r2Key FROM ocr_samples WHERE id = ?')
+    .bind(id).first<{ r2Key: string }>()
+  if (!row) return json({ error: 'not found' }, 404)
+  const obj = await env.MODELS.get(row.r2Key)
+  if (!obj) return json({ error: 'image missing' }, 404)
+  return new Response(obj.body, {
+    headers: { 'content-type': obj.httpMetadata?.contentType ?? 'image/jpeg',
+      'content-length': String(obj.size), 'access-control-allow-origin': '*' },
+  })
+}
+
+async function ocrAdminDelete(id: string, env: Env): Promise<Response> {
+  const row = await env.DB.prepare('SELECT r2_key AS r2Key FROM ocr_samples WHERE id = ?')
+    .bind(id).first<{ r2Key: string }>()
+  if (!row) return json({ error: 'not found' }, 404)
+  await env.MODELS.delete(row.r2Key)
+  await env.DB.prepare('DELETE FROM ocr_samples WHERE id = ?').bind(id).run()
   return json({ id, deleted: true })
 }
 
