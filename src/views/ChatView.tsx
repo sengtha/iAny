@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ai,
   clearCrashGuard,
@@ -8,6 +8,7 @@ import {
   getGenModelId,
   setGenModelChoice,
 } from '../ai/client'
+import { khmerStt, sttSupported, type SttState } from '../ai/khmerStt'
 import { useModelStatus } from '../hooks/useModelStatus'
 import { useI18n } from '../i18n'
 import { ask, retrieve } from '../rag/ask'
@@ -26,6 +27,11 @@ export function ChatView() {
   const [busy, setBusy] = useState(false)
   const [generatorWanted, setGeneratorWanted] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+
+  // Voice input (desktop/tablet only — in-browser Whisper is too slow on phones).
+  const canVoice = useMemo(() => sttSupported(), [])
+  const [stt, setStt] = useState<SttState>({ phase: 'idle', level: 0 })
+  useEffect(() => khmerStt.subscribe(setStt), [])
 
   // If the previous generator load crashed the tab, hold off on loading it
   // again until the user explicitly retries or picks a smaller model.
@@ -103,6 +109,35 @@ export function ChatView() {
       setBusy(false)
     }
   }
+
+  // Mic: tap to record, tap again to stop → transcribe → drop the Khmer text
+  // into the composer for review before sending.
+  const toggleMic = async () => {
+    if (stt.phase === 'recording') {
+      try {
+        const text = await khmerStt.stopAndTranscribe()
+        if (text) setInput((prev) => (prev ? `${prev} ${text}` : text))
+      } catch {
+        /* error surfaced via stt state */
+      }
+      return
+    }
+    if (stt.phase === 'loading' || stt.phase === 'transcribing') return
+    try {
+      await khmerStt.startRecording()
+    } catch {
+      setStt((s) => ({ ...s, phase: 'error', error: t('chatMicDenied') }))
+    }
+  }
+
+  const micTitle =
+    stt.phase === 'recording'
+      ? t('chatMicStop')
+      : stt.phase === 'loading'
+        ? t('chatMicLoading')
+        : stt.phase === 'transcribing'
+          ? t('chatMicTranscribing')
+          : t('chatMicStart')
 
   return (
     <div className="chat">
@@ -193,6 +228,20 @@ export function ChatView() {
         <div ref={bottomRef} />
       </div>
 
+      {canVoice && stt.phase !== 'idle' ? (
+        <div className={stt.phase === 'error' ? 'stt-status err' : 'stt-status'}>
+          {stt.phase === 'recording'
+            ? t('chatMicListening')
+            : stt.phase === 'loading'
+              ? `${t('chatMicLoading')}${
+                  stt.download != null ? ` ${Math.round(stt.download * 100)}%` : '…'
+                }`
+              : stt.phase === 'transcribing'
+                ? t('chatMicTranscribing')
+                : stt.error ?? t('chatMicError')}
+        </div>
+      ) : null}
+
       <form
         className="composer"
         onSubmit={(e) => {
@@ -200,11 +249,23 @@ export function ChatView() {
           void send()
         }}
       >
+        {canVoice ? (
+          <button
+            type="button"
+            className={stt.phase === 'recording' ? 'mic on' : 'mic'}
+            onClick={() => void toggleMic()}
+            disabled={busy || stt.phase === 'loading' || stt.phase === 'transcribing'}
+            title={micTitle}
+            aria-label={micTitle}
+          >
+            {stt.phase === 'recording' ? '⏹' : '🎤'}
+          </button>
+        ) : null}
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder={t('chatPlaceholder')}
-          disabled={busy}
+          disabled={busy || stt.phase === 'recording'}
         />
         <button className="primary" type="submit" disabled={busy || !input.trim()}>
           {t('chatSend')}

@@ -20,6 +20,11 @@ export { EMBEDDING_DIMS, CHUNK_MAX_CHARS, CHUNK_OVERLAP_SENTENCES, PACK_FORMAT }
 /** Web embedding weights: EmbeddingGemma-300m as ONNX (transformers.js). The
  *  logical model + 256-dim space is pinned in core; this is its web packaging. */
 export const EMBEDDING_MODEL_ID = 'onnx-community/embeddinggemma-300m-ONNX'
+
+/** Web Khmer STT: whisper-tiny-khmer as ONNX (transformers.js / WASM). Voice
+ *  input for Chat on desktop/tablet — heavier than the mobile GGML, so the mic
+ *  is gated to fine-pointer devices. Served through the model mirror. */
+export const STT_MODEL_ID = 'sengtha/whisper-tiny-khmer'
 export type GenModelChoice = 'tiny' | 'small' | 'compact' | 'full' | 'max' | 'khmer'
 
 export interface GenModelSpec {

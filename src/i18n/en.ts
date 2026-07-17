@@ -17,6 +17,13 @@ export const en = {
   chatLoadModel: 'Load the AI model',
   chatLoadModelHint: 'One-time download (~0.7–1.5 GB), then fully offline. Resumes if interrupted.',
   chatNoResults: 'Nothing found yet. Add more in Library.',
+  chatMicStart: 'Speak your question (Khmer)',
+  chatMicStop: 'Stop & transcribe',
+  chatMicListening: '🎙️ Listening… tap ⏹ to transcribe',
+  chatMicLoading: 'Downloading voice model (first time)',
+  chatMicTranscribing: 'Transcribing…',
+  chatMicError: 'Voice input failed.',
+  chatMicDenied: 'Microphone blocked. Allow mic access and try again.',
 
   libraryTitle: 'Feed iAny',
   libraryBody: 'The more you feed it, the smarter it gets. Paste text or add files — Khmer or English.',

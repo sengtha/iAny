@@ -15,6 +15,9 @@ const BUF = 4096
 export interface RecordedClip {
   /** 16 kHz mono 16-bit PCM WAV. */
   wav: Blob
+  /** 16 kHz mono float samples (−1..1) — for transformers.js ASR, which wants
+   *  a Float32Array rather than an encoded file. */
+  samples: Float32Array
   /** Seconds of audio after silence trim. */
   durationSec: number
   /** Peak absolute sample (0–1) — lets the UI flag "too quiet". */
@@ -108,7 +111,12 @@ export class VoiceRecorder {
       const a = Math.abs(trimmed[i]!)
       if (a > peak) peak = a
     }
-    return { wav: encodeWav(trimmed, TARGET_SR), durationSec: trimmed.length / TARGET_SR, peak }
+    return {
+      wav: encodeWav(trimmed, TARGET_SR),
+      samples: trimmed,
+      durationSec: trimmed.length / TARGET_SR,
+      peak,
+    }
   }
 
   /** Abort without producing a clip (e.g. the user cancels). */
