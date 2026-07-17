@@ -20,6 +20,8 @@ export interface SttState {
 
 type Listener = (s: SttState) => void
 
+const READY_KEY = 'iany.stt.downloaded'
+
 /** Only offer voice input where in-browser Whisper is practical. */
 export function sttSupported(): boolean {
   return (
@@ -116,6 +118,74 @@ class KhmerStt {
     this.recorder?.cancel()
     this.recorder = null
     this.set({ phase: 'idle', level: 0 })
+  }
+
+  /** Has the model been fetched into the browser cache on this device? */
+  isDownloaded(): boolean {
+    try {
+      return localStorage.getItem(READY_KEY) === '1'
+    } catch {
+      return false
+    }
+  }
+
+  /**
+   * Pre-download + warm the model from the Models screen, so voice input is
+   * ready instantly (and works offline) before the user ever taps the mic.
+   */
+  download(onProgress?: (fraction: number) => void): Promise<void> {
+    const worker = this.getWorker()
+    this.set({ phase: 'loading', download: 0 })
+    return new Promise<void>((resolve, reject) => {
+      const onMsg = (e: MessageEvent) => {
+        const m = e.data
+        if (m.type === 'progress') {
+          const p = m.progress
+          if (p && p.status === 'progress' && typeof p.progress === 'number') {
+            const frac = Math.min(1, p.progress / 100)
+            this.set({ download: frac })
+            onProgress?.(frac)
+          }
+        } else if (m.type === 'ready') {
+          worker.removeEventListener('message', onMsg)
+          try {
+            localStorage.setItem(READY_KEY, '1')
+          } catch {
+            /* private mode */
+          }
+          this.set({ phase: 'idle', download: undefined })
+          resolve()
+        } else if (m.type === 'error') {
+          worker.removeEventListener('message', onMsg)
+          this.set({ phase: 'error', error: m.error, download: undefined })
+          reject(new Error(m.error))
+        }
+      }
+      worker.addEventListener('message', onMsg)
+      worker.postMessage({ type: 'load' })
+    })
+  }
+
+  /** Remove the cached model (for "redownload"/delete). */
+  async clearCache(): Promise<void> {
+    try {
+      localStorage.removeItem(READY_KEY)
+    } catch {
+      /* ignore */
+    }
+    if (this.worker) {
+      this.worker.terminate()
+      this.worker = null
+    }
+    if (typeof caches !== 'undefined') {
+      for (const name of await caches.keys()) {
+        const c = await caches.open(name)
+        for (const req of await c.keys()) {
+          if (req.url.includes('whisper-tiny-khmer')) await c.delete(req)
+        }
+      }
+    }
+    this.set({ phase: 'idle', level: 0, download: undefined, error: undefined })
   }
 }
 

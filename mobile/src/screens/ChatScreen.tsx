@@ -30,9 +30,9 @@ export function ChatScreen() {
   const [speed, setSpeed] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [gen, setGen] = useState<GenProgress>({ status: generator.status })
-  const [listening, setListening] = useState(false)
   const [sttProg, setSttProg] = useState<SttProgress>({ status: 'idle' })
   const sttSession = useRef<Awaited<ReturnType<typeof stt.listen>> | null>(null)
+  const sttStarting = useRef(false)
   const scroll = useRef<ScrollView>(null)
 
   const genReady = gen.status === 'ready' || generator.ready
@@ -89,25 +89,32 @@ export function ChatScreen() {
 
   // Voice input: tap to record, tap again to stop. Partial transcription fills
   // the composer live; the final text stays there for the user to review/send.
+  const micActive = sttProg.status === 'listening'
+  const micBusy = sttProg.status === 'downloading' || sttProg.status === 'loading'
+
   const toggleMic = async () => {
-    if (listening) {
+    // Stop an active session.
+    if (micActive) {
       const session = sttSession.current
       sttSession.current = null
-      setListening(false)
       try {
         const text = (await session?.stop()) ?? ''
-        if (text) setQuery(text)
+        if (text) setQuery((q) => (q ? `${q} ${text}` : text))
       } catch {
         /* ignore */
       }
       return
     }
+    // Ignore taps while downloading/loading or while a start is already in
+    // flight — this is what caused the stuck "-100 already capturing" state.
+    if (micBusy || sttStarting.current) return
+
     const perm = await Audio.requestPermissionsAsync()
     if (!perm.granted) {
       Alert.alert('Microphone needed', 'Allow microphone access to speak your question.')
       return
     }
-    setListening(true)
+    sttStarting.current = true
     setQuery('')
     try {
       sttSession.current = await stt.listen(
@@ -115,8 +122,9 @@ export function ChatScreen() {
         (p) => setSttProg(p),
       )
     } catch (e) {
-      setListening(false)
       setSttProg({ status: 'error', error: e instanceof Error ? e.message : String(e) })
+    } finally {
+      sttStarting.current = false
     }
   }
 
@@ -125,7 +133,7 @@ export function ChatScreen() {
       ? `Downloading voice input… ${Math.round((sttProg.progress ?? 0) * 100)}%`
       : sttProg.status === 'loading'
         ? 'Preparing voice input…'
-        : listening
+        : micActive
           ? '🎙️ Listening… tap the mic to stop'
           : sttProg.status === 'error'
             ? `⚠️ Voice input: ${sttProg.error ?? 'failed'}`
@@ -216,15 +224,15 @@ export function ChatScreen() {
 
       <View style={styles.composer}>
         <Pressable
-          style={[styles.mic, listening && styles.micOn]}
+          style={[styles.mic, micActive && styles.micOn]}
           onPress={toggleMic}
-          disabled={busy || sttProg.status === 'downloading' || sttProg.status === 'loading'}
-          accessibilityLabel={listening ? 'Stop recording' : 'Speak your question'}
+          disabled={busy || micBusy}
+          accessibilityLabel={micActive ? 'Stop recording' : 'Speak your question'}
         >
-          {sttProg.status === 'downloading' || sttProg.status === 'loading' ? (
+          {micBusy ? (
             <ActivityIndicator size="small" color={C.accent} />
           ) : (
-            <Text style={styles.micIcon}>{listening ? '⏹' : '🎤'}</Text>
+            <Text style={styles.micIcon}>{micActive ? '⏹' : '🎤'}</Text>
           )}
         </Pressable>
         <TextInput
@@ -235,12 +243,12 @@ export function ChatScreen() {
           onChangeText={setQuery}
           onSubmitEditing={onAsk}
           returnKeyType="send"
-          editable={!busy && !listening}
+          editable={!busy && !micActive}
         />
         <Pressable
-          style={[styles.send, (busy || listening || !query.trim()) && styles.sendDim]}
+          style={[styles.send, (busy || micActive || !query.trim()) && styles.sendDim]}
           onPress={onAsk}
-          disabled={busy || listening || !query.trim()}
+          disabled={busy || micActive || !query.trim()}
         >
           <Text style={styles.sendText}>Send</Text>
         </Pressable>

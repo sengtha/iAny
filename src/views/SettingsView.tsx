@@ -15,6 +15,7 @@ import {
 } from '../lib/backup'
 import { runDiagnostics, type DiagnosticResult } from '../lib/diagnostics'
 import { khmerTts, type VoiceProgress } from '../ai/khmertts'
+import { khmerStt, sttSupported, type SttState } from '../ai/khmerStt'
 import {
   deleteModelCache,
   exportModelBundle,
@@ -360,6 +361,61 @@ function VoiceCard() {
   )
 }
 
+/** Khmer voice input (STT, ONNX via transformers.js/WASM) — download once for
+ *  offline speech-to-text in Chat. Desktop/tablet only (~150 MB). */
+function SttCard() {
+  const { t } = useI18n()
+  const [state, setState] = useState<SttState>({ phase: 'idle', level: 0 })
+  const [cached, setCached] = useState(() => khmerStt.isDownloaded())
+
+  useEffect(() => khmerStt.subscribe(setState), [])
+
+  const download = () => {
+    void khmerStt
+      .download()
+      .then(() => setCached(true))
+      .catch(() => {})
+  }
+  const redownload = () => {
+    void khmerStt.clearCache().then(() => {
+      setCached(false)
+      download()
+    })
+  }
+
+  const busy = state.phase === 'loading' || state.phase === 'transcribing'
+  const statusText =
+    state.phase === 'loading'
+      ? `${t('settingsModelLoading')}${
+          state.download != null ? ` ${Math.round(state.download * 100)}%` : ''
+        }`
+      : state.phase === 'error'
+        ? (state.error ?? t('settingsModelError'))
+        : cached
+          ? t('settingsModelReady')
+          : t('settingsSttNote')
+
+  return (
+    <div className="card doc model">
+      <div>
+        <strong>{t('settingsStt')}</strong>
+        <p className="hint">{statusText}</p>
+        {state.phase === 'loading' && state.download != null && (
+          <progress value={state.download} max={1} />
+        )}
+      </div>
+      {!busy &&
+        (cached ? (
+          <button onClick={redownload}>{t('settingsRedownload')}</button>
+        ) : (
+          <button className="primary" onClick={download}>
+            {t('settingsDownload')}
+          </button>
+        ))}
+    </div>
+  )
+}
+
 export function SettingsView() {
   const { t, lang, setLang } = useI18n()
   const status = useModelStatus()
@@ -459,6 +515,14 @@ export function SettingsView() {
         {/* Khmer voice (ONNX) — reads the Radio news aloud. */}
         <p className="hint model-group">{t('settingsVoiceLabel')}</p>
         <VoiceCard />
+
+        {/* Khmer voice input (STT) — desktop/tablet only. */}
+        {sttSupported() && (
+          <>
+            <p className="hint model-group">{t('settingsSttLabel')}</p>
+            <SttCard />
+          </>
+        )}
 
         <details className="advanced">
           <summary>{t('settingsAdvanced')}</summary>

@@ -73,17 +73,28 @@ class Stt {
     onPartial: (text: string) => void,
     onProgress?: (p: SttProgress) => void,
   ): Promise<SttSession> {
-    const ctx = await this.init(onProgress)
-    onProgress?.({ status: 'listening' })
-
     // realtimeAudioSec 30 = whisper's hard chunk limit; useVad trims silence so
     // short utterances finish quickly. Khmer language is forced.
-    const { stop, subscribe } = await ctx.transcribeRealtime({
+    const opts = {
       language: 'km',
       realtimeAudioSec: 30,
       realtimeAudioSliceSec: 25,
       useVad: true,
-    })
+    }
+    let ctx = await this.init(onProgress)
+    let realtime: Awaited<ReturnType<WhisperContext['transcribeRealtime']>>
+    try {
+      realtime = await ctx.transcribeRealtime(opts)
+    } catch {
+      // whisper.rn returns state -100 when a previous realtime session is still
+      // capturing (e.g. a start/stop race left it stuck). Release the native
+      // context to clear that state, then re-init and try once more.
+      await this.reset()
+      ctx = await this.init(onProgress)
+      realtime = await ctx.transcribeRealtime(opts)
+    }
+    const { stop, subscribe } = realtime
+    onProgress?.({ status: 'listening' })
 
     let latest = ''
     let resolveFinal!: (t: string) => void
