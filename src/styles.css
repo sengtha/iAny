@@ -1374,15 +1374,6 @@ progress {
   padding-left: calc(16px + env(safe-area-inset-left));
   padding-right: calc(16px + env(safe-area-inset-right));
 }
-.voice-footer {
-  text-align: center;
-  padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
-  font-size: 0.8rem;
-  color: var(--fg-muted);
-  border-top: 1px solid var(--bg-softer);
-}
-.voice-footer a {
-  color: var(--accent);
-  text-decoration: none;
-  font-weight: 600;
+.voice-main {
+  padding-bottom: calc(24px + env(safe-area-inset-bottom));
 }

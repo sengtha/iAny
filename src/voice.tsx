@@ -31,11 +31,6 @@ function VoiceApp() {
       <main className="voice-main">
         <ContributeView />
       </main>
-
-      <footer className="voice-footer">
-        {km ? 'គម្រោងសហគមន៍' : 'A community project'} ·{' '}
-        <a href="/">iAny</a>
-      </footer>
     </div>
   )
 }

@@ -1,15 +1,16 @@
 /**
  * Mic → 16 kHz mono 16-bit WAV, in the browser.
  *
- * Whisper (and our Khmer STT trained on it) wants 16 kHz mono PCM. We record
- * with MediaRecorder (broadly supported), then decode + downsample + WAV-encode
- * on stop. A live RMS level is exposed for a classroom VU meter, and we trim
- * leading/trailing silence so clips are tight.
+ * Captures PCM directly from the Web Audio graph (a ScriptProcessorNode) rather
+ * than recording webm/opus and decoding it — decoding MediaRecorder output is
+ * flaky across browsers, and direct PCM gives us clean, downsample-ready audio
+ * plus a live level for the VU meter. Trims leading/trailing silence.
  *
  * No dependencies; runs on any modern mobile/Chromebook browser with a mic.
  */
 
 const TARGET_SR = 16000
+const BUF = 4096
 
 export interface RecordedClip {
   /** 16 kHz mono 16-bit PCM WAV. */
@@ -21,17 +22,19 @@ export interface RecordedClip {
 }
 
 export interface VoiceRecorderOptions {
-  /** Called ~30×/s with the current input level (0–1) for a live meter. */
+  /** Called each audio block with the current input level (0–1) for a meter. */
   onLevel?: (level: number) => void
 }
 
 export class VoiceRecorder {
   private stream: MediaStream | null = null
-  private rec: MediaRecorder | null = null
-  private chunks: BlobPart[] = []
   private ctx: AudioContext | null = null
-  private analyser: AnalyserNode | null = null
-  private raf = 0
+  private source: MediaStreamAudioSourceNode | null = null
+  private processor: ScriptProcessorNode | null = null
+  private sink: GainNode | null = null
+  private blocks: Float32Array[] = []
+  private srcSampleRate = 48000
+  private recording = false
   private readonly opts: VoiceRecorderOptions
 
   constructor(opts: VoiceRecorderOptions = {}) {
@@ -39,10 +42,11 @@ export class VoiceRecorder {
   }
 
   static isSupported(): boolean {
+    const AC =
+      typeof window !== 'undefined' &&
+      (window.AudioContext || (window as unknown as { webkitAudioContext?: unknown }).webkitAudioContext)
     return (
-      typeof navigator !== 'undefined' &&
-      !!navigator.mediaDevices?.getUserMedia &&
-      typeof MediaRecorder !== 'undefined'
+      typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia && !!AC
     )
   }
 
@@ -56,108 +60,98 @@ export class VoiceRecorder {
         autoGainControl: true,
       },
     })
-    this.chunks = []
-    this.rec = new MediaRecorder(this.stream)
-    this.rec.ondataavailable = (e) => {
-      if (e.data.size > 0) this.chunks.push(e.data)
+    const AC =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+    this.ctx = new AC()
+    // Autoplay policies can leave the context suspended until a gesture; the
+    // Record tap is that gesture, so resume explicitly.
+    if (this.ctx.state === 'suspended') await this.ctx.resume()
+    this.srcSampleRate = this.ctx.sampleRate
+
+    this.source = this.ctx.createMediaStreamSource(this.stream)
+    this.processor = this.ctx.createScriptProcessor(BUF, 1, 1)
+    // A muted sink keeps the processor in a graph that reaches destination (so
+    // onaudioprocess fires) without echoing the mic back to the speakers.
+    this.sink = this.ctx.createGain()
+    this.sink.gain.value = 0
+
+    this.blocks = []
+    this.recording = true
+    this.processor.onaudioprocess = (e: AudioProcessingEvent) => {
+      if (!this.recording) return
+      const input = e.inputBuffer.getChannelData(0)
+      this.blocks.push(new Float32Array(input))
+      if (this.opts.onLevel) {
+        let sum = 0
+        for (let i = 0; i < input.length; i++) sum += input[i]! * input[i]!
+        this.opts.onLevel(Math.min(1, Math.sqrt(sum / input.length) * 3))
+      }
     }
-    this.rec.start()
-    this.startMeter()
+    this.source.connect(this.processor)
+    this.processor.connect(this.sink)
+    this.sink.connect(this.ctx.destination)
   }
 
-  /** Stop, decode, downsample to 16 kHz mono, trim silence, WAV-encode. */
+  /** Stop, concatenate, downsample to 16 kHz, trim silence, WAV-encode. */
   async stop(): Promise<RecordedClip> {
-    const rec = this.rec
-    if (!rec) throw new Error('not recording')
-    const blob: Blob = await new Promise((resolve) => {
-      rec.onstop = () => resolve(new Blob(this.chunks, { type: rec.mimeType || 'audio/webm' }))
-      rec.stop()
-    })
-    this.stopMeter()
-    this.teardownStream()
+    this.recording = false
+    const from = this.srcSampleRate
+    this.teardown()
 
-    const audioCtx = new AudioContext()
-    try {
-      const decoded = await audioCtx.decodeAudioData(await blob.arrayBuffer())
-      const mono = toMono(decoded)
-      const down = downsample(mono, decoded.sampleRate, TARGET_SR)
-      const trimmed = trimSilence(down)
-      let peak = 0
-      for (let i = 0; i < trimmed.length; i++) {
-        const a = Math.abs(trimmed[i]!)
-        if (a > peak) peak = a
-      }
-      return {
-        wav: encodeWav(trimmed, TARGET_SR),
-        durationSec: trimmed.length / TARGET_SR,
-        peak,
-      }
-    } finally {
-      void audioCtx.close()
+    const raw = concat(this.blocks)
+    this.blocks = []
+    const down = downsample(raw, from, TARGET_SR)
+    const trimmed = trimSilence(down)
+    let peak = 0
+    for (let i = 0; i < trimmed.length; i++) {
+      const a = Math.abs(trimmed[i]!)
+      if (a > peak) peak = a
     }
+    return { wav: encodeWav(trimmed, TARGET_SR), durationSec: trimmed.length / TARGET_SR, peak }
   }
 
   /** Abort without producing a clip (e.g. the user cancels). */
   cancel(): void {
+    this.recording = false
+    this.blocks = []
+    this.teardown()
+  }
+
+  private teardown(): void {
     try {
-      this.rec?.stop()
+      this.processor?.disconnect()
+      this.source?.disconnect()
+      this.sink?.disconnect()
     } catch {
-      /* already stopped */
+      /* ignore */
     }
-    this.stopMeter()
-    this.teardownStream()
-  }
-
-  private startMeter(): void {
-    if (!this.opts.onLevel || !this.stream) return
-    this.ctx = new AudioContext()
-    const src = this.ctx.createMediaStreamSource(this.stream)
-    this.analyser = this.ctx.createAnalyser()
-    this.analyser.fftSize = 512
-    src.connect(this.analyser)
-    const buf = new Float32Array(this.analyser.fftSize)
-    const tick = () => {
-      if (!this.analyser) return
-      this.analyser.getFloatTimeDomainData(buf)
-      let sum = 0
-      for (let i = 0; i < buf.length; i++) sum += buf[i]! * buf[i]!
-      this.opts.onLevel?.(Math.min(1, Math.sqrt(sum / buf.length) * 3))
-      this.raf = requestAnimationFrame(tick)
-    }
-    this.raf = requestAnimationFrame(tick)
-  }
-
-  private stopMeter(): void {
-    if (this.raf) cancelAnimationFrame(this.raf)
-    this.raf = 0
-    this.analyser = null
-    if (this.ctx) {
-      void this.ctx.close()
-      this.ctx = null
-    }
-  }
-
-  private teardownStream(): void {
+    if (this.processor) this.processor.onaudioprocess = null
     this.stream?.getTracks().forEach((t) => t.stop())
+    if (this.ctx) void this.ctx.close()
+    this.processor = null
+    this.source = null
+    this.sink = null
+    this.ctx = null
     this.stream = null
-    this.rec = null
   }
 }
 
-function toMono(buf: AudioBuffer): Float32Array {
-  if (buf.numberOfChannels === 1) return buf.getChannelData(0).slice()
-  const n = buf.length
+function concat(blocks: Float32Array[]): Float32Array {
+  let n = 0
+  for (const b of blocks) n += b.length
   const out = new Float32Array(n)
-  for (let c = 0; c < buf.numberOfChannels; c++) {
-    const ch = buf.getChannelData(c)
-    for (let i = 0; i < n; i++) out[i]! += ch[i]! / buf.numberOfChannels
+  let off = 0
+  for (const b of blocks) {
+    out.set(b, off)
+    off += b.length
   }
   return out
 }
 
 /** Linear-interpolation resample (fine for speech at these rates). */
 function downsample(data: Float32Array, from: number, to: number): Float32Array {
-  if (from === to) return data
+  if (from === to || data.length === 0) return data
   const ratio = from / to
   const n = Math.floor(data.length / ratio)
   const out = new Float32Array(n)
@@ -173,6 +167,7 @@ function downsample(data: Float32Array, from: number, to: number): Float32Array 
 
 /** Drop near-silence from both ends (threshold on absolute amplitude). */
 function trimSilence(data: Float32Array, threshold = 0.008, padSec = 0.08): Float32Array {
+  if (data.length === 0) return data
   const pad = Math.floor(padSec * TARGET_SR)
   let start = 0
   let end = data.length - 1
