@@ -190,7 +190,7 @@ args = Seq2SeqTrainingArguments(
 trainer = Seq2SeqTrainer(model=model, args=args,
     train_dataset=ds["train"], eval_dataset=ds["test"],
     data_collator=Collator(processor), compute_metrics=compute_metrics,
-    tokenizer=processor.feature_extractor)
+    processing_class=processor.feature_extractor)  # `tokenizer=` on transformers <4.46
 
 resume = get_last_checkpoint(OUT) if os.path.isdir(OUT) else None
 if resume is None and os.path.isdir(f"{OUT}/last-checkpoint"):
