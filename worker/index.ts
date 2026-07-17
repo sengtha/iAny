@@ -37,6 +37,7 @@ const ALLOWED_PREFIXES = [
   // Shared on-device models.
   'sengtha/khmer-tts-female-v2/', // Khmer TTS voice (Radio)
   'sengtha/khmer-ocr/', // Khmer OCR — detector + recognizer
+  'sengtha/whisper-tiny-khmer/', // Khmer STT (whisper.rn GGML + ct2/onnx)
 ]
 // OCR language data, served through the same mirror. Khmer uses the
 // high-accuracy models; English's fast model is accurate enough.
