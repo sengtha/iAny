@@ -80,15 +80,18 @@ class Stt {
     onPartial: (text: string) => void,
     onProgress?: (p: SttProgress) => void,
   ): Promise<SttSession> {
-    // NO VAD: VAD gating often never triggers on a phone mic, so nothing gets
-    // transcribed. Instead transcribe continuously (live partials) AND save the
-    // audio to a WAV, so on stop we can do one clean file-based pass for the
-    // final text — the reliable result.
+    // RECORD-ONLY: continuous realtime transcription re-runs Whisper over the
+    // whole growing buffer every second, which pegs a 2019 phone's CPU and
+    // freezes the UI. Instead we set the transcribe threshold to the full
+    // window so the realtime engine effectively just *records* to a WAV
+    // (audioOutputPath), then we do ONE file-based transcribe on stop. VAD off.
     const wavUri = `${FileSystem.cacheDirectory ?? ''}iany-stt.wav`
     const wavPath = wavUri.replace('file://', '')
     const opts = {
       language: 'km',
-      realtimeAudioSec: 30, // whisper's hard 30 s window
+      realtimeAudioSec: 30, // whisper's hard 30 s window (also caps recording)
+      realtimeAudioSliceSec: 30,
+      realtimeAudioMinSec: 30, // don't transcribe mid-recording → no CPU spikes
       audioOutputPath: wavPath,
     }
     let ctx = await this.init(onProgress)
@@ -106,12 +109,15 @@ class Stt {
     const { stop, subscribe } = realtime
     onProgress?.({ status: 'listening' })
 
+    // In record-only mode partials rarely fire; keep the handler as a harmless
+    // bonus (any early result still shows), but the real result is the
+    // file-based pass on stop.
     let latest = ''
     subscribe((evt) => {
       const t = (evt.data?.result ?? '').trim()
       if (t) {
         latest = t
-        onPartial(t) // live feedback in the composer
+        onPartial(t)
       }
     })
 
