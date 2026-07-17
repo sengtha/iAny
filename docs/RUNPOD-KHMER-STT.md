@@ -148,6 +148,9 @@ def prepare(b):
     b["labels"] = processor.tokenizer(b["sentence"]).input_ids
     return b
 ds = ds.map(prepare, remove_columns=ds["train"].column_names, num_proc=2)
+# Whisper's decoder caps labels at 448 tokens; Khmer tokenizes densely, so a few
+# long clips exceed it and would crash training. Drop them (cheap; map stays cached).
+ds = ds.filter(lambda b: len(b["labels"]) <= 448, num_proc=2)
 
 @dataclass
 class Collator:
