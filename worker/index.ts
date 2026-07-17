@@ -413,10 +413,20 @@ async function serveVoice(url: URL, request: Request, env: Env): Promise<Respons
         'access-control-allow-headers': 'authorization,content-type' },
     })
   }
-  if (path === 'clip' && request.method === 'POST') return voicePostClip(request, env)
-  if (path === 'stats' && request.method === 'GET') return voiceStats(env)
-  if (path === 'admin' || path.startsWith('admin/')) return serveVoiceAdmin(path, request, env)
-  return json({ error: 'not found' }, 404)
+  try {
+    if (path === 'clip' && request.method === 'POST') return await voicePostClip(request, env)
+    if (path === 'stats' && request.method === 'GET') return await voiceStats(env)
+    if (path === 'admin' || path.startsWith('admin/')) return await serveVoiceAdmin(path, request, env)
+    return json({ error: 'not found' }, 404)
+  } catch (e) {
+    // Most likely the voice_clips table hasn't been created yet — surface a
+    // legible hint instead of a raw Worker 1101 crash.
+    const msg = e instanceof Error ? e.message : String(e)
+    const hint = /no such table|voice_clips/i.test(msg)
+      ? 'voice storage not initialised — run the D1 schema migration (worker/schema.sql)'
+      : 'server error'
+    return json({ error: hint, detail: msg }, 500)
+  }
 }
 
 // Public: accept one recording. multipart/form-data with `audio` + metadata.
