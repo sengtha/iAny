@@ -10,7 +10,7 @@ import { useI18n } from '../i18n'
 const GITHUB_URL = 'https://github.com/sengtha/iAny'
 const HF_URL = 'https://huggingface.co/sengtha'
 const APP_URL = '/app'
-const APK_URL = '/download/iany-android.apk'
+const APK_URL = '/download/iany-android-preview.apk'
 const COMPANY_URL = 'https://www.e-khmer.com'
 const COMPANY_NAME = 'E-KHMER Technology Co., Ltd'
 const COMPANY_YEAR = 2026
@@ -79,7 +79,13 @@ export function LandingView() {
         </ul>
         <p className="lp-apk">
           {L('On Android? ', 'ប្រើ Android? ')}
-          <a href={APK_URL}>📱 {L('Download the app (APK)', 'ទាញយកកម្មវិធី (APK)')}</a>
+          <a href={APK_URL}>
+            📱 {L('Download the app (APK)', 'ទាញយកកម្មវិធី (APK)')} · {L('Preview', 'មើលជាមុន')}
+          </a>
+          <br />
+          <span className="lp-apk-note">
+            {L('Preview build — not an official release yet.', 'កំណែសាកល្បង — មិនទាន់ជាការចេញផ្សាយផ្លូវការទេ។')}
+          </span>
         </p>
       </section>
 
@@ -192,7 +198,7 @@ export function LandingView() {
         </p>
         <div className="lp-foot-links">
           <a href={APP_URL}>{L('App', 'កម្មវិធី')}</a>
-          <a href={APK_URL}>{L('Android APK', 'Android APK')}</a>
+          <a href={APK_URL}>{L('Android APK (Preview)', 'Android APK (សាកល្បង)')}</a>
           <a href={GITHUB_URL} target="_blank" rel="noreferrer">GitHub</a>
           <a href={HF_URL} target="_blank" rel="noreferrer">Hugging Face</a>
           <a href="/voice">/voice</a>

@@ -893,7 +893,8 @@ async function signAdminDelete(id: string, env: Env): Promise<Response> {
  * ------------------------------------------------------------------ */
 
 const APK_CONTENT_TYPE = 'application/vnd.android.package-archive'
-const APK_FILENAME = 'iany-android.apk'
+// Preview build — not an official release. Filename reflects that.
+const APK_FILENAME = 'iany-android-preview.apk'
 // Fallback if the R2 listing is empty/unavailable (the file the user uploaded).
 const APK_FALLBACK_KEY = 'apk/application-87aacdb8-848c-4d12-87ea-342899d102d9.apk'
 

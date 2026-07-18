@@ -602,6 +602,16 @@ export function SettingsView() {
         </details>
       </section>
 
+      <section className="card">
+        <h2>
+          {t('settingsAndroid')} <span className="badge reco">{t('settingsPreview')}</span>
+        </h2>
+        <p className="hint">{t('settingsAndroidNote')}</p>
+        <a className="button-link" href="/download/iany-android-preview.apk">
+          📱 {t('settingsAndroidDownload')}
+        </a>
+      </section>
+
       <CloudBackup />
 
       <section className="card">

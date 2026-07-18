@@ -74,6 +74,11 @@ export const en = {
   settingsSignLabel: 'Sign Language',
   settingsSign: 'Khmer Sign hand tracker',
   settingsSignNote: 'Pre-download so the Sign page works offline · ~8 MB',
+  settingsAndroid: 'Android app',
+  settingsPreview: 'Preview',
+  settingsAndroidNote:
+    'A preview build for Android — not an official release yet. On the web you can also install iAny as an app (Add to Home screen).',
+  settingsAndroidDownload: 'Download APK (Preview)',
   settingsRedownload: 'Redownload',
   settingsUse: 'Use',
   settingsInUse: 'in use',

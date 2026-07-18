@@ -209,6 +209,12 @@ body {
 .lp-apk a:hover {
   text-decoration: underline;
 }
+.lp-apk-note {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 0.8rem;
+  opacity: 0.75;
+}
 
 /* ----------------------------------------------------------------- sections */
 .lp-section {

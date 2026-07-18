@@ -76,6 +76,11 @@ export const km: Translation = {
   settingsSignLabel: 'ភាសាសញ្ញា',
   settingsSign: 'កម្មវិធីតាមដានដៃ ភាសាសញ្ញាខ្មែរ',
   settingsSignNote: 'ទាញយកជាមុន ដើម្បីឲ្យទំព័រភាសាសញ្ញាដំណើរការក្រៅបណ្ដាញ · ~8 MB',
+  settingsAndroid: 'កម្មវិធី Android',
+  settingsPreview: 'សាកល្បង',
+  settingsAndroidNote:
+    'កំណែសាកល្បងសម្រាប់ Android — មិនទាន់ជាការចេញផ្សាយផ្លូវការទេ។ នៅលើបណ្ដាញ អ្នកក៏អាចដំឡើង iAny ជាកម្មវិធី (បន្ថែមទៅអេក្រង់ដើម)។',
+  settingsAndroidDownload: 'ទាញយក APK (សាកល្បង)',
   settingsRedownload: 'ទាញយកឡើងវិញ',
   settingsUse: 'ប្រើ',
   settingsInUse: 'កំពុងប្រើ',

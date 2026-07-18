@@ -195,6 +195,26 @@ button:disabled {
   cursor: default;
 }
 
+/* Anchor styled like a button (e.g. the Android APK download in Settings). */
+.button-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-radius: var(--radius-sm);
+  padding: 10px 16px;
+  min-height: var(--touch);
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-decoration: none;
+  touch-action: manipulation;
+}
+.button-link:hover {
+  filter: brightness(1.05);
+}
+
 button.primary {
   background: var(--accent);
   border-color: var(--accent);
