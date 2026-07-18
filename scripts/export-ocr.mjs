@@ -11,7 +11,7 @@
  *
  * Usage:
  *   OCR_ADMIN_TOKEN=xxxx node scripts/export-ocr.mjs \
- *     [--base https://iany.sengtha.workers.dev] [--out ./ocr-out]
+ *     [--base https://iany.app] [--out ./ocr-out]
  *
  * The token is the same RADIO_ADMIN_TOKEN secret the Worker uses. Never commit it.
  */
@@ -26,7 +26,7 @@ const opt = (name, def) => {
   const i = args.indexOf(name)
   return i >= 0 && args[i + 1] ? args[i + 1] : def
 }
-const BASE = opt('--base', process.env.OCR_BASE || 'https://iany.sengtha.workers.dev').replace(/\/$/, '')
+const BASE = opt('--base', process.env.OCR_BASE || 'https://iany.app').replace(/\/$/, '')
 const OUT = opt('--out', './ocr-out')
 const TOKEN = process.env.OCR_ADMIN_TOKEN
 if (!TOKEN) {

@@ -13,7 +13,7 @@
  *
  * Usage:
  *   VOICE_ADMIN_TOKEN=xxxx node scripts/export-voice.mjs \
- *     [--base https://iany.sengtha.workers.dev] [--out ./out]
+ *     [--base https://iany.app] [--out ./out]
  *
  * The token is the same RADIO_ADMIN_TOKEN secret the Worker uses. Never commit it.
  */
@@ -28,7 +28,7 @@ const opt = (name, def) => {
   const i = args.indexOf(name)
   return i >= 0 && args[i + 1] ? args[i + 1] : def
 }
-const BASE = opt('--base', process.env.VOICE_BASE || 'https://iany.sengtha.workers.dev').replace(/\/$/, '')
+const BASE = opt('--base', process.env.VOICE_BASE || 'https://iany.app').replace(/\/$/, '')
 const OUT = opt('--out', './out')
 const TOKEN = process.env.VOICE_ADMIN_TOKEN
 if (!TOKEN) {

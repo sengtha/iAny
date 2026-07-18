@@ -51,7 +51,7 @@ The token is the Worker's `RADIO_ADMIN_TOKEN` secret:
 
 ```bash
 OCR_ADMIN_TOKEN=your-admin-token \
-  node scripts/export-ocr.mjs --base https://iany.sengtha.workers.dev --out ./ocr-out
+  node scripts/export-ocr.mjs --base https://iany.app --out ./ocr-out
 ```
 
 Produces:

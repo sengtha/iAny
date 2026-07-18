@@ -82,7 +82,7 @@ The token is the Worker's `RADIO_ADMIN_TOKEN` secret:
 
 ```bash
 SIGN_ADMIN_TOKEN=your-admin-token \
-  node scripts/export-sign.mjs --base https://iany.sengtha.workers.dev --out ./sign-out
+  node scripts/export-sign.mjs --base https://iany.app --out ./sign-out
 ```
 
 Produces:

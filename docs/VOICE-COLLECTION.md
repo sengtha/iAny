@@ -72,7 +72,7 @@ token is the Worker's `RADIO_ADMIN_TOKEN` secret:
 
 ```bash
 VOICE_ADMIN_TOKEN=your-admin-token \
-  node scripts/export-voice.mjs --base https://iany.sengtha.workers.dev --out ./out
+  node scripts/export-voice.mjs --base https://iany.app --out ./out
 ```
 
 Produces:
