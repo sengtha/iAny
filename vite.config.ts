@@ -81,6 +81,21 @@ export default defineConfig({
             },
           },
           {
+            // MediaPipe hand model (the /sign collector). Cache it the first
+            // time it's fetched — whether by the Models-screen pre-download or
+            // by MediaPipe itself on /sign — so /sign works offline afterwards.
+            urlPattern: ({ url }) =>
+              /\/models\/sengtha\/mediapipe-hand\//.test(url.pathname) ||
+              url.pathname.endsWith('hand_landmarker.task'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'runtime-hand-model',
+              expiration: { maxEntries: 2 },
+              cacheableResponse: { statuses: [0, 200] },
+              rangeRequests: true,
+            },
+          },
+          {
             // Radio loop music (.mp3) and the pdf.js worker (.mjs) are bundled
             // but not precached — cache them the first time they're used, so
             // installs stay lean but the features work offline afterward.

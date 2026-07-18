@@ -57,13 +57,10 @@ export function detectFrame(video: HTMLVideoElement, timestampMs: number): HandF
 
 const round = (n: number) => Math.round(n * 1e4) / 1e4 // 4 dp keeps files tiny
 
-export function isHandTrackingSupported(): boolean {
-  return (
-    typeof navigator !== 'undefined' &&
-    !!navigator.mediaDevices?.getUserMedia &&
-    typeof WebAssembly !== 'undefined'
-  )
-}
+// The capability check lives in ../ai/handModel (no MediaPipe import), so the
+// Models screen can use it without bundling the tracker. Re-exported here for
+// callers that already load the tracker (e.g. ContributeSignView).
+export { isHandTrackingSupported } from '../ai/handModel'
 
 export function releaseHandLandmarker(): void {
   landmarker?.close()

@@ -17,6 +17,12 @@ import { runDiagnostics, type DiagnosticResult } from '../lib/diagnostics'
 import { khmerTts, type VoiceProgress } from '../ai/khmertts'
 import { khmerStt, sttSupported, type SttState } from '../ai/khmerStt'
 import {
+  clearHandModel,
+  downloadHandModel,
+  isHandModelDownloaded,
+  isHandTrackingSupported as handTrackingSupported,
+} from '../ai/handModel'
+import {
   deleteModelCache,
   exportModelBundle,
   formatBytes,
@@ -416,6 +422,63 @@ function SttCard() {
   )
 }
 
+/** Pre-download the MediaPipe hand model that powers the /sign collector. */
+function HandModelCard() {
+  const { t } = useI18n()
+  const [cached, setCached] = useState(false)
+  const [progress, setProgress] = useState<number | null>(null)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    void isHandModelDownloaded().then(setCached)
+  }, [])
+
+  const download = async () => {
+    setError('')
+    setProgress(0)
+    try {
+      await downloadHandModel((f) => setProgress(f))
+      setCached(true)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('settingsModelError'))
+    } finally {
+      setProgress(null)
+    }
+  }
+  const redownload = async () => {
+    await clearHandModel()
+    setCached(false)
+    void download()
+  }
+
+  const busy = progress != null
+  const statusText = busy
+    ? `${t('settingsModelLoading')}${progress != null ? ` ${Math.round(progress * 100)}%` : ''}`
+    : error
+      ? error
+      : cached
+        ? t('settingsModelReady')
+        : t('settingsSignNote')
+
+  return (
+    <div className="card doc model">
+      <div>
+        <strong>{t('settingsSign')}</strong>
+        <p className="hint">{statusText}</p>
+        {busy && progress != null && <progress value={progress} max={1} />}
+      </div>
+      {!busy &&
+        (cached ? (
+          <button onClick={() => void redownload()}>{t('settingsRedownload')}</button>
+        ) : (
+          <button className="primary" onClick={() => void download()}>
+            {t('settingsDownload')}
+          </button>
+        ))}
+    </div>
+  )
+}
+
 export function SettingsView() {
   const { t, lang, setLang } = useI18n()
   const status = useModelStatus()
@@ -524,6 +587,14 @@ export function SettingsView() {
           </>
         )}
 
+        {/* Khmer Sign Language (/sign) — pre-download the hand tracker. */}
+        {handTrackingSupported() && (
+          <>
+            <p className="hint model-group">{t('settingsSignLabel')}</p>
+            <HandModelCard />
+          </>
+        )}
+
         <details className="advanced">
           <summary>{t('settingsAdvanced')}</summary>
           <ModelShare />
@@ -584,6 +655,9 @@ export function SettingsView() {
           </li>
           <li>
             Khmer OCR — <strong>seanghay/KhmerOCR</strong> (MIT)
+          </li>
+          <li>
+            Sign Language — <strong>MediaPipe Hand Landmarker</strong> (Apache-2.0, Google)
           </li>
           <li>
             Answering — <strong>Qwen3-0.6B</strong> (Apache-2.0), Gemma (Google)
