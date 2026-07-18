@@ -9,6 +9,9 @@ import { useI18n } from '../i18n'
 
 const GITHUB_URL = 'https://github.com/sengtha/iany'
 const APP_URL = '/app'
+const COMPANY_URL = 'https://www.e-khmer.com'
+const COMPANY_NAME = 'E-KHMER Technology Co., Ltd'
+const COMPANY_YEAR = 2026
 
 export function LandingView() {
   const { lang, setLang } = useI18n()
@@ -183,6 +186,14 @@ export function LandingView() {
           <a href="/sign">/sign</a>
           <a href="/braille">/braille</a>
         </div>
+        <p className="lp-foot-co">
+          © {COMPANY_YEAR}{' '}
+          <a href={COMPANY_URL} target="_blank" rel="noreferrer">
+            {COMPANY_NAME}
+          </a>{' '}
+          · {L('Apache-2.0 · "iAny" is a trademark of', 'Apache-2.0 · "iAny" ជាពាណិជ្ជសញ្ញារបស់')}{' '}
+          {COMPANY_NAME}
+        </p>
       </footer>
     </div>
   )

@@ -2,6 +2,7 @@ import type { Translation } from './en'
 
 export const km: Translation = {
   appTagline: 'AI ក្រៅបណ្ដាញ · ខ្មែរ និងអង់គ្លេស',
+  navHome: 'ទំព័រដើម',
   navChat: 'សន្ទនា',
   navRadio: 'វិទ្យុ',
   navLibrary: 'បណ្ណាល័យ',

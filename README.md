@@ -158,10 +158,10 @@ See [COMMERCIAL.md](COMMERCIAL.md) for the full model, and
 ## Trademark
 
 The Apache-2.0 license grants rights to the **code, not the name.** **"iAny"**
-and the iAny logo are trademarks of the project owner. You're free to build and
-even sell products from this code, but please give your product **its own name**
-and don't imply it's the official iAny or endorsed by it. Nominative use ("built
-with iAny", "based on iAny") is fine.
+and the iAny logo are trademarks of **[E-KHMER Technology Co., Ltd](https://www.e-khmer.com)**.
+You're free to build and even sell products from this code, but please give your
+product **its own name** and don't imply it's the official iAny or endorsed by
+it. Nominative use ("built with iAny", "based on iAny") is fine.
 
 ## Security
 

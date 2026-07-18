@@ -62,7 +62,7 @@ export default defineConfig({
         // instead: each device only ever needs the one matching its
         // capabilities (WebGPU vs CPU), so precaching all of them would
         // waste ~75 MB per install. Same for the Vite-bundled copy.
-        globIgnores: ['ort/**', '**/ort-wasm*'],
+        globIgnores: ['ort/**', '**/ort-wasm*', 'og-image.png'],
         maximumFileSizeToCacheInBytes: 30 * 1024 * 1024,
         // The offline shell is the APP (app.html, served at /app) — that's the
         // installable PWA. The marketing landing page at / is a real precached

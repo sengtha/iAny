@@ -42,13 +42,14 @@ reliability of the hosted service, and the expertise of the people who build it.
 ## Trademark
 
 The **Apache-2.0 license covers the code, not the name.** "iAny" and the iAny
-logo are trademarks of the project owner. You may build and even sell derivative
-products from this code, but please **do not use the "iAny" name or logo** in a
-way that implies your product is the official iAny or is endorsed by it. Give it
-your own name. Nominative references ("built with iAny", "based on iAny") are
-fine. See the TRADEMARK note in `README.md`.
+logo are trademarks of **E-KHMER Technology Co., Ltd**. You may build and even
+sell derivative products from this code, but please **do not use the "iAny" name
+or logo** in a way that implies your product is the official iAny or is endorsed
+by it. Give it your own name. Nominative references ("built with iAny", "based on
+iAny") are fine. See the TRADEMARK note in `README.md`.
 
 ## Questions
 
+iAny is a project of **E-KHMER Technology Co., Ltd** (https://www.e-khmer.com).
 For commercial support, hosting, partnerships, or trademark questions, contact
 **sengtha@gmail.com**.

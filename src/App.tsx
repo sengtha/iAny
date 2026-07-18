@@ -38,6 +38,9 @@ export default function App() {
             <p className="tagline">{t('appTagline')}</p>
           </div>
         </div>
+        <a className="home-link" href="/" title={t('navHome')} aria-label={t('navHome')}>
+          ← {t('navHome')}
+        </a>
       </header>
 
       <main className="main">

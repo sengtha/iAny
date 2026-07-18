@@ -1,9 +1,10 @@
 iAny
-Copyright 2026 Sengtha and the iAny contributors
+Copyright 2026 E-KHMER Technology Co., Ltd and the iAny contributors
 
 This product includes software developed as part of the iAny project
-(https://iany.sengtha.workers.dev). The iAny source code is licensed under the
-Apache License, Version 2.0 (see the LICENSE file).
+(https://iany.app) by E-KHMER Technology Co., Ltd (https://www.e-khmer.com).
+The iAny source code is licensed under the Apache License, Version 2.0 (see the
+LICENSE file).
 
 ------------------------------------------------------------------------------
 Separate licenses for models, datasets, and third-party components
@@ -38,6 +39,6 @@ Data and models contributed by, or collected with, the community are released
 openly so anyone can use and build upon them. Where a source imposes share-alike
 terms (CC-BY-SA), derived datasets and models are released under the same terms.
 
-"iAny" and the iAny logo are trademarks of the project owner. The Apache-2.0
-license grants rights to the code; it does not grant rights to the iAny name or
-logo (see the TRADEMARK section in README.md).
+"iAny" and the iAny logo are trademarks of E-KHMER Technology Co., Ltd. The
+Apache-2.0 license grants rights to the code; it does not grant rights to the
+iAny name or logo (see the TRADEMARK section in README.md).

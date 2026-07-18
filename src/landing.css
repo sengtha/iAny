@@ -343,6 +343,19 @@ body {
 .lp-foot-links a:hover {
   color: var(--lp-fg);
 }
+.lp-foot-co {
+  margin: 20px auto 0;
+  font-size: 0.82rem;
+  color: var(--lp-muted);
+  opacity: 0.85;
+}
+.lp-foot-co a {
+  color: var(--lp-accent);
+  font-weight: 600;
+}
+.lp-foot-co a:hover {
+  text-decoration: underline;
+}
 
 /* ------------------------------------------------------------- responsive */
 @media (max-width: 720px) {

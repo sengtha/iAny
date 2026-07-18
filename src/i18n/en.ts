@@ -1,5 +1,6 @@
 export const en = {
   appTagline: 'Offline AI · Khmer & English',
+  navHome: 'Home',
   navChat: 'Chat',
   navLibrary: 'Library',
   navPacks: 'Packs',
