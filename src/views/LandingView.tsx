@@ -7,7 +7,7 @@ import { useI18n } from '../i18n'
  * so it stays a tiny, fast-loading page separate from the app bundle.
  */
 
-const GITHUB_URL = 'https://github.com/sengtha/iany'
+const GITHUB_URL = 'https://github.com/sengtha/iAny'
 const APP_URL = '/app'
 const COMPANY_URL = 'https://www.e-khmer.com'
 const COMPANY_NAME = 'E-KHMER Technology Co., Ltd'
