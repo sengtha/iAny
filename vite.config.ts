@@ -62,9 +62,13 @@ export default defineConfig({
         globIgnores: ['ort/**', '**/ort-wasm*'],
         maximumFileSizeToCacheInBytes: 30 * 1024 * 1024,
         navigateFallback: 'index.html',
-        // The standalone /voice and /scan pages are separate apps; don't let the
-        // iAny service worker answer their navigations with the iAny shell.
-        navigateFallbackDenylist: [/^\/voice(\/|\.html|$)/, /^\/scan(\/|\.html|$)/],
+        // The standalone /voice, /scan, /braille pages are separate apps; don't
+        // let the iAny service worker answer their navigations with the iAny shell.
+        navigateFallbackDenylist: [
+          /^\/voice(\/|\.html|$)/,
+          /^\/scan(\/|\.html|$)/,
+          /^\/braille(\/|\.html|$)/,
+        ],
         runtimeCaching: [
           {
             urlPattern: ({ url }) => url.pathname.startsWith('/ort/'),
@@ -108,6 +112,7 @@ export default defineConfig({
         main: path.resolve(root, 'index.html'),
         voice: path.resolve(root, 'voice.html'),
         scan: path.resolve(root, 'scan.html'),
+        braille: path.resolve(root, 'braille.html'),
       },
     },
   },

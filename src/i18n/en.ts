@@ -220,6 +220,22 @@ export const en = {
   ocrReading: 'Reading text from the photo…',
   ocrUploadFailed: 'Could not save. Check your connection and try again.',
   ocrHint: 'Tip: crop close to the text, avoid glare and blur, keep the page flat.',
+
+  // Khmer Braille converter (/braille)
+  brTitle: 'Khmer Braille',
+  brLead:
+    'Turn Khmer text into Braille — type it, or photograph a page and let OCR read it. Copy the dots, or download a BRF file for an embosser.',
+  brInput: 'Khmer text',
+  brPlaceholder: 'Type or paste Khmer text…',
+  brFromPhoto: 'From a photo',
+  brClear: 'Clear',
+  brDownloading: 'Downloading OCR model (first time)…',
+  brReading: 'Reading text from the photo…',
+  brOutput: 'Braille',
+  brCopy: 'Copy Braille',
+  brDownload: 'Download BRF',
+  brNote:
+    'The Braille mapping follows the Khmer Braille standard. Please proofread before embossing important material — verify against the official chart.',
 }
 
 export type Translation = typeof en

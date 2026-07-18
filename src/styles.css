@@ -1455,3 +1455,21 @@ progress {
   resize: vertical;
   width: 100%;
 }
+
+/* Khmer Braille converter (/braille) */
+.br-label {
+  font-size: 0.85rem;
+  color: var(--fg-muted);
+  margin-top: 6px;
+}
+.br-out {
+  border: 1px solid var(--bg-softer);
+  background: var(--bg-soft);
+  border-radius: 12px;
+  padding: 16px;
+  font-size: 2rem;
+  line-height: 1.9;
+  letter-spacing: 0.06em;
+  word-break: break-word;
+  user-select: all;
+}
