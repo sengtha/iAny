@@ -1,0 +1,372 @@
+/* iAny landing page (/) — self-contained styles, dark-first, responsive.
+   Kept separate from the app's styles.css so the front page loads tiny. */
+
+:root {
+  --lp-bg: #0b1120;
+  --lp-bg2: #0f172a;
+  --lp-panel: #131c31;
+  --lp-border: #1e2a44;
+  --lp-fg: #e8edf7;
+  --lp-muted: #97a3ba;
+  --lp-accent: #38bdf8;
+  --lp-accent2: #818cf8;
+  --lp-radius: 16px;
+}
+
+* {
+  box-sizing: border-box;
+}
+html {
+  scroll-behavior: smooth;
+}
+body {
+  margin: 0;
+}
+
+.lp {
+  min-height: 100vh;
+  background: var(--lp-bg);
+  color: var(--lp-fg);
+  font-family:
+    'Noto Sans Khmer', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+.lp a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* ---------------------------------------------------------------------- nav */
+.lp-nav {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 12px clamp(16px, 5vw, 48px);
+  background: color-mix(in srgb, var(--lp-bg) 82%, transparent);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--lp-border);
+}
+.lp-logo {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-weight: 800;
+  font-size: 1.15rem;
+  letter-spacing: -0.01em;
+}
+.lp-nav-links {
+  display: flex;
+  gap: 22px;
+  margin-left: auto;
+  font-size: 0.92rem;
+  color: var(--lp-muted);
+}
+.lp-nav-links a:hover {
+  color: var(--lp-fg);
+}
+.lp-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.lp-lang {
+  background: transparent;
+  border: 1px solid var(--lp-border);
+  color: var(--lp-muted);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.lp-lang:hover {
+  color: var(--lp-fg);
+  border-color: var(--lp-accent);
+}
+
+/* --------------------------------------------------------------------- btns */
+.lp-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, var(--lp-accent), var(--lp-accent2));
+  color: #0a1020;
+  font-weight: 700;
+  border: 0;
+  border-radius: 999px;
+  padding: 11px 22px;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  box-shadow: 0 6px 20px -6px color-mix(in srgb, var(--lp-accent) 60%, transparent);
+}
+.lp-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 28px -6px color-mix(in srgb, var(--lp-accent) 70%, transparent);
+}
+.lp-btn-sm {
+  padding: 8px 16px;
+  font-size: 0.9rem;
+}
+.lp-btn-lg {
+  padding: 14px 28px;
+  font-size: 1.02rem;
+}
+.lp-btn-ghost {
+  background: transparent;
+  color: var(--lp-fg);
+  border: 1px solid var(--lp-border);
+  box-shadow: none;
+}
+.lp-btn-ghost:hover {
+  border-color: var(--lp-accent);
+  box-shadow: none;
+}
+
+/* --------------------------------------------------------------------- hero */
+.lp-hero {
+  position: relative;
+  text-align: center;
+  padding: clamp(56px, 10vw, 120px) clamp(16px, 6vw, 48px) clamp(40px, 7vw, 80px);
+  max-width: 900px;
+  margin: 0 auto;
+}
+.lp-hero-glow {
+  position: absolute;
+  top: -10%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(720px, 90%);
+  height: 420px;
+  background: radial-gradient(
+    ellipse at center,
+    color-mix(in srgb, var(--lp-accent) 26%, transparent),
+    transparent 70%
+  );
+  filter: blur(30px);
+  z-index: 0;
+  pointer-events: none;
+}
+.lp-hero > * {
+  position: relative;
+  z-index: 1;
+}
+.lp-eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--lp-accent);
+  margin: 0 0 14px;
+}
+.lp-title {
+  font-size: clamp(2.1rem, 6vw, 3.6rem);
+  line-height: 1.12;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0 0 18px;
+}
+.lp-grad {
+  background: linear-gradient(120deg, var(--lp-accent), var(--lp-accent2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.lp-sub {
+  font-size: clamp(1rem, 2.4vw, 1.22rem);
+  color: var(--lp-muted);
+  max-width: 640px;
+  margin: 0 auto 30px;
+}
+.lp-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  justify-content: center;
+}
+.lp-trust {
+  list-style: none;
+  padding: 0;
+  margin: 36px auto 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+  justify-content: center;
+  font-size: 0.9rem;
+  color: var(--lp-muted);
+}
+
+/* ----------------------------------------------------------------- sections */
+.lp-section {
+  padding: clamp(48px, 8vw, 90px) clamp(16px, 6vw, 48px);
+  max-width: 1080px;
+  margin: 0 auto;
+}
+.lp-section-alt {
+  background: var(--lp-bg2);
+  max-width: none;
+  border-top: 1px solid var(--lp-border);
+  border-bottom: 1px solid var(--lp-border);
+}
+.lp-section-alt > * {
+  max-width: 1080px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.lp-h2 {
+  font-size: clamp(1.6rem, 4vw, 2.3rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0 0 12px;
+  text-align: center;
+}
+.lp-lead {
+  color: var(--lp-muted);
+  font-size: clamp(1rem, 2.2vw, 1.12rem);
+  max-width: 680px;
+  margin: 0 auto 40px;
+  text-align: center;
+}
+
+/* -------------------------------------------------------------------- cards */
+.lp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 18px;
+}
+.lp-card {
+  background: var(--lp-panel);
+  border: 1px solid var(--lp-border);
+  border-radius: var(--lp-radius);
+  padding: 22px;
+  transition: transform 0.14s ease, border-color 0.14s ease;
+}
+.lp-card:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--lp-accent) 55%, var(--lp-border));
+}
+.lp-card-icon {
+  font-size: 1.7rem;
+  line-height: 1;
+  margin-bottom: 12px;
+}
+.lp-card h3 {
+  margin: 0 0 6px;
+  font-size: 1.08rem;
+  font-weight: 700;
+}
+.lp-card p {
+  margin: 0;
+  color: var(--lp-muted);
+  font-size: 0.94rem;
+}
+.lp-card-link {
+  display: inline-block;
+  margin-top: 12px;
+  color: var(--lp-accent);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.lp-card-link:hover {
+  text-decoration: underline;
+}
+
+/* --------------------------------------------------------------------- band */
+.lp-band {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 32px;
+  align-items: center;
+  background: linear-gradient(135deg, var(--lp-panel), var(--lp-bg2));
+  border: 1px solid var(--lp-border);
+  border-radius: 22px;
+  padding: clamp(24px, 4vw, 44px);
+}
+.lp-band .lp-h2,
+.lp-band .lp-lead {
+  text-align: left;
+  margin-left: 0;
+}
+.lp-band-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.lp-chip {
+  background: var(--lp-bg);
+  border: 1px solid var(--lp-border);
+  border-radius: 999px;
+  padding: 10px 18px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: border-color 0.14s ease, transform 0.14s ease;
+}
+.lp-chip:hover {
+  border-color: var(--lp-accent);
+  transform: translateY(-2px);
+}
+
+/* ---------------------------------------------------------------- open src */
+.lp-os {
+  text-align: center;
+}
+
+/* ------------------------------------------------------------------- footer */
+.lp-footer {
+  border-top: 1px solid var(--lp-border);
+  padding: 40px clamp(16px, 6vw, 48px) 56px;
+  text-align: center;
+  color: var(--lp-muted);
+}
+.lp-foot-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  color: var(--lp-fg);
+  margin-bottom: 8px;
+}
+.lp-foot-note {
+  margin: 0 auto 16px;
+  max-width: 460px;
+  font-size: 0.92rem;
+}
+.lp-foot-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  justify-content: center;
+  font-size: 0.9rem;
+}
+.lp-foot-links a:hover {
+  color: var(--lp-fg);
+}
+
+/* ------------------------------------------------------------- responsive */
+@media (max-width: 720px) {
+  .lp-nav-links {
+    display: none;
+  }
+  .lp-band {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Light mode: the app is dark-first, but respect a light preference softly. */
+@media (prefers-color-scheme: light) {
+  :root {
+    --lp-bg: #f6f8fc;
+    --lp-bg2: #eef2f9;
+    --lp-panel: #ffffff;
+    --lp-border: #dbe2ee;
+    --lp-fg: #0f172a;
+    --lp-muted: #566076;
+    --lp-accent: #0284c7;
+    --lp-accent2: #4f46e5;
+  }
+  .lp-btn {
+    color: #fff;
+  }
+}

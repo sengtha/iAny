@@ -1,0 +1,218 @@
+import { useI18n } from '../i18n'
+
+/**
+ * iAny landing / front page (served at /). Marketing entry point that sits in
+ * front of the app (now at /app) and the community tools (/voice, /scan, /sign,
+ * /braille). Self-contained + bilingual (EN/KM) with its own styles (landing.css)
+ * so it stays a tiny, fast-loading page separate from the app bundle.
+ */
+
+const GITHUB_URL = 'https://github.com/sengtha/iany'
+const APP_URL = '/app'
+
+export function LandingView() {
+  const { lang, setLang } = useI18n()
+  const km = lang === 'km'
+  const L = (en: string, khmer: string) => (km ? khmer : en)
+
+  return (
+    <div className="lp" lang={km ? 'km' : 'en'}>
+      {/* ---------------------------------------------------------------- nav */}
+      <header className="lp-nav">
+        <a className="lp-logo" href="/">
+          <img src="/icon.svg" alt="" width={30} height={30} />
+          <span>iAny</span>
+        </a>
+        <nav className="lp-nav-links">
+          <a href="#features">{L('Features', 'មុខងារ')}</a>
+          <a href="#open">{L('Open Khmer AI', 'AI ខ្មែរបើកចំហ')}</a>
+          <a href="#contribute">{L('Contribute', 'ចូលរួម')}</a>
+          <a href={GITHUB_URL} target="_blank" rel="noreferrer">
+            GitHub
+          </a>
+        </nav>
+        <div className="lp-nav-actions">
+          <button className="lp-lang" onClick={() => setLang(km ? 'en' : 'km')}>
+            {km ? 'EN' : 'ខ្មែរ'}
+          </button>
+          <a className="lp-btn lp-btn-sm" href={APP_URL}>
+            {L('Open app', 'បើកកម្មវិធី')}
+          </a>
+        </div>
+      </header>
+
+      {/* --------------------------------------------------------------- hero */}
+      <section className="lp-hero">
+        <div className="lp-hero-glow" aria-hidden />
+        <p className="lp-eyebrow">{L('Offline · On-device · Open source', 'ក្រៅបណ្ដាញ · លើឧបករណ៍ · បើកចំហ')}</p>
+        <h1 className="lp-title">
+          {L('Khmer AI that runs ', 'AI ខ្មែរ ដែលដំណើរការ')}
+          <span className="lp-grad">{L('on your device', 'នៅលើឧបករណ៍របស់អ្នក')}</span>
+        </h1>
+        <p className="lp-sub">
+          {L(
+            'Chat with your own knowledge, and use free, open Khmer speech-to-text, text-to-speech, OCR, Braille and sign language — 100% private, works without internet.',
+            'សន្ទនាជាមួយចំណេះដឹងផ្ទាល់ខ្លួន និងប្រើ ការបំប្លែងសំឡេងជាអក្សរ អក្សរជាសំឡេង OCR អក្សរផុស និងភាសាសញ្ញាខ្មែរ ដោយឥតគិតថ្លៃ — ឯកជន ១០០% ដំណើរការដោយគ្មានអ៊ីនធឺណិត។',
+          )}
+        </p>
+        <div className="lp-cta">
+          <a className="lp-btn lp-btn-lg" href={APP_URL}>
+            {L('Open the app', 'បើកកម្មវិធី')} →
+          </a>
+          <a className="lp-btn lp-btn-ghost lp-btn-lg" href="#open">
+            {L('Explore Khmer AI tools', 'ស្វែងយល់ឧបករណ៍ AI ខ្មែរ')}
+          </a>
+        </div>
+        <ul className="lp-trust">
+          <li>🔒 {L('No account, no tracking', 'គ្មានគណនី គ្មានតាមដាន')}</li>
+          <li>📴 {L('Works fully offline', 'ដំណើរការក្រៅបណ្ដាញ')}</li>
+          <li>🇰🇭 {L('Khmer + English', 'ខ្មែរ + អង់គ្លេស')}</li>
+          <li>🆓 {L('Free & open source', 'ឥតគិតថ្លៃ & បើកចំហ')}</li>
+        </ul>
+      </section>
+
+      {/* ----------------------------------------------------------- features */}
+      <section id="features" className="lp-section">
+        <h2 className="lp-h2">{L('Your private knowledge base', 'មូលដ្ឋានចំណេះដឹងឯកជនរបស់អ្នក')}</h2>
+        <p className="lp-lead">
+          {L(
+            'Feed iAny text and documents; it indexes them in a real database inside your browser and answers your questions with sources — grounded in your own knowledge, never leaving your device.',
+            'បញ្ចូលអត្ថបទ និងឯកសារទៅ iAny; វារៀបចំសន្ទស្សន៍ក្នុងមូលដ្ឋានទិន្នន័យពិតប្រាកដក្នុងកម្មវិធីរុករករបស់អ្នក ហើយឆ្លើយសំណួរជាមួយប្រភព — ផ្អែកលើចំណេះដឹងផ្ទាល់ខ្លួន មិនចេញពីឧបករណ៍ឡើយ។',
+          )}
+        </p>
+        <div className="lp-grid">
+          <Feature icon="💬" title={L('Ask your docs', 'សួរឯកសាររបស់អ្នក')}
+            desc={L('On-device RAG chat with hybrid Khmer/English search and cited sources.', 'ការសន្ទនា RAG លើឧបករណ៍ ជាមួយការស្វែងរកខ្មែរ/អង់គ្លេស និងប្រភពយោង។')} />
+          <Feature icon="📚" title={L('Library', 'បណ្ណាល័យ')}
+            desc={L('Import text, PDFs and photos (Khmer OCR) into your knowledge base.', 'នាំចូលអត្ថបទ PDF និងរូបភាព (OCR ខ្មែរ) ចូលមូលដ្ឋានចំណេះដឹង។')} />
+          <Feature icon="📦" title={L('Knowledge packs', 'កញ្ចប់ចំណេះដឹង')}
+            desc={L('Share a ready-made knowledge base as a file — no internet needed.', 'ចែករំលែកមូលដ្ឋានចំណេះដឹងជាឯកសារ — មិនត្រូវការអ៊ីនធឺណិត។')} />
+          <Feature icon="📻" title={L('Radio', 'វិទ្យុ')}
+            desc={L('Khmer news read aloud by the on-device voice.', 'ព័ត៌មានខ្មែរអានឮៗដោយសំឡេងលើឧបករណ៍។')} />
+          <Feature icon="🎙️" title={L('Voice input', 'បញ្ចូលដោយសំឡេង')}
+            desc={L('Speak in Khmer — on-device speech-to-text, no cloud.', 'និយាយជាភាសាខ្មែរ — បំប្លែងសំឡេងជាអក្សរលើឧបករណ៍ គ្មានពពក។')} />
+          <Feature icon="⚙️" title={L('Your models', 'ម៉ូឌែលរបស់អ្នក')}
+            desc={L('Download models once, share device-to-device, encrypted backup.', 'ទាញយកម៉ូឌែលម្ដង ចែករំលែករវាងឧបករណ៍ បម្រុងទុកបំបាំង។')} />
+        </div>
+      </section>
+
+      {/* --------------------------------------------------------- open Khmer AI */}
+      <section id="open" className="lp-section lp-section-alt">
+        <h2 className="lp-h2">{L('Open Khmer AI, for everyone', 'AI ខ្មែរបើកចំហ សម្រាប់អ្នកគ្រប់គ្នា')}</h2>
+        <p className="lp-lead">
+          {L(
+            'Our mission: build the best free Khmer speech, vision and accessibility AI — and release the models open source, with the community and for the community.',
+            'បេសកកម្មរបស់យើង៖ បង្កើត AI ខ្មែរ ផ្នែកសំឡេង រូបភាព និងភាពងាយស្រួល ដ៏ល្អបំផុតដោយឥតគិតថ្លៃ — ហើយចេញផ្សាយម៉ូឌែលជាបែបបើកចំហ ជាមួយ និងសម្រាប់សហគមន៍។',
+          )}
+        </p>
+        <div className="lp-grid">
+          <Feature icon="🗣️" title={L('Speech-to-Text', 'សំឡេងទៅអក្សរ')}
+            desc={L('Khmer STT you can run on-device and in the app.', 'STT ខ្មែរ ដែលអ្នកអាចដំណើរការលើឧបករណ៍ និងក្នុងកម្មវិធី។')} />
+          <Feature icon="🔊" title={L('Text-to-Speech', 'អក្សរទៅសំឡេង')}
+            desc={L('Natural Khmer voices that read text aloud, offline.', 'សំឡេងខ្មែរធម្មជាតិ អានអត្ថបទឮៗ ក្រៅបណ្ដាញ។')} />
+          <Feature icon="📷" title={L('Khmer OCR', 'OCR ខ្មែរ')}
+            desc={L('Read Khmer text from photos, right on your phone.', 'អានអក្សរខ្មែរពីរូបថត នៅលើទូរស័ព្ទរបស់អ្នក។')} link="/scan" linkLabel={L('Try /scan', 'សាកល្បង /scan')} />
+          <Feature icon="⠿" title={L('Khmer Braille', 'អក្សរផុសខ្មែរ')}
+            desc={L('Convert Khmer text to Braille dots and BRF files.', 'បម្លែងអក្សរខ្មែរទៅជាចំណុចផុស និងឯកសារ BRF។')} link="/braille" linkLabel={L('Open /braille', 'បើក /braille')} />
+          <Feature icon="🤟" title={L('Khmer Sign Language', 'ភាសាសញ្ញាខ្មែរ')}
+            desc={L('Building an open sign-language dataset, with the Deaf community.', 'កំពុងបង្កើតទិន្នន័យភាសាសញ្ញាបើកចំហ ជាមួយសហគមន៍ថ្លង់។')} link="/sign" linkLabel={L('Open /sign', 'បើក /sign')} />
+          <Feature icon="🎤" title={L('Contribute your voice', 'ចូលរួមសំឡេងរបស់អ្នក')}
+            desc={L('Help train a better open Khmer speech model.', 'ជួយបង្រៀនម៉ូឌែលសំឡេងខ្មែរបើកចំហ ឲ្យប្រសើរ។')} link="/voice" linkLabel={L('Open /voice', 'បើក /voice')} />
+        </div>
+      </section>
+
+      {/* -------------------------------------------------------- contribute */}
+      <section id="contribute" className="lp-section">
+        <div className="lp-band">
+          <div>
+            <h2 className="lp-h2">{L('Built with the community', 'បង្កើតជាមួយសហគមន៍')}</h2>
+            <p className="lp-lead">
+              {L(
+                'Every recording, photo and sign you contribute becomes an open dataset — and the models trained from them are released free for everyone. Contributors are credited by name.',
+                'រាល់ការថត រូបភាព និងសញ្ញាដែលអ្នកចូលរួម ក្លាយជាទិន្នន័យបើកចំហ — ហើយម៉ូឌែលដែលបង្រៀនចេញពីវា ត្រូវបានចេញផ្សាយឥតគិតថ្លៃសម្រាប់អ្នកគ្រប់គ្នា។ អ្នកចូលរួមត្រូវបានផ្ដល់កិត្តិនាម។',
+              )}
+            </p>
+          </div>
+          <div className="lp-band-links">
+            <a className="lp-chip" href="/voice">🎤 {L('Voice', 'សំឡេង')}</a>
+            <a className="lp-chip" href="/scan">📷 {L('Scan', 'ស្កេន')}</a>
+            <a className="lp-chip" href="/sign">🤟 {L('Sign', 'សញ្ញា')}</a>
+            <a className="lp-chip" href="/braille">⠿ {L('Braille', 'អក្សរផុស')}</a>
+          </div>
+        </div>
+      </section>
+
+      {/* ------------------------------------------------------- open source */}
+      <section className="lp-section lp-section-alt">
+        <div className="lp-os">
+          <h2 className="lp-h2">{L('Free & open source', 'ឥតគិតថ្លៃ & បើកចំហ')}</h2>
+          <p className="lp-lead">
+            {L(
+              'iAny is open source under Apache-2.0 — free to use, self-host, and build on, including commercially. No lock-in, no secrets. Help us build the best open Khmer AI.',
+              'iAny ជាកម្មវិធីបើកចំហក្រោមអាជ្ញាបណ្ណ Apache-2.0 — ឥតគិតថ្លៃក្នុងការប្រើ ដំឡើងផ្ទាល់ខ្លួន និងបង្កើតបន្ថែម រួមទាំងពាណិជ្ជកម្ម។ គ្មានចាក់សោ គ្មានអាថ៌កំបាំង។ សូមជួយយើងបង្កើត AI ខ្មែរបើកចំហ ដ៏ល្អបំផុត។',
+            )}
+          </p>
+          <div className="lp-cta">
+            <a className="lp-btn lp-btn-lg" href={GITHUB_URL} target="_blank" rel="noreferrer">
+              ★ {L('Star on GitHub', 'ផ្ដល់ផ្កាយនៅ GitHub')}
+            </a>
+            <a className="lp-btn lp-btn-ghost lp-btn-lg" href={APP_URL}>
+              {L('Open the app', 'បើកកម្មវិធី')} →
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* ------------------------------------------------------------- footer */}
+      <footer className="lp-footer">
+        <div className="lp-foot-brand">
+          <img src="/icon.svg" alt="" width={22} height={22} />
+          <span>iAny</span>
+        </div>
+        <p className="lp-foot-note">
+          {L(
+            'Offline, on-device Khmer AI — with the community, for the community.',
+            'AI ខ្មែរ ក្រៅបណ្ដាញ លើឧបករណ៍ — ជាមួយសហគមន៍ សម្រាប់សហគមន៍។',
+          )}
+        </p>
+        <div className="lp-foot-links">
+          <a href={APP_URL}>{L('App', 'កម្មវិធី')}</a>
+          <a href={GITHUB_URL} target="_blank" rel="noreferrer">GitHub</a>
+          <a href="/voice">/voice</a>
+          <a href="/scan">/scan</a>
+          <a href="/sign">/sign</a>
+          <a href="/braille">/braille</a>
+        </div>
+      </footer>
+    </div>
+  )
+}
+
+function Feature({
+  icon,
+  title,
+  desc,
+  link,
+  linkLabel,
+}: {
+  icon: string
+  title: string
+  desc: string
+  link?: string
+  linkLabel?: string
+}) {
+  return (
+    <div className="lp-card">
+      <div className="lp-card-icon" aria-hidden>
+        {icon}
+      </div>
+      <h3>{title}</h3>
+      <p>{desc}</p>
+      {link ? (
+        <a className="lp-card-link" href={link}>
+          {linkLabel ?? link} →
+        </a>
+      ) : null}
+    </div>
+  )
+}

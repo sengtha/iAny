@@ -31,7 +31,10 @@ export default defineConfig({
         theme_color: '#0f172a',
         background_color: '#0f172a',
         display: 'standalone',
-        start_url: '/',
+        // The installed app opens the app itself (/app), not the marketing
+        // landing page at /.
+        start_url: '/app',
+        scope: '/',
         icons: [
           { src: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
@@ -61,10 +64,15 @@ export default defineConfig({
         // waste ~75 MB per install. Same for the Vite-bundled copy.
         globIgnores: ['ort/**', '**/ort-wasm*'],
         maximumFileSizeToCacheInBytes: 30 * 1024 * 1024,
-        navigateFallback: 'index.html',
-        // The standalone /voice, /scan, /braille pages are separate apps; don't
-        // let the iAny service worker answer their navigations with the iAny shell.
+        // The offline shell is the APP (app.html, served at /app) — that's the
+        // installable PWA. The marketing landing page at / is a real precached
+        // document, so navigations to / still resolve to it, not this fallback.
+        navigateFallback: 'app.html',
+        // Separate pages that must NOT be answered with the app shell: the
+        // landing page (/) and the standalone /voice, /scan, /braille, /sign apps.
         navigateFallbackDenylist: [
+          /^\/$/,
+          /^\/index\.html$/,
           /^\/voice(\/|\.html|$)/,
           /^\/scan(\/|\.html|$)/,
           /^\/braille(\/|\.html|$)/,
@@ -125,7 +133,8 @@ export default defineConfig({
       // Two HTML entries: the iAny app (index.html) and the standalone Khmer
       // Voice collection page (voice.html, served at /voice).
       input: {
-        main: path.resolve(root, 'index.html'),
+        main: path.resolve(root, 'index.html'), // landing / front page (/)
+        app: path.resolve(root, 'app.html'), // the PWA app (/app)
         voice: path.resolve(root, 'voice.html'),
         scan: path.resolve(root, 'scan.html'),
         braille: path.resolve(root, 'braille.html'),
