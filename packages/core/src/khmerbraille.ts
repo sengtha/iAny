@@ -9,11 +9,16 @@
  * coeng-រ → merge composite vowels → map each glyph to a Braille cell.
  *
  * This is an independent iAny implementation. The character→cell mapping follows
- * the Khmer Braille standard; the algorithm was reimplemented from the approach
- * in IDRI-LAB/Khmer-Braille-Translation (used only as a reference — its repo
- * carries no license, so no code was copied). The mapping should be verified
- * against the official Khmer Braille chart (Krousar Thmey / MoEYS) before any
- * production embossing.
+ * the official **Khmer Braille standard** (primary source: "Khmer Braille Signs",
+ * Krousar Thmey Organization). Core cells + rules were cross-checked against
+ * *World Braille Usage* (3rd ed.): ka=⠛, kha=⠅, ko=⠠⠛; the ô-class (voiced)
+ * consonants take a point-6 prefix (our `,`), and conjuncts link with ⠧ (coeng
+ * `្` → `v` → ⠧). The algorithm was reimplemented from the approach in
+ * IDRI-LAB/Khmer-Braille-Translation (used only as a reference — its repo carries
+ * no license, so no code was copied).
+ *
+ * Still worth a human proofread of the full vowel/independent-vowel/punctuation
+ * set against the Krousar Thmey chart before production embossing.
  */
 
 /* eslint-disable */
