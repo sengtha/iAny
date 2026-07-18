@@ -19,7 +19,7 @@ community and for the community.** The community data collectors (`/voice`,
 | [sengtha/whisper-tiny-khmer](https://huggingface.co/sengtha/whisper-tiny-khmer) | Khmer speech-to-text (STT) | GGML + CT2 + ONNX | App + mobile (whisper.rn) | Whisper tiny (MIT) |
 | [sengtha/khmer-tts-female-v2](https://huggingface.co/sengtha/khmer-tts-female-v2) | Khmer text-to-speech (female voice) | ONNX (VITS) | App (Radio + TTS) | VITS · DDD-Cambodia (CC-BY-SA-4.0) |
 | [sengtha/khmer-ocr](https://huggingface.co/sengtha/khmer-ocr) | Khmer OCR — detector + recognizer | ONNX | App + mobile | seanghay/KhmerOCR (MIT) |
-| [sengtha/mediapipe-hand](https://huggingface.co/sengtha/mediapipe-hand) | Hand tracking for the `/sign` collector | `.task` | `/sign` | MediaPipe Hand Landmarker (Apache-2.0, Google) |
+| MediaPipe Hand Landmarker | Hand tracking for the `/sign` collector | `.task` | `/sign` | Google (Apache-2.0) — mirrored from Google's model storage, no HF repo needed |
 
 > **Licensing:** each Hugging Face repo card is the authoritative source for that
 > model's license. The lineage column shows what the model is derived from.

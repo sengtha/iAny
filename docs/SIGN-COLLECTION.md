@@ -52,21 +52,14 @@ npx wrangler d1 execute iany-radio --remote --file worker/schema.sql
 npx wrangler deploy
 ```
 
-**Model asset (one-time):** the hand tracker needs Google's
-`hand_landmarker.task` (bundled full model, ~7.5 MB). iAny serves it through the
-**same `/models/` mirror as every other model** — the Worker fetches it from
-Hugging Face once and caches it in R2, so devices get it same-origin and
-offline. Upload the file to a HF repo named **`sengtha/mediapipe-hand`** (the
-path already allow-listed in `worker/index.ts`):
-
-```bash
-# Download once from the MediaPipe HandLandmarker model card, then:
-huggingface-cli upload sengtha/mediapipe-hand hand_landmarker.task
-```
-
-The app requests it at
-`/models/sengtha/mediapipe-hand/resolve/main/hand_landmarker.task`. For local
-testing you can point at any URL via `localStorage.setItem('iany.handModel', …)`.
+**Model asset (automatic):** the hand tracker needs Google's
+`hand_landmarker.task` (~7.5 MB, Apache-2.0). **No manual upload is needed** —
+the Worker mirrors it from Google's public model storage the first time it's
+requested and caches it in R2, so devices get it same-origin and offline. The
+app requests it at `/models/sengtha/mediapipe-hand/resolve/main/hand_landmarker.task`;
+the Worker maps that to Google's official URL (see `upstreamUrl` in
+`worker/index.ts`). For local testing you can override the source via
+`localStorage.setItem('iany.handModel', …)`.
 
 The MediaPipe **WASM** runtime is copied automatically into `public/mediapipe/`
 by `scripts/copy-ort.mjs` (runs before dev/build), so it's served same-origin too.

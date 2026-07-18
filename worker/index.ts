@@ -48,10 +48,19 @@ function isAllowedKey(key: string): boolean {
   return ALLOWED_PREFIXES.some((p) => key.startsWith(p)) || TESSDATA_RE.test(key)
 }
 
+// Google hosts the MediaPipe Hand Landmarker model (Apache-2.0) publicly, so we
+// mirror it from there instead of requiring a Hugging Face upload. Cached in R2
+// on first fetch like every other model.
+const MEDIAPIPE_HAND_URL =
+  'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task'
+
 function upstreamUrl(key: string, hfPath: string): string {
   if (key.startsWith('tessdata2/')) {
     const file = key.slice('tessdata2/'.length)
     return `${file.startsWith('khm') ? TESSDATA_BEST : TESSDATA_FAST}/${file}`
+  }
+  if (key.startsWith('sengtha/mediapipe-hand/')) {
+    return MEDIAPIPE_HAND_URL
   }
   return `${HF}/${hfPath}`
 }
