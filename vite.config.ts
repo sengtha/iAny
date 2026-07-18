@@ -73,6 +73,7 @@ export default defineConfig({
         navigateFallbackDenylist: [
           /^\/$/,
           /^\/index\.html$/,
+          /^\/contribute(\/|\.html|$)/,
           /^\/voice(\/|\.html|$)/,
           /^\/scan(\/|\.html|$)/,
           /^\/braille(\/|\.html|$)/,
@@ -135,6 +136,7 @@ export default defineConfig({
       input: {
         main: path.resolve(root, 'index.html'), // landing / front page (/)
         app: path.resolve(root, 'app.html'), // the PWA app (/app)
+        contribute: path.resolve(root, 'contribute.html'), // contribute + build (/contribute)
         voice: path.resolve(root, 'voice.html'),
         scan: path.resolve(root, 'scan.html'),
         braille: path.resolve(root, 'braille.html'),

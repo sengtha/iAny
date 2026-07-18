@@ -30,7 +30,7 @@ export function LandingView() {
         <nav className="lp-nav-links">
           <a href="#features">{L('Features', 'មុខងារ')}</a>
           <a href="#open">{L('Open Khmer AI', 'AI ខ្មែរបើកចំហ')}</a>
-          <a href="#contribute">{L('Contribute', 'ចូលរួម')}</a>
+          <a href="/contribute">{L('Contribute', 'ចូលរួម')}</a>
           <a href={HF_URL} target="_blank" rel="noreferrer">
             {L('Models', 'ម៉ូឌែល')}
           </a>
@@ -145,6 +145,9 @@ export function LandingView() {
             <a className="lp-chip" href="/scan">📷 {L('Scan', 'ស្កេន')}</a>
             <a className="lp-chip" href="/sign">🤟 {L('Sign', 'សញ្ញា')}</a>
             <a className="lp-chip" href="/braille">⠿ {L('Braille', 'អក្សរផុស')}</a>
+            <a className="lp-chip" href="/contribute">
+              {L('All ways to help', 'គ្រប់មធ្យោបាយជួយ')} →
+            </a>
           </div>
         </div>
       </section>
