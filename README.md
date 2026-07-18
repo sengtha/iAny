@@ -47,6 +47,11 @@ Postgres FTS. Sentence segmentation (for chunking) handles the Khmer khan
 Khmer), so semantic search works in both languages out of the box, and
 cross-language retrieval (ask in Khmer, find English content) comes free.
 
+**Accessibility — Khmer Braille:** the `/braille` page (and `@iany/core`'s
+`khmerToBraille` / `khmerToBrf`) convert Khmer text to Unicode Braille and BRF
+embosser files, offline. See **[docs/KHMER-BRAILLE.md](docs/KHMER-BRAILLE.md)**
+for usage, the algorithm, and how to verify/port it.
+
 ## Knowledge packs
 
 A **pack** is iAny's portability primitive: a self-contained JSON bundle of
