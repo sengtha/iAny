@@ -13,7 +13,7 @@
     // else (including the standalone /voice page → voice.html) is served
     // directly as static assets. The voice API lives under /api/voice/*,
     // already covered by /api/*.
-    "run_worker_first": ["/models/*", "/api/*", "/hf-api/*", "/radio/*"]
+    "run_worker_first": ["/models/*", "/api/*", "/hf-api/*", "/radio/*", "/download/*"]
   },
   "r2_buckets": [
     {

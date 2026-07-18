@@ -94,6 +94,9 @@ export default {
     if (url.pathname.startsWith('/api/sign/')) {
       return serveSign(url, request, env)
     }
+    if (url.pathname.startsWith('/download/')) {
+      return serveApk(request, env)
+    }
     // The standalone "Contribute your voice" page (voice.html) is served
     // directly by the asset layer at the clean URL /voice — Cloudflare maps
     // /voice → voice.html natively, so the worker must NOT intercept it (doing
@@ -879,6 +882,82 @@ async function signAdminDelete(id: string, env: Env): Promise<Response> {
   await env.MODELS.delete(row.r2Key)
   await env.DB.prepare('DELETE FROM sign_samples WHERE id = ?').bind(id).run()
   return json({ id, deleted: true })
+}
+
+/* ------------------------------------------------------------------ *
+ * Android app download — serves the latest APK uploaded to R2 under   *
+ * the apk/ prefix, at /download/* (e.g. /download/iany-android.apk).  *
+ * Picks the most recently uploaded .apk so re-uploading a new build   *
+ * "just works" with no code change. Supports Range for resumable      *
+ * downloads and HEAD for size probes.                                 *
+ * ------------------------------------------------------------------ */
+
+const APK_CONTENT_TYPE = 'application/vnd.android.package-archive'
+const APK_FILENAME = 'iany-android.apk'
+// Fallback if the R2 listing is empty/unavailable (the file the user uploaded).
+const APK_FALLBACK_KEY = 'apk/application-87aacdb8-848c-4d12-87ea-342899d102d9.apk'
+
+function apkHeaders(size?: number): Headers {
+  const h = new Headers({
+    'content-type': APK_CONTENT_TYPE,
+    // Short cache so a freshly uploaded build propagates quickly.
+    'cache-control': 'public, max-age=300',
+    'access-control-allow-origin': '*',
+    'accept-ranges': 'bytes',
+    'content-disposition': `attachment; filename="${APK_FILENAME}"`,
+  })
+  if (size !== undefined) h.set('content-length', String(size))
+  return h
+}
+
+async function latestApkKey(env: Env): Promise<string | null> {
+  try {
+    const listed = await env.MODELS.list({ prefix: 'apk/' })
+    let key: string | null = null
+    let newest = -Infinity
+    for (const o of listed.objects) {
+      if (!o.key.toLowerCase().endsWith('.apk')) continue
+      const t = o.uploaded ? o.uploaded.getTime() : 0
+      if (t >= newest) {
+        newest = t
+        key = o.key
+      }
+    }
+    return key
+  } catch {
+    return null
+  }
+}
+
+async function serveApk(request: Request, env: Env): Promise<Response> {
+  if (request.method !== 'GET' && request.method !== 'HEAD') {
+    return new Response('Method not allowed', { status: 405 })
+  }
+  const key = (await latestApkKey(env)) ?? APK_FALLBACK_KEY
+
+  if (request.method === 'HEAD') {
+    const head = await env.MODELS.head(key)
+    if (!head) return new Response('APK not found', { status: 404 })
+    return new Response(null, { headers: apkHeaders(head.size) })
+  }
+
+  const range = parseRange(request.headers.get('range'))
+  if (range) {
+    const head = await env.MODELS.head(key)
+    if (!head) return new Response('APK not found', { status: 404 })
+    const end = Math.min(range.end ?? head.size - 1, head.size - 1)
+    if (range.start > end) return new Response('Range not satisfiable', { status: 416 })
+    const length = end - range.start + 1
+    const obj = await env.MODELS.get(key, { range: { offset: range.start, length } })
+    if (!obj) return new Response('APK not found', { status: 404 })
+    const headers = apkHeaders(length)
+    headers.set('content-range', `bytes ${range.start}-${end}/${head.size}`)
+    return new Response(obj.body, { status: 206, headers })
+  }
+
+  const obj = await env.MODELS.get(key)
+  if (!obj) return new Response('APK not found', { status: 404 })
+  return new Response(obj.body, { headers: apkHeaders(obj.size) })
 }
 
 // Read-only proxy for Hugging Face model metadata (file lists), so clients in

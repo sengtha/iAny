@@ -197,6 +197,18 @@ body {
   font-size: 0.9rem;
   color: var(--lp-muted);
 }
+.lp-apk {
+  margin: 16px 0 0;
+  font-size: 0.92rem;
+  color: var(--lp-muted);
+}
+.lp-apk a {
+  color: var(--lp-accent);
+  font-weight: 600;
+}
+.lp-apk a:hover {
+  text-decoration: underline;
+}
 
 /* ----------------------------------------------------------------- sections */
 .lp-section {

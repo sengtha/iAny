@@ -10,6 +10,7 @@ import { useI18n } from '../i18n'
 const GITHUB_URL = 'https://github.com/sengtha/iAny'
 const HF_URL = 'https://huggingface.co/sengtha'
 const APP_URL = '/app'
+const APK_URL = '/download/iany-android.apk'
 const COMPANY_URL = 'https://www.e-khmer.com'
 const COMPANY_NAME = 'E-KHMER Technology Co., Ltd'
 const COMPANY_YEAR = 2026
@@ -76,6 +77,10 @@ export function LandingView() {
           <li>🇰🇭 {L('Khmer + English', 'ខ្មែរ + អង់គ្លេស')}</li>
           <li>🆓 {L('Free & open source', 'ឥតគិតថ្លៃ & បើកចំហ')}</li>
         </ul>
+        <p className="lp-apk">
+          {L('On Android? ', 'ប្រើ Android? ')}
+          <a href={APK_URL}>📱 {L('Download the app (APK)', 'ទាញយកកម្មវិធី (APK)')}</a>
+        </p>
       </section>
 
       {/* ----------------------------------------------------------- features */}
@@ -187,6 +192,7 @@ export function LandingView() {
         </p>
         <div className="lp-foot-links">
           <a href={APP_URL}>{L('App', 'កម្មវិធី')}</a>
+          <a href={APK_URL}>{L('Android APK', 'Android APK')}</a>
           <a href={GITHUB_URL} target="_blank" rel="noreferrer">GitHub</a>
           <a href={HF_URL} target="_blank" rel="noreferrer">Hugging Face</a>
           <a href="/voice">/voice</a>
