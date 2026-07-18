@@ -8,6 +8,7 @@ import { useI18n } from '../i18n'
  */
 
 const GITHUB_URL = 'https://github.com/sengtha/iAny'
+const HF_URL = 'https://huggingface.co/sengtha'
 const APP_URL = '/app'
 const COMPANY_URL = 'https://www.e-khmer.com'
 const COMPANY_NAME = 'E-KHMER Technology Co., Ltd'
@@ -30,6 +31,9 @@ export function LandingView() {
           <a href="#features">{L('Features', 'មុខងារ')}</a>
           <a href="#open">{L('Open Khmer AI', 'AI ខ្មែរបើកចំហ')}</a>
           <a href="#contribute">{L('Contribute', 'ចូលរួម')}</a>
+          <a href={HF_URL} target="_blank" rel="noreferrer">
+            {L('Models', 'ម៉ូឌែល')}
+          </a>
           <a href={GITHUB_URL} target="_blank" rel="noreferrer">
             GitHub
           </a>
@@ -159,8 +163,8 @@ export function LandingView() {
             <a className="lp-btn lp-btn-lg" href={GITHUB_URL} target="_blank" rel="noreferrer">
               ★ {L('Star on GitHub', 'ផ្ដល់ផ្កាយនៅ GitHub')}
             </a>
-            <a className="lp-btn lp-btn-ghost lp-btn-lg" href={APP_URL}>
-              {L('Open the app', 'បើកកម្មវិធី')} →
+            <a className="lp-btn lp-btn-ghost lp-btn-lg" href={HF_URL} target="_blank" rel="noreferrer">
+              🤗 {L('Models on Hugging Face', 'ម៉ូឌែលនៅ Hugging Face')}
             </a>
           </div>
         </div>
@@ -181,6 +185,7 @@ export function LandingView() {
         <div className="lp-foot-links">
           <a href={APP_URL}>{L('App', 'កម្មវិធី')}</a>
           <a href={GITHUB_URL} target="_blank" rel="noreferrer">GitHub</a>
+          <a href={HF_URL} target="_blank" rel="noreferrer">Hugging Face</a>
           <a href="/voice">/voice</a>
           <a href="/scan">/scan</a>
           <a href="/sign">/sign</a>

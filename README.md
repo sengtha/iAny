@@ -59,16 +59,33 @@ embedding-model upgrades).
 
 ## Models
 
-Both models download once from Hugging Face and are cached by the browser
-(Cache API), then work fully offline:
+All of iAny's models download once from Hugging Face and are cached on-device,
+then work fully offline. The app asks the browser for persistent storage so
+neither the models nor your knowledge base get evicted.
+
+**Answering + search** (PWA):
 
 - **EmbeddingGemma 300M** (q4, ~200 MB) — required; loads on first feed/search.
-- **Gemma 4 E2B** (q4f16, ~1.5 GB) — optional, needs WebGPU (desktop
-  Chrome/Edge). Without it iAny runs in **search mode**: you still get the
-  most relevant passages, just not a generated answer.
+- **iAny Khmer** (~270M, the small default) or **Gemma 4 E2B** (q4f16, ~1.5 GB,
+  needs WebGPU) — the answering model. Without a generator iAny runs in **search
+  mode**: you still get the most relevant passages, just not a generated answer.
 
-The app asks the browser for persistent storage so neither the models nor
-your knowledge base get evicted.
+### Open Khmer models — 🤗 https://huggingface.co/sengtha
+
+iAny publishes its Khmer models open source. Browse them all on the profile
+above; the full catalog (purpose, format, license lineage) is in
+**[docs/MODELS.md](docs/MODELS.md)**.
+
+| Model | Purpose |
+|---|---|
+| [iany-khmer-tiny-v1-ONNX](https://huggingface.co/sengtha/iany-khmer-tiny-v1-ONNX) · [Qwen3-0.6B-khm-ft3-…-GGUF](https://huggingface.co/sengtha/Qwen3-0.6B-khm-ft3-Q8_0-GGUF) | Khmer answering LLM (PWA / mobile) |
+| [whisper-tiny-khmer](https://huggingface.co/sengtha/whisper-tiny-khmer) | Khmer speech-to-text (STT) |
+| [khmer-tts-female-v2](https://huggingface.co/sengtha/khmer-tts-female-v2) | Khmer text-to-speech (TTS) |
+| [khmer-ocr](https://huggingface.co/sengtha/khmer-ocr) | Khmer OCR (detector + recognizer) |
+
+> Models and datasets carry their **own licenses**, separate from iAny's
+> Apache-2.0 **code** license — each Hugging Face repo card is authoritative.
+> Help improve them by contributing at `/voice`, `/scan`, and `/sign`.
 
 ## Development
 

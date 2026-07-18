@@ -665,6 +665,12 @@ export function SettingsView() {
           <li>
             Semantic search — <strong>EmbeddingGemma</strong> (Google)
           </li>
+          <li>
+            All open Khmer models —{' '}
+            <a href="https://huggingface.co/sengtha" target="_blank" rel="noreferrer">
+              huggingface.co/sengtha
+            </a>
+          </li>
         </ul>
       </section>
 
