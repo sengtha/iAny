@@ -1,0 +1,99 @@
+name: Publish dataset to Hugging Face
+
+# Terminal-free dataset publishing. Trigger it from the browser:
+#   GitHub → Actions → "Publish dataset to Hugging Face" → Run workflow.
+# It exports the chosen dataset from iany.app (voice / OCR / sign) and uploads
+# it to a Hugging Face dataset repo. No local machine needed.
+#
+# One-time setup (all in the browser — Settings → Secrets and variables → Actions):
+#   - RADIO_ADMIN_TOKEN : the same admin token your Worker uses (set/rotate it in
+#                         the Cloudflare dashboard: Workers → your Worker →
+#                         Settings → Variables → RADIO_ADMIN_TOKEN, then paste the
+#                         same value here).
+#   - HF_TOKEN          : a Hugging Face *write* token (hf.co/settings/tokens).
+
+on:
+  workflow_dispatch:
+    inputs:
+      dataset:
+        description: Which dataset to publish
+        type: choice
+        options: [voice, ocr, sign]
+        default: voice
+      hf_repo:
+        description: Hugging Face dataset repo (owner/name)
+        type: string
+        default: sengtha/iany-khmer-voice
+      private:
+        description: Create the repo as private (recommended for a first run)
+        type: boolean
+        default: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Export dataset from iany.app
+        env:
+          VOICE_ADMIN_TOKEN: ${{ secrets.RADIO_ADMIN_TOKEN }}
+          OCR_ADMIN_TOKEN: ${{ secrets.RADIO_ADMIN_TOKEN }}
+          SIGN_ADMIN_TOKEN: ${{ secrets.RADIO_ADMIN_TOKEN }}
+        run: |
+          if [ -z "$VOICE_ADMIN_TOKEN" ]; then
+            echo "::error::RADIO_ADMIN_TOKEN secret is not set (Settings → Secrets → Actions)."
+            exit 1
+          fi
+          node "scripts/export-${{ inputs.dataset }}.mjs" \
+            --base https://iany.app --out ./out --repo "${{ inputs.hf_repo }}"
+          echo "---- exported files ----"
+          ls -la ./out
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Upload to Hugging Face
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_REPO: ${{ inputs.hf_repo }}
+          PRIVATE: ${{ inputs.private }}
+        run: |
+          if [ -z "$HF_TOKEN" ]; then
+            echo "::error::HF_TOKEN secret is not set (a Hugging Face write token)."
+            exit 1
+          fi
+          pip install -U "huggingface_hub>=0.24"
+          python - <<'PY'
+          import os
+          from huggingface_hub import HfApi
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          repo = os.environ["HF_REPO"]
+          private = os.environ["PRIVATE"] == "true"
+          api.create_repo(repo, repo_type="dataset", private=private, exist_ok=True)
+          api.upload_folder(
+              folder_path="out",
+              repo_id=repo,
+              repo_type="dataset",
+              commit_message="Publish iAny dataset (via GitHub Actions)",
+          )
+          print(f"Uploaded ./out to https://huggingface.co/datasets/{repo} (private={private})")
+          PY
+
+      - name: Summary
+        run: |
+          echo "### ✅ Published to Hugging Face" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Dataset: \`${{ inputs.dataset }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Repo: [\`${{ inputs.hf_repo }}\`](https://huggingface.co/datasets/${{ inputs.hf_repo }})" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Private: ${{ inputs.private }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "If private, flip it to public in the dataset's **Settings** when you're ready." >> "$GITHUB_STEP_SUMMARY"
