@@ -136,3 +136,34 @@ credits system will gate this endpoint.
 2. **v2 (in progress)** — encrypted cloud backup/restore (done, beta);
    next: credits & payments, live multi-device sync via ElectricSQL.
 3. **v3** — knowledge pack marketplace (buy/sell packs, platform fee).
+
+## License
+
+iAny's **source code is licensed under [Apache-2.0](LICENSE)** — free to use,
+modify, and build on, including for commercial products, with an explicit patent
+grant. See [NOTICE](NOTICE) for third-party attributions.
+
+> The code license covers **code only.** Machine-learning **models** and
+> **datasets** carry their own licenses (e.g. community datasets are
+> CC-BY-SA-4.0, some models follow Google's Gemma Terms). See [NOTICE](NOTICE).
+
+## Open source & commercial
+
+iAny is fully open source *and* a sustainable project. Revenue comes from
+building on it, support, a hosted service + credits, B2B/B2G contracts, and
+grants — **not** from restricting the code. Anyone may build derivative products.
+See [COMMERCIAL.md](COMMERCIAL.md) for the full model, and
+[CONTRIBUTING.md](CONTRIBUTING.md) to get involved.
+
+## Trademark
+
+The Apache-2.0 license grants rights to the **code, not the name.** **"iAny"**
+and the iAny logo are trademarks of the project owner. You're free to build and
+even sell products from this code, but please give your product **its own name**
+and don't imply it's the official iAny or endorsed by it. Nominative use ("built
+with iAny", "based on iAny") is fine.
+
+## Security
+
+Found a vulnerability? Please report it privately — see [SECURITY.md](SECURITY.md).
+Do not open a public issue.

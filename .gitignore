@@ -7,3 +7,9 @@ dev-dist
 public/ort
 public/mediapipe
 .wrangler
+# Secrets / local env — never commit; iAny uses Cloudflare env secrets.
+.env
+.env.*
+.dev.vars
+*.pem
+*.key
