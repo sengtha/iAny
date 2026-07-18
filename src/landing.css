@@ -92,19 +92,21 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: linear-gradient(135deg, var(--lp-accent), var(--lp-accent2));
-  color: #0a1020;
+  /* Fixed bright gradient + near-black text in BOTH themes — high contrast
+     (~9:1) and consistent, so the label never washes out on the fill. */
+  background: linear-gradient(135deg, #38bdf8, #818cf8);
+  color: #08101f;
   font-weight: 700;
   border: 0;
   border-radius: 999px;
   padding: 11px 22px;
   cursor: pointer;
   transition: transform 0.12s ease, box-shadow 0.12s ease;
-  box-shadow: 0 6px 20px -6px color-mix(in srgb, var(--lp-accent) 60%, transparent);
+  box-shadow: 0 6px 20px -6px color-mix(in srgb, #38bdf8 60%, transparent);
 }
 .lp-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 10px 28px -6px color-mix(in srgb, var(--lp-accent) 70%, transparent);
+  box-shadow: 0 10px 28px -6px color-mix(in srgb, #38bdf8 70%, transparent);
 }
 .lp-btn-sm {
   padding: 8px 16px;
@@ -483,8 +485,5 @@ body {
     --lp-muted: #566076;
     --lp-accent: #0284c7;
     --lp-accent2: #4f46e5;
-  }
-  .lp-btn {
-    color: #fff;
   }
 }
