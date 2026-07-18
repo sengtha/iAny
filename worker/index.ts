@@ -38,6 +38,7 @@ const ALLOWED_PREFIXES = [
   'sengtha/khmer-tts-female-v2/', // Khmer TTS voice (Radio)
   'sengtha/khmer-ocr/', // Khmer OCR — detector + recognizer
   'sengtha/whisper-tiny-khmer/', // Khmer STT (whisper.rn GGML + ct2/onnx)
+  'sengtha/mediapipe-hand/', // MediaPipe hand_landmarker.task (KSL /sign collector)
 ]
 // OCR language data, served through the same mirror. Khmer uses the
 // high-accuracy models; English's fast model is accurate enough.
@@ -89,6 +90,9 @@ export default {
     }
     if (url.pathname.startsWith('/api/ocr/')) {
       return serveOcr(url, request, env)
+    }
+    if (url.pathname.startsWith('/api/sign/')) {
+      return serveSign(url, request, env)
     }
     // The standalone "Contribute your voice" page (voice.html) is served
     // directly by the asset layer at the clean URL /voice — Cloudflare maps
@@ -701,6 +705,179 @@ async function ocrAdminDelete(id: string, env: Env): Promise<Response> {
   if (!row) return json({ error: 'not found' }, 404)
   await env.MODELS.delete(row.r2Key)
   await env.DB.prepare('DELETE FROM ocr_samples WHERE id = ?').bind(id).run()
+  return json({ id, deleted: true })
+}
+
+/* ------------------------------------------------------------------ *
+ * Contribute Khmer Sign Language — the standalone /sign page POSTs    *
+ * (label, hand-landmark sequence) pairs that become an OPEN Khmer     *
+ * Sign Language training set. Served under /api/sign/*. We store only *
+ * landmarks (JSON), never video — tiny + identity-free.               *
+ * Sequence → R2 (sign/…), metadata → D1 (sign_samples). Public:       *
+ * submit a sample + aggregate stats. Admin (RADIO_ADMIN_TOKEN):       *
+ * list / download / delete for export. See docs/SIGN-COLLECTION.md.   *
+ * ------------------------------------------------------------------ */
+
+const SIGN_MAX_FRAMES = 200 // ~10 s at 20 fps — plenty for one gesture
+const SIGN_MAX_BYTES = 1 * 1024 * 1024 // 1 MB of landmark JSON is already huge
+const SIGN_DEVICE_RE = /^g-[0-9a-z]{6,16}$/
+
+async function serveSign(url: URL, request: Request, env: Env): Promise<Response> {
+  const path = url.pathname.slice('/api/sign/'.length)
+  if (request.method === 'OPTIONS') {
+    return new Response(null, {
+      headers: { ...JSON_HEADERS, 'access-control-allow-methods': 'GET,POST,DELETE,OPTIONS',
+        'access-control-allow-headers': 'authorization,content-type' },
+    })
+  }
+  try {
+    if (path === 'sample' && request.method === 'POST') return await signPostSample(request, env)
+    if (path === 'stats' && request.method === 'GET') return await signStats(env)
+    if (path === 'admin' || path.startsWith('admin/')) return await serveSignAdmin(path, request, env)
+    return json({ error: 'not found' }, 404)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    const hint = /no such table|sign_samples/i.test(msg)
+      ? 'sign storage not initialised — run the D1 schema migration (worker/schema.sql)'
+      : 'server error'
+    return json({ error: hint, detail: msg }, 500)
+  }
+}
+
+// Public: accept one (label, landmark sequence) sample. application/json.
+async function signPostSample(request: Request, env: Env): Promise<Response> {
+  let body: {
+    device?: string
+    consent?: boolean
+    promptId?: string
+    label?: string
+    fps?: number
+    frames?: unknown
+    creditName?: string
+    region?: string
+  }
+  try {
+    body = await request.json()
+  } catch {
+    return json({ error: 'expected json body' }, 400)
+  }
+  const device = String(body.device ?? '').trim()
+  const label = String(body.label ?? '').trim()
+  const promptId = String(body.promptId ?? '').trim()
+  const frames = body.frames
+
+  if (body.consent !== true) return json({ error: 'consent required' }, 403)
+  if (!SIGN_DEVICE_RE.test(device)) return json({ error: 'bad device id' }, 400)
+  if (!label || label.length > 80) return json({ error: 'bad label' }, 400)
+  if (!Array.isArray(frames) || frames.length === 0 || frames.length > SIGN_MAX_FRAMES) {
+    return json({ error: 'bad frames' }, 400)
+  }
+  const withHands = frames.filter(
+    (f) => f && typeof f === 'object' && Array.isArray((f as { hands?: unknown }).hands) &&
+      (f as { hands: unknown[] }).hands.length > 0,
+  ).length
+  if (withHands < 3) return json({ error: 'no hands detected in sample' }, 400)
+
+  const fps = Number(body.fps)
+  const payload = JSON.stringify({
+    label,
+    promptId,
+    fps: Number.isFinite(fps) && fps > 0 ? Math.round(fps) : null,
+    frames,
+  })
+  const size = new TextEncoder().encode(payload).length
+  if (size > SIGN_MAX_BYTES) return json({ error: 'sample too large' }, 413)
+
+  const id = crypto.randomUUID()
+  const now = new Date()
+  const day = now.toISOString().slice(0, 10).replace(/-/g, '')
+  const r2Key = `sign/${day}/${id}.json`
+  await env.MODELS.put(r2Key, payload, {
+    httpMetadata: { contentType: 'application/json' },
+    customMetadata: { device },
+  })
+
+  const trim = (v: string | undefined, max: number): string | null => {
+    const s = (v ?? '').trim()
+    return s ? s.slice(0, max) : null
+  }
+  await env.DB.prepare(
+    `INSERT INTO sign_samples
+       (id, r2_key, device, label, prompt_id, frames, hand_frames, credit_name, region, bytes, created_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+  ).bind(
+    id, r2Key, device, label, promptId || null, frames.length, withHands,
+    trim(body.creditName, 60), trim(body.region, 40), size, now.toISOString(),
+  ).run()
+  return json({ id })
+}
+
+// Public, aggregate only — motivates contributors with live totals.
+async function signStats(env: Env): Promise<Response> {
+  const row = await env.DB.prepare(
+    `SELECT COUNT(*) AS samples, COUNT(DISTINCT device) AS devices,
+            COUNT(DISTINCT label) AS labels FROM sign_samples`,
+  ).first<{ samples: number; devices: number; labels: number }>()
+  return new Response(
+    JSON.stringify({
+      samples: row?.samples ?? 0,
+      devices: row?.devices ?? 0,
+      labels: row?.labels ?? 0,
+    }),
+    { headers: { ...JSON_HEADERS, 'cache-control': 'public, max-age=30' } },
+  )
+}
+
+// Admin (RADIO_ADMIN_TOKEN): paginated list, single-sequence download, delete.
+async function serveSignAdmin(path: string, request: Request, env: Env): Promise<Response> {
+  if (!env.RADIO_ADMIN_TOKEN || bearer(request) !== env.RADIO_ADMIN_TOKEN) {
+    return json({ error: 'unauthorized' }, 401)
+  }
+  const seg = path.split('/') // ['admin', kind, id?]
+  const kind = seg[1]
+  const id = seg[2]
+  const m = request.method
+  if (kind === 'samples' && m === 'GET') return signAdminList(request, env)
+  if (kind === 'sequence' && id && m === 'GET') return signAdminGet(id, env)
+  if (kind === 'sample' && id && m === 'DELETE') return signAdminDelete(id, env)
+  return json({ error: 'not found' }, 404)
+}
+
+async function signAdminList(request: Request, env: Env): Promise<Response> {
+  const url = new URL(request.url)
+  const after = url.searchParams.get('after') ?? ''
+  const limit = Math.min(500, Math.max(1, Number(url.searchParams.get('limit') ?? 200)))
+  const { results } = await env.DB.prepare(
+    `SELECT id, r2_key AS r2Key, device, label, prompt_id AS promptId, frames,
+            hand_frames AS handFrames, credit_name AS creditName, region, bytes,
+            created_at AS createdAt
+       FROM sign_samples
+      WHERE (created_at || '|' || id) > ?
+      ORDER BY created_at ASC, id ASC LIMIT ?`,
+  ).bind(after, limit).all()
+  const items = results ?? []
+  const last = items.length ? (items[items.length - 1] as { createdAt: string; id: string }) : null
+  return json({ samples: items, next: last ? `${last.createdAt}|${last.id}` : null })
+}
+
+async function signAdminGet(id: string, env: Env): Promise<Response> {
+  const row = await env.DB.prepare('SELECT r2_key AS r2Key FROM sign_samples WHERE id = ?')
+    .bind(id).first<{ r2Key: string }>()
+  if (!row) return json({ error: 'not found' }, 404)
+  const obj = await env.MODELS.get(row.r2Key)
+  if (!obj) return json({ error: 'sequence missing' }, 404)
+  return new Response(obj.body, {
+    headers: { 'content-type': 'application/json',
+      'content-length': String(obj.size), 'access-control-allow-origin': '*' },
+  })
+}
+
+async function signAdminDelete(id: string, env: Env): Promise<Response> {
+  const row = await env.DB.prepare('SELECT r2_key AS r2Key FROM sign_samples WHERE id = ?')
+    .bind(id).first<{ r2Key: string }>()
+  if (!row) return json({ error: 'not found' }, 404)
+  await env.MODELS.delete(row.r2Key)
+  await env.DB.prepare('DELETE FROM sign_samples WHERE id = ?').bind(id).run()
   return json({ id, deleted: true })
 }
 

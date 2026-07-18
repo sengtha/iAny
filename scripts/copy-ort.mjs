@@ -21,3 +21,11 @@ copyMatching(
   'public/ort',
   /^ort-wasm-simd-threaded.*\.(wasm|mjs)$/,
 )
+
+// MediaPipe Tasks-Vision WASM (hand tracking for /sign) -> public/mediapipe/.
+// The hand_landmarker.task model is fetched separately (see docs/SIGN-COLLECTION.md).
+copyMatching(
+  'node_modules/@mediapipe/tasks-vision/wasm',
+  'public/mediapipe',
+  /^vision_wasm.*\.(wasm|js)$/,
+)

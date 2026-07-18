@@ -68,6 +68,7 @@ export default defineConfig({
           /^\/voice(\/|\.html|$)/,
           /^\/scan(\/|\.html|$)/,
           /^\/braille(\/|\.html|$)/,
+          /^\/sign(\/|\.html|$)/,
         ],
         runtimeCaching: [
           {
@@ -113,6 +114,7 @@ export default defineConfig({
         voice: path.resolve(root, 'voice.html'),
         scan: path.resolve(root, 'scan.html'),
         braille: path.resolve(root, 'braille.html'),
+        sign: path.resolve(root, 'sign.html'),
       },
     },
   },

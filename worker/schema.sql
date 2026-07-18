@@ -73,3 +73,25 @@ CREATE TABLE IF NOT EXISTS ocr_samples (
   created_at  TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_ocr_created ON ocr_samples (created_at);
+
+-- Crowd-sourced Khmer Sign Language ("Contribute Khmer Sign Language", the
+-- /sign page). Each row is one (label, hand-landmark sequence) pair for training
+-- an open Khmer Sign Language recognition model. We store ONLY the landmark
+-- sequence (a JSON array of per-frame 21-keypoint hand skeletons) in R2 at
+-- r2_key — never the video, so a contributor can't be identified. `label` is the
+-- Khmer word/letter signed; credit_name is opt-in for the released credits.
+CREATE TABLE IF NOT EXISTS sign_samples (
+  id          TEXT PRIMARY KEY,
+  r2_key      TEXT NOT NULL,          -- R2 object key: sign/<yyyymmdd>/<id>.json
+  device      TEXT NOT NULL,          -- anonymous per-device id, e.g. g-3f9a2c71
+  label       TEXT NOT NULL,          -- the Khmer word/letter that was signed
+  prompt_id   TEXT,                   -- prompt id from the bundled set
+  frames      INTEGER,                -- total frames in the sequence
+  hand_frames INTEGER,                -- frames in which a hand was detected
+  credit_name TEXT,                   -- opt-in public credit (dataset contributors)
+  region      TEXT,                   -- optional province/dialect
+  bytes       INTEGER,
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sign_created ON sign_samples (created_at);
+CREATE INDEX IF NOT EXISTS idx_sign_label ON sign_samples (label);

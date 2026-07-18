@@ -236,6 +236,40 @@ export const en = {
   brDownload: 'Download BRF',
   brNote:
     'The Braille mapping follows the Khmer Braille standard. Please proofread before embossing important material — verify against the official chart.',
+
+  // Contribute Khmer Sign Language (/sign)
+  signTitle: 'Contribute Khmer Sign Language',
+  signLead:
+    'You’re shown a Khmer word or letter and you sign it to the camera. Each gesture helps train a free Khmer Sign Language recogniser — built with and for the Deaf community.',
+  signStatSamples: 'gestures',
+  signStatLabels: 'signs',
+  signOpenPrivacy:
+    'Only your hand shape is recorded (skeleton points) — never the video. Your face and background are never saved.',
+  signOpenData: 'The gestures are released as an open, free dataset for anyone to use.',
+  signOpenModel: 'The sign-language model built from them is released free for everyone.',
+  signConsent:
+    'I agree that my recorded hand movements (landmarks only, no video) can be released as an open dataset and used to train and share a free sign-language model.',
+  signTip:
+    'This records only the position of your hands, never the camera image. Good, even lighting and a plain background help the tracker.',
+  signUnsupported:
+    'This device or browser can’t run the hand tracker. Try a recent Chrome or Safari on a phone or laptop with a camera.',
+  signStart: 'Start',
+  signDoneCount: 'contributed',
+  signOpenModelShort: 'Open model',
+  signLoadingCam: 'Starting camera and hand tracker…',
+  signCameraFailed: 'Could not open the camera. Please allow camera access and try again.',
+  signShowHands: 'Show your hand(s) to the camera',
+  signHandsSeen: 'Hand detected — ready to record',
+  signRecord: 'Record sign',
+  signRecording: 'Recording…',
+  signSkip: 'Skip',
+  signRedo: 'Redo',
+  signSubmit: 'Submit & next',
+  signFramesCaptured: 'frames captured',
+  signNoHands: 'No hand was detected. Keep your hand in view and record again.',
+  signReviewNote: 'Review your gesture, then submit or redo.',
+  signUploadFailed: 'Could not save. Check your connection and try again.',
+  signHint: 'Tip: sign at a natural speed, keep your hand fully inside the frame.',
 }
 
 export type Translation = typeof en

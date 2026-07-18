@@ -1473,3 +1473,107 @@ progress {
   word-break: break-word;
   user-select: all;
 }
+
+/* Khmer Sign Language collector (/sign) */
+.sign-prompt {
+  text-align: center;
+  padding: 14px 16px;
+  border: 1px solid var(--bg-softer);
+  background: var(--bg-soft);
+  border-radius: 14px;
+  margin-bottom: 12px;
+}
+.sign-prompt-km {
+  font-size: 2.2rem;
+  line-height: 1.4;
+  font-weight: 700;
+}
+.sign-prompt-en {
+  font-size: 0.95rem;
+  color: var(--fg-muted);
+  margin-top: 2px;
+}
+.sign-index {
+  font-size: 0.85rem;
+  color: var(--fg-muted);
+}
+.sign-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: #000;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid var(--bg-softer);
+}
+.sign-video,
+.sign-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1); /* mirror, so it feels like a mirror to the signer */
+}
+.sign-canvas {
+  transform: none; /* the overlay already mirrors when drawing */
+}
+.sign-loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #e2e8f0;
+  font-size: 0.95rem;
+  text-align: center;
+  padding: 16px;
+}
+.sign-countdown {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 5rem;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+}
+.sign-rec {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(220, 38, 38, 0.92);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 700;
+  animation: sign-blink 1s steps(2, start) infinite;
+}
+@keyframes sign-blink {
+  50% {
+    opacity: 0.45;
+  }
+}
+.sign-hint-hands {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #e2e8f0;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.sign-hint-hands.ok {
+  background: rgba(22, 163, 74, 0.85);
+  color: #fff;
+}
+.sign-review-note {
+  text-align: center;
+  font-size: 0.95rem;
+  color: var(--fg-muted);
+  margin: 10px 0 4px;
+}
