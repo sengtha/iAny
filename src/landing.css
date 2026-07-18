@@ -149,7 +149,9 @@ body {
   z-index: 0;
   pointer-events: none;
 }
-.lp-hero > * {
+/* Lift the content above the glow — but NOT the glow itself, or it would take
+   layout space and leave a big empty gap above the headline. */
+.lp-hero > :not(.lp-hero-glow) {
   position: relative;
   z-index: 1;
 }
@@ -214,6 +216,91 @@ body {
   margin-top: 4px;
   font-size: 0.8rem;
   opacity: 0.75;
+}
+
+/* Hero device mock */
+.lp-hero-visual {
+  margin: 48px auto 0;
+  display: flex;
+  justify-content: center;
+}
+.lp-phone {
+  width: 270px;
+  max-width: 78vw;
+  border-radius: 36px;
+  padding: 12px;
+  background: linear-gradient(160deg, #1c2947, #0c1424);
+  border: 1px solid var(--lp-border);
+  box-shadow: 0 34px 70px -24px rgba(2, 8, 23, 0.65);
+}
+.lp-phone-screen {
+  background: var(--lp-bg2);
+  border: 1px solid var(--lp-border);
+  border-radius: 26px;
+  padding: 18px 14px 14px;
+  min-height: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+.lp-phone-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 800;
+  font-size: 0.92rem;
+  padding-bottom: 8px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid var(--lp-border);
+}
+.lp-phone-dot {
+  margin-left: auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 3px color-mix(in srgb, #22c55e 22%, transparent);
+}
+.lp-bubble {
+  max-width: 88%;
+  padding: 9px 12px;
+  border-radius: 14px;
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+.lp-bubble-user {
+  align-self: flex-end;
+  background: linear-gradient(135deg, var(--lp-accent), var(--lp-accent2));
+  color: #08101f;
+  font-weight: 600;
+  border-bottom-right-radius: 4px;
+}
+.lp-bubble-bot {
+  align-self: flex-start;
+  background: var(--lp-panel);
+  border: 1px solid var(--lp-border);
+  color: var(--lp-fg);
+  border-bottom-left-radius: 4px;
+}
+.lp-phone-input {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--lp-panel);
+  border: 1px solid var(--lp-border);
+  border-radius: 999px;
+  padding: 9px 12px;
+}
+.lp-phone-ph {
+  flex: 1;
+  color: var(--lp-muted);
+  font-size: 0.82rem;
+}
+.lp-phone-send {
+  color: var(--lp-accent);
+  font-size: 0.9rem;
 }
 
 /* ----------------------------------------------------------------- sections */

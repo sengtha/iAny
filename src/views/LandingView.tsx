@@ -87,6 +87,34 @@ export function LandingView() {
             {L('Preview build — not an official release yet.', 'កំណែសាកល្បង — មិនទាន់ជាការចេញផ្សាយផ្លូវការទេ។')}
           </span>
         </p>
+
+        {/* Hero visual — a device mock showing the app answering in Khmer,
+            on-device. Pure CSS/HTML, so it stays crisp and loads instantly. */}
+        <div className="lp-hero-visual" aria-hidden>
+          <div className="lp-phone">
+            <div className="lp-phone-screen">
+              <div className="lp-phone-head">
+                <img src="/icon.svg" width={18} height={18} alt="" />
+                <span>iAny</span>
+                <span className="lp-phone-dot" />
+              </div>
+              <div className="lp-bubble lp-bubble-user">
+                {L('What is iAny?', 'តើ iAny ជាអ្វី?')}
+              </div>
+              <div className="lp-bubble lp-bubble-bot">
+                {L(
+                  'A Khmer AI assistant that runs on your device — no internet needed.',
+                  'ជំនួយការ AI ខ្មែរ ដែលដំណើរការលើឧបករណ៍របស់អ្នក ដោយឥតបាច់អ៊ីនធឺណិត។',
+                )}
+              </div>
+              <div className="lp-phone-input">
+                <span className="lp-phone-mic">🎙️</span>
+                <span className="lp-phone-ph">{L('Ask a question…', 'សួរសំណួរ…')}</span>
+                <span className="lp-phone-send">➤</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* ----------------------------------------------------------- features */}
