@@ -3,17 +3,21 @@
  * Export the crowd-sourced Khmer voice clips into a training-ready dataset.
  *
  * Pulls every clip from the Worker admin API (metadata from D1, audio from R2),
- * writing:
+ * writing a ready-to-publish Hugging Face **audiofolder** dataset:
  *   out/clips/<speaker>/<id>.wav        the 16 kHz mono recordings
- *   out/metadata.csv                    path,sentence,speaker,sentence_id,...
+ *   out/metadata.csv                    file_name,sentence,speaker,sentence_id,...
+ *   out/README.md                       dataset card (license, stats, usage)
  *   out/CREDITS.md                      opt-in contributor names (for the release)
  *
- * metadata.csv matches §2 of docs/RUNPOD-KHMER-STT.md, so you can fold it
- * straight into the STT fine-tune.
+ * The `file_name` column makes `out/` load directly as a HF audiofolder, and it
+ * also folds straight into §2 of docs/RUNPOD-KHMER-STT.md for the STT fine-tune.
  *
  * Usage:
  *   VOICE_ADMIN_TOKEN=xxxx node scripts/export-voice.mjs \
- *     [--base https://iany.app] [--out ./out]
+ *     [--base https://iany.app] [--out ./out] [--repo sengtha/iany-khmer-voice]
+ *
+ * Publish to Hugging Face (after export):
+ *   huggingface-cli upload <repo> ./out --repo-type dataset
  *
  * The token is the same RADIO_ADMIN_TOKEN secret the Worker uses. Never commit it.
  */
@@ -30,6 +34,7 @@ const opt = (name, def) => {
 }
 const BASE = opt('--base', process.env.VOICE_BASE || 'https://iany.app').replace(/\/$/, '')
 const OUT = opt('--out', './out')
+const REPO = opt('--repo', process.env.VOICE_HF_REPO || 'sengtha/iany-khmer-voice')
 const TOKEN = process.env.VOICE_ADMIN_TOKEN
 if (!TOKEN) {
   console.error('Set VOICE_ADMIN_TOKEN (the Worker RADIO_ADMIN_TOKEN secret).')
@@ -44,8 +49,11 @@ const csvCell = (v) => {
 
 async function main() {
   await mkdir(path.join(OUT, 'clips'), { recursive: true })
-  const rows = [['path', 'sentence', 'speaker', 'sentence_id', 'gender', 'age_band', 'region', 'duration_ms']]
+  // `file_name` (not `path`) is the HF audiofolder convention, so `out/` loads
+  // directly with `load_dataset(...)`.
+  const rows = [['file_name', 'sentence', 'speaker', 'sentence_id', 'gender', 'age_band', 'region', 'duration_ms']]
   const credits = new Map() // creditName -> count
+  const speakers = new Set()
   let after = ''
   let total = 0
   let hours = 0
@@ -72,6 +80,7 @@ async function main() {
 
       rows.push([rel, c.sentence, c.speaker, c.sentenceId, c.gender, c.ageBand, c.region, c.durationMs])
       if (c.creditName) credits.set(c.creditName, (credits.get(c.creditName) || 0) + 1)
+      speakers.add(c.speaker)
       total++
       hours += (c.durationMs || 0) / 3600000
       if (total % 100 === 0) console.log(`  ${total} clips (${hours.toFixed(1)} h)…`)
@@ -90,9 +99,92 @@ async function main() {
     '\n'
   await writeFile(path.join(OUT, 'CREDITS.md'), creditsMd)
 
-  console.log(`\nDone: ${total} clips, ${hours.toFixed(1)} h, ${names.length} credited contributors`)
+  // Hugging Face dataset card — makes `out/` a publish-ready dataset repo.
+  await writeFile(path.join(OUT, 'README.md'), datasetCard({
+    repo: REPO, clips: total, speakers: speakers.size, hours, credited: names.length,
+  }))
+
+  console.log(`\nDone: ${total} clips, ${hours.toFixed(1)} h, ${speakers.size} speakers, ${names.length} credited`)
   console.log(`  ${path.join(OUT, 'metadata.csv')}`)
+  console.log(`  ${path.join(OUT, 'README.md')} (dataset card)`)
   console.log(`  ${path.join(OUT, 'CREDITS.md')}`)
+  console.log(`\nPublish to Hugging Face:`)
+  console.log(`  huggingface-cli upload ${REPO} ${OUT} --repo-type dataset`)
+}
+
+function sizeCategory(n) {
+  if (n < 1000) return 'n<1K'
+  if (n < 10000) return '1K<n<10K'
+  if (n < 100000) return '10K<n<100K'
+  return '100K<n<1M'
+}
+
+/** A Hugging Face dataset card (README.md) with YAML metadata + usage. */
+function datasetCard({ repo, clips, speakers, hours, credited }) {
+  return `---
+license: cc-by-sa-4.0
+task_categories:
+- automatic-speech-recognition
+language:
+- km
+tags:
+- khmer
+- cambodia
+- speech
+- asr
+- iany
+pretty_name: iAny Khmer Voice
+size_categories:
+- ${sizeCategory(clips)}
+---
+
+# iAny Khmer Voice
+
+An open, community-contributed **Khmer speech dataset** for training speech-to-text
+(ASR). Recorded through the iAny "Contribute your voice" page
+(https://iany.app/voice), where people read short Khmer sentences aloud —
+**with the community, for the community.**
+
+- **Clips:** ${clips}
+- **Speakers:** ${speakers} (anonymous ids)
+- **Duration:** ${hours.toFixed(1)} hours
+- **Audio:** 16 kHz mono WAV
+- **Language:** Khmer (\`km\`)
+- **License:** CC-BY-SA-4.0
+
+## Structure
+
+Standard Hugging Face *audiofolder*:
+
+- \`clips/<speaker>/<id>.wav\` — the recordings
+- \`metadata.csv\` — \`file_name, sentence, speaker, sentence_id, gender, age_band, region, duration_ms\`
+
+## Usage
+
+\`\`\`python
+from datasets import load_dataset
+ds = load_dataset("${repo}")            # or load_dataset("audiofolder", data_dir="./out")
+print(ds["train"][0])                   # {'audio': {...}, 'sentence': 'សួស្ដី ...', 'speaker': 's-...'}
+\`\`\`
+
+## Privacy & consent
+
+Contributors opted in to release their recordings as an open dataset. \`speaker\`
+is a random, anonymous per-device id — never a name. A real name appears only in
+\`CREDITS.md\`, and only if a contributor chose to add one. Please use the data
+respectfully and keep derivatives open (share-alike).
+
+## Credits
+
+Thank you to all ${speakers} speakers (${credited} added their name — see
+\`CREDITS.md\`). Built by [E-KHMER Technology Co., Ltd](https://www.e-khmer.com).
+
+## Citation
+
+\`\`\`
+iAny Khmer Voice. E-KHMER Technology Co., Ltd. https://iany.app · CC-BY-SA-4.0
+\`\`\`
+`
 }
 
 main().catch((e) => {

@@ -75,11 +75,12 @@ VOICE_ADMIN_TOKEN=your-admin-token \
   node scripts/export-voice.mjs --base https://iany.app --out ./out
 ```
 
-Produces:
+Produces a **Hugging Face `audiofolder` dataset**, ready to publish:
 
 ```
 out/clips/<speaker>/<id>.wav   # 16 kHz mono recordings, grouped by voice
-out/metadata.csv               # path,sentence,speaker,sentence_id,gender,age_band,region,duration_ms
+out/metadata.csv               # file_name,sentence,speaker,sentence_id,gender,age_band,region,duration_ms
+out/README.md                  # dataset card (license, stats, usage)
 out/CREDITS.md                 # opt-in contributor names for the release
 ```
 
@@ -87,6 +88,30 @@ out/CREDITS.md                 # opt-in contributor names for the release
 straight into the fine-tune (append your rows to the DDD `meta` list, or train on
 it alone for a classroom-voices model). More speakers + real rooms = lower CER on
 real audio.
+
+## Publishing the dataset to Hugging Face
+
+The export folder *is* a valid HF dataset — the `file_name` column + dataset card
+make it load with `load_dataset(...)`. Publish it (fulfilling the "released as an
+open dataset" promise) with the Hugging Face CLI:
+
+```bash
+pip install -U huggingface_hub          # once
+huggingface-cli login                   # once (a write token from hf.co/settings/tokens)
+huggingface-cli upload sengtha/iany-khmer-voice ./out --repo-type dataset
+```
+
+The repo is created on first upload (add `--private` to stage it first, then flip
+to public in the repo settings). Keep the release **CC-BY-SA-4.0** and the
+contributor credits (`README.md` + `CREDITS.md`). Anyone can then use it with:
+
+```python
+from datasets import load_dataset
+ds = load_dataset("sengtha/iany-khmer-voice")
+```
+
+> For a much larger dataset later, convert to Parquet shards for a faster viewer
+> and streaming: load the audiofolder and `ds.push_to_hub("sengtha/iany-khmer-voice")`.
 
 ---
 

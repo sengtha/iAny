@@ -157,7 +157,7 @@ if os.path.exists(VOICE_CSV):
     rows = list(csv.DictReader(open(VOICE_CSV, encoding="utf-8")))
     for _ in range(VOICE_REPEAT):
         for r in rows:
-            meta.append({"path": os.path.join("/workspace/voice", r["path"]),
+            meta.append({"path": os.path.join("/workspace/voice", r["file_name"]),
                          "sentence": r["sentence"], "source": "iany/voice"})
     print(f"DONE iany/voice: {len(rows)} clips x{VOICE_REPEAT} (consented, CC-BY-SA-4.0)", flush=True)
 
