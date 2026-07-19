@@ -200,27 +200,40 @@ for s in SOURCES:
 # We snapshot_download the whole repo in one RESUMABLE pass and load it as a
 # local audiofolder — not the loose-file loader that hangs. Re-run if it stalls;
 # it resumes. (If you still 429, wait ~5–10 min for the limit to reset.)
+# We snapshot_download the repo in one RESUMABLE pass, then read its metadata.csv
+# DIRECTLY (file_name → sentence) instead of the `audiofolder` loader — audiofolder
+# is finicky ("file_name must be present in metadata files") and needless here,
+# since we decode the wavs ourselves anyway. Re-run if a download stalls; it
+# resumes. (If you still 429, wait ~5–10 min for the limit to reset.)
 # The whole block is wrapped in try/except so the pipeline still runs if the
 # dataset is unavailable — it just trains on the public corpora that loaded.
 os.environ["HF_HUB_DISABLE_XET"] = "1"      # set BEFORE the download; plain HTTPS is reliable here
+import csv
 from huggingface_hub import snapshot_download
 VOICE_REPEAT = 3
 try:
     vdir = snapshot_download("sengtha/iany-khmer-voice", repo_type="dataset",
                              local_dir="/workspace/iany_voice_dl", max_workers=8)
-    vraw = (load_dataset("audiofolder", data_dir=vdir, split="train")
-            .cast_column("audio", Audio(decode=False)))
-    print(f"iany/voice rows on HF: {vraw.num_rows}", flush=True)
+    meta_path = next(os.path.join(vdir, c) for c in ("metadata.csv", "data/metadata.csv")
+                     if os.path.exists(os.path.join(vdir, c)))
+    rows = list(csv.DictReader(open(meta_path, encoding="utf-8-sig")))   # utf-8-sig strips BOM
+    cols = list(rows[0].keys())
+    FN  = next(c for c in cols if "file" in c.lower())                   # 'file_name'
+    TXT = next(c for c in ("sentence", "transcript", "text", "transcription") if c in cols)
+    print(f"iany/voice rows on HF: {len(rows)} | columns: {cols}", flush=True)
     vsub = os.path.join(OUT, "iany_voice"); os.makedirs(vsub, exist_ok=True)
-    vbase = []
-    for ex in vraw:
+    vbase, miss = [], 0
+    for r in rows:
+        fp = os.path.join(vdir, r[FN])
+        if not os.path.exists(fp): miss += 1; continue
         try:
-            y = load16k(ex["audio"])
+            y, sr = sf.read(fp, dtype="float32")
+            if y.ndim > 1: y = y.mean(1)
+            if sr != 16000: y = librosa.resample(y, orig_sr=sr, target_sr=16000)
         except Exception:
-            continue
-        dur = len(y) / 16000
-        if not (MIN_SEC <= dur <= MAX_SEC): continue
-        txt = text_of(ex)                          # 'sentence' column, already in TEXT_KEYS
+            miss += 1; continue
+        if not (MIN_SEC <= len(y)/16000 <= MAX_SEC): continue
+        txt = (r.get(TXT) or "").strip()
         if not txt: continue
         p = f"{vsub}/{i:06d}.wav"; sf.write(p, y, 16000)
         vbase.append({"path": p, "sentence": txt, "source": "iany/voice"})
@@ -228,7 +241,7 @@ try:
     for _ in range(VOICE_REPEAT):
         meta.extend(vbase)
     print(f"DONE iany/voice: {len(vbase)} unique clips x{VOICE_REPEAT} = "
-          f"{len(vbase)*VOICE_REPEAT} rows (consented, CC-BY-SA-4.0)", flush=True)
+          f"{len(vbase)*VOICE_REPEAT} rows (missing/failed {miss}, consented, CC-BY-SA-4.0)", flush=True)
 except Exception as e:
     print("skip iany/voice (unavailable?):", e, flush=True)
 
