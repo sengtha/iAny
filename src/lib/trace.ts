@@ -23,14 +23,17 @@
 export interface PhotoSig {
   /** 160px JPEG data URL — lets the verifier see the origin photo side-by-side. */
   thumb: string
-  /** 64-bit difference hash, hex. Robust to lighting/scale; compares by Hamming. */
-  dhash: string
-  /** 64-bin (4×4×4) normalized RGB colour histogram. */
-  hist: number[]
+  /** 64-bit DCT perceptual hash (pHash), hex — robust to lighting/scale/blur. */
+  phash: string
+  /** L2-normalized descriptor: spatial colour grid + gradient-orientation
+   *  (texture/shape) histogram. Compared by cosine — the main appearance signal. */
+  vec: number[]
+  /** 64-bin (4×4×4) normalized RGB colour histogram — the separate colour signal. */
+  color: number[]
 }
 
 export interface TraceCapsule {
-  v: 1
+  v: 2
   /** Matchable signals — re-captured and scored at verify. */
   match: {
     photos: PhotoSig[]
@@ -102,38 +105,109 @@ function drawToData(bmp: ImageBitmap, w: number, h: number): ImageData {
   return ctx.getImageData(0, 0, w, h)
 }
 
-/** 64-bit difference hash (dHash) as hex. Compare with hammingSimilarity. */
-function dHash(bmp: ImageBitmap): string {
-  const { data } = drawToData(bmp, 9, 8) // 9×8 → 8×8 adjacent comparisons = 64 bits
-  const gray: number[] = []
-  for (let i = 0; i < data.length; i += 4) {
-    gray.push(0.299 * data[i]! + 0.587 * data[i + 1]! + 0.114 * data[i + 2]!)
+const S = 32 // working resolution for all descriptors
+
+/** Precomputed DCT-II basis for length S (cos((π/S)(x+½)u)). */
+const DCT_COS = (() => {
+  const t = new Float64Array(S * S)
+  for (let u = 0; u < S; u++) for (let x = 0; x < S; x++) t[u * S + x] = Math.cos((Math.PI / S) * (x + 0.5) * u)
+  return t
+})()
+
+function dct1d(vec: Float64Array, out: Float64Array): void {
+  for (let u = 0; u < S; u++) {
+    let sum = 0
+    for (let x = 0; x < S; x++) sum += vec[x]! * DCT_COS[u * S + x]!
+    out[u] = sum
   }
-  let bits = ''
-  for (let row = 0; row < 8; row++) {
-    for (let col = 0; col < 8; col++) {
-      const l = gray[row * 9 + col]!
-      const r = gray[row * 9 + col + 1]!
-      bits += l > r ? '1' : '0'
-    }
+}
+
+/** 64-bit DCT perceptual hash from a 32×32 grayscale plane. */
+function pHash(gray: Float64Array): string {
+  const rows = new Float64Array(S * S)
+  const row = new Float64Array(S), rout = new Float64Array(S)
+  for (let y = 0; y < S; y++) {
+    for (let x = 0; x < S; x++) row[x] = gray[y * S + x]!
+    dct1d(row, rout)
+    for (let x = 0; x < S; x++) rows[y * S + x] = rout[x]!
   }
-  // 64 bits → 16 hex chars
+  const col = new Float64Array(S), cout = new Float64Array(S)
+  const dct = new Float64Array(S * S)
+  for (let x = 0; x < S; x++) {
+    for (let y = 0; y < S; y++) col[y] = rows[y * S + x]!
+    dct1d(col, cout)
+    for (let y = 0; y < S; y++) dct[y * S + x] = cout[y]!
+  }
+  // top-left 8×8 low-frequency block (excl. DC), threshold on its median → 64 bits
+  const low: number[] = []
+  for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) if (x || y) low.push(dct[y * S + x]!)
+  const med = [...low].sort((a, b) => a - b)[Math.floor(low.length / 2)]!
+  let bits = (dct[0]! > med ? '1' : '0')
+  for (const v of low) bits += v > med ? '1' : '0'
+  bits = bits.slice(0, 64)
   let hex = ''
   for (let i = 0; i < 64; i += 4) hex += parseInt(bits.slice(i, i + 4), 2).toString(16)
   return hex
 }
 
-/** 4×4×4 = 64-bin normalized RGB colour histogram. */
-function colorHistogram(bmp: ImageBitmap): number[] {
-  const { data } = drawToData(bmp, 32, 32)
-  const bins = new Array(64).fill(0)
+function l2normalize(v: number[]): number[] {
   let n = 0
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i]! >> 6, g = data[i + 1]! >> 6, b = data[i + 2]! >> 6
-    bins[r * 16 + g * 4 + b]++
-    n++
+  for (const x of v) n += x * x
+  n = Math.sqrt(n) || 1
+  return v.map((x) => x / n)
+}
+
+const round3 = (n: number) => Math.round(n * 1000) / 1000
+
+/** Full v2 descriptor: pHash + spatial-colour + gradient-orientation vector. */
+function features(bmp: ImageBitmap): { phash: string; vec: number[]; color: number[] } {
+  const { data } = drawToData(bmp, S, S)
+  const gray = new Float64Array(S * S)
+  for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+    gray[p] = 0.299 * data[i]! + 0.587 * data[i + 1]! + 0.114 * data[i + 2]!
   }
-  return bins.map((c) => c / (n || 1))
+
+  const phash = pHash(gray)
+
+  // Spatial colour: 4×4 grid of mean R,G,B (captures layout, not just palette).
+  const grid = 4, cell = S / grid
+  const spatial: number[] = []
+  for (let gy = 0; gy < grid; gy++) for (let gx = 0; gx < grid; gx++) {
+    let r = 0, g = 0, b = 0, n = 0
+    for (let y = gy * cell; y < (gy + 1) * cell; y++) for (let x = gx * cell; x < (gx + 1) * cell; x++) {
+      const idx = (y * S + x) * 4
+      r += data[idx]!; g += data[idx + 1]!; b += data[idx + 2]!; n++
+    }
+    spatial.push(r / n / 255, g / n / 255, b / n / 255)
+  }
+
+  // Gradient orientation (texture/shape): Sobel → 8 bins over a 2×2 block grid.
+  const orient = new Array(2 * 2 * 8).fill(0)
+  for (let y = 1; y < S - 1; y++) for (let x = 1; x < S - 1; x++) {
+    const gx =
+      -gray[(y - 1) * S + x - 1]! - 2 * gray[y * S + x - 1]! - gray[(y + 1) * S + x - 1]! +
+      gray[(y - 1) * S + x + 1]! + 2 * gray[y * S + x + 1]! + gray[(y + 1) * S + x + 1]!
+    const gy =
+      -gray[(y - 1) * S + x - 1]! - 2 * gray[(y - 1) * S + x]! - gray[(y - 1) * S + x + 1]! +
+      gray[(y + 1) * S + x - 1]! + 2 * gray[(y + 1) * S + x]! + gray[(y + 1) * S + x + 1]!
+    const mag = Math.hypot(gx, gy)
+    if (mag < 8) continue
+    let ang = Math.atan2(gy, gx); if (ang < 0) ang += Math.PI // orientation mod π
+    const bin = Math.min(7, Math.floor((ang / Math.PI) * 8))
+    const bx = x < S / 2 ? 0 : 1, by = y < S / 2 ? 0 : 1
+    orient[(by * 2 + bx) * 8 + bin] += mag
+  }
+
+  const vec = l2normalize([...spatial, ...l2normalize(orient)]).map(round3)
+
+  // Separate global colour histogram (4×4×4) for the standalone colour signal.
+  const bins = new Array(64).fill(0)
+  for (let i = 0; i < data.length; i += 4) {
+    bins[(data[i]! >> 6) * 16 + (data[i + 1]! >> 6) * 4 + (data[i + 2]! >> 6)]++
+  }
+  const color = bins.map((c) => round3(c / (S * S)))
+
+  return { phash, vec, color }
 }
 
 async function thumbnail(blob: Blob, max = 160): Promise<string> {
@@ -149,14 +223,20 @@ async function thumbnail(blob: Blob, max = 160): Promise<string> {
   return canvas.toDataURL('image/jpeg', 0.7)
 }
 
-/** Turn a product photo into its signature (thumb + perceptual hashes). */
+/**
+ * Turn a product photo into its signature (thumb + descriptors).
+ *
+ * ⭐ This is the single swap-in point: to use a learned on-device image
+ * embedding (MobileCLIP / DINO via onnxruntime-web) instead of / alongside the
+ * classical descriptor, compute it here and add it to `vec` — the capsule shape
+ * and the scoring below stay the same.
+ */
 export async function photoSignature(blob: Blob): Promise<PhotoSig> {
   const bmp = await createImageBitmap(blob)
-  const dhash = dHash(bmp)
-  const hist = colorHistogram(bmp)
+  const { phash, vec, color } = features(bmp)
   bmp.close()
   const thumb = await thumbnail(blob)
-  return { thumb, dhash, hist }
+  return { thumb, phash, vec, color }
 }
 
 /* --------------------------------------------------------- similarities --- */
@@ -178,12 +258,23 @@ function histSimilarity(a: number[], b: number[]): number {
   return s
 }
 
-/** Best visual+colour match of one fresh photo against all origin photos. */
+/** Cosine similarity of two L2-normalized vectors, clamped to 0..1. */
+function cosine(a: number[], b: number[]): number {
+  let dot = 0
+  const n = Math.min(a.length, b.length)
+  for (let i = 0; i < n; i++) dot += (a[i] ?? 0) * (b[i] ?? 0)
+  return Math.max(0, Math.min(1, dot))
+}
+
+/** Best appearance+colour match of one fresh photo against all origin photos.
+ *  Appearance blends the descriptor (cosine) with the pHash (Hamming). */
 function bestPhotoMatch(fresh: PhotoSig, origins: PhotoSig[]): { v: number; c: number } {
   let best = { v: 0, c: 0, sum: -1 }
   for (const o of origins) {
-    const v = hammingSimilarity(fresh.dhash, o.dhash)
-    const c = histSimilarity(fresh.hist, o.hist)
+    const cos = cosine(fresh.vec, o.vec)
+    const ham = hammingSimilarity(fresh.phash, o.phash)
+    const v = 0.65 * cos + 0.35 * ham
+    const c = histSimilarity(fresh.color, o.color)
     const sum = v + c
     if (sum > best.sum) best = { v, c, sum }
   }

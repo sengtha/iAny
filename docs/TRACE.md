@@ -29,8 +29,9 @@ phone browser; no account.
 
 ### 1. Create proof (100% offline)
 Capture into a capsule:
-- **Product photos** → on-device perceptual signature (difference-hash + colour
-  histogram). *Matchable.*
+- **Product photos** → on-device signature: **DCT perceptual hash + spatial
+  colour grid + gradient-orientation (texture) descriptor**, compared by cosine +
+  Hamming. Robust to lighting/rotation/crop. *Matchable.*
 - **Box / label text** → typed, or **📷 Scan label** (on-device Khmer OCR).
   *Matchable.*
 - **Witness** (co-op / buyer who vouches), **producer**, **product**, **GPS**,
@@ -114,18 +115,24 @@ Endpoints (public, keyless): `POST /api/trace/register`, `GET /api/trace/check/:
 
 ## Roadmap
 
-**v1 (now) — offline trust score.** ✅ Keyless content-addressed capsule; dHash +
+**v1 — offline trust score.** ✅ Keyless content-addressed capsule; dHash +
 colour + box-text matching; weighted score with coverage penalty; tamper cap;
 Khmer OCR label scan; witness/GPS/story context; optional registry (trusted time
 + verify count); P2P transfer by file.
 
-**v2 — better matching.**
-- Swap the perceptual signature for a **learned on-device image embedding**
-  (MobileCLIP / DINO via ONNX) — `photoSignature()` is the single swap-in point;
-  capsule shape and scoring stay the same. Big accuracy jump for both unique and
-  bulk goods.
-- **Guided multi-angle capture** (framing prompts) to cut lighting/angle noise.
-- **Grade/quality + crop classifier** as extra scored signals.
+**v2 (now) — better matching.** ✅
+- **DCT perceptual hash + spatial-colour grid + gradient-orientation (texture)
+  descriptor**, compared by cosine + Hamming. Verified robust: the same product
+  under brightness/hue change, **8° rotation and 12% crop** still scores ~72
+  ("good"), well clear of a different product (~35). Still **pure-JS, zero model
+  download, instant** — keeps the works-on-any-cheap-phone-offline property.
+- **Guided multi-angle capture** (Front / Back-label / Close-up prompts) to cut
+  lighting/angle noise and make a match harder to fake.
+- *Optional next:* a **learned on-device embedding** (MobileCLIP / DINO via
+  onnxruntime-web) can drop into the `photoSignature()` swap-in for an even bigger
+  jump — deferred by default because it adds a ~10–80 MB model download; the
+  classical descriptor keeps Trace instant and download-free. A **grade/quality
+  classifier** can be added as an extra scored signal the same way.
 
 **v3 — credibility & reach.**
 - **Witness co-attestation flow** (co-op/buyer adds their confirmation P2P, then

@@ -81,7 +81,7 @@ function Create({ L }: { L: LFn }) {
   async function create() {
     setBusy(true)
     const body: Omit<TraceCapsule, 'id'> = {
-      v: 1,
+      v: 2,
       match: { photos: photos.map((p) => p.sig), boxText },
       context: {
         gps,
@@ -146,7 +146,12 @@ function Create({ L }: { L: LFn }) {
         {photos.map((p, i) => <img key={i} src={p.sig.thumb} alt="" />)}
         <button className="trace-add" onClick={() => fileRef.current?.click()}>＋</button>
       </div>
-      <small className="hint">{L('2–3 angles + a close-up of texture work best.', 'ថត ២–៣ មុំ + រូបជិតនៃវាយនភាព ល្អបំផុត។')}</small>
+      <div className="trace-angles">
+        {[L('Front', 'ខាងមុខ'), L('Back / label', 'ខាងក្រោយ / ស្លាក'), L('Close-up texture', 'វាយនភាពជិត')].map((a, i) => (
+          <span key={i} className={photos.length > i ? 'done' : ''}>{photos.length > i ? '✓' : i + 1} {a}</span>
+        ))}
+      </div>
+      <small className="hint">{L('More angles = a stronger, harder-to-fake match. A close-up of texture helps most.', 'មុំកាន់តែច្រើន = ការផ្គូផ្គងកាន់តែរឹងមាំ។ រូបជិតនៃវាយនភាពជួយច្រើនបំផុត។')}</small>
 
       <label className="voice-field">
         <span>🏷️ {L('Text on the box / label', 'អក្សរនៅលើប្រអប់ / ស្លាក')}</span>

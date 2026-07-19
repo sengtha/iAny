@@ -1755,3 +1755,25 @@ progress {
   background: var(--accent);
   border-radius: 999px;
 }
+
+/* Trace v2 — guided multi-angle capture chips */
+.trace-angles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 2px;
+}
+.trace-angles span {
+  font-size: 0.75rem;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--bg-softer);
+  color: var(--fg-muted);
+}
+.trace-angles span.done {
+  border-color: #16a34a;
+  color: #16a34a;
+}
+.trace-scan {
+  margin: 2px 0 8px;
+}
