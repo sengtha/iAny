@@ -299,6 +299,7 @@ import os
 # per worker gives clean parallelism (Map finishes in minutes, not hours).
 for _v in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
     os.environ[_v] = "1"
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"   # less GPU fragmentation
 import io, evaluate, torch, soundfile as sf
 torch.set_num_threads(1)
 from dataclasses import dataclass
@@ -382,13 +383,18 @@ model.generation_config.language = "km"
 model.generation_config.task = "transcribe"
 model.generation_config.forced_decoder_ids = None
 
+# Batch sizing by GPU. Keep the EFFECTIVE batch (batch × grad_accum) ≈ 32 so the
+# LR schedule is unchanged — only speed differs. whisper-base's loss materializes a
+# batch×448×51865 logits tensor, which OOMs a 16 GB card at batch 32:
+#   24 GB (RTX 4090 / A5000):  batch 32, grad_accum 1   (fastest)
+#   16 GB (T4 / A4000 / 4080): batch  8, grad_accum 4   ← safe default below
 args = Seq2SeqTrainingArguments(
     output_dir=OUT,
-    per_device_train_batch_size=32, gradient_accumulation_steps=1,
+    per_device_train_batch_size=8, gradient_accumulation_steps=4,   # effective 32; fits 16 GB
     learning_rate=3.75e-5, warmup_steps=200, max_steps=3000,   # ↑ with more data
     fp16=True, predict_with_generate=True, generation_max_length=225,
     eval_strategy="steps", eval_steps=500, save_steps=500, logging_steps=25,
-    save_total_limit=2, per_device_eval_batch_size=16, report_to=["tensorboard"],
+    save_total_limit=2, per_device_eval_batch_size=8, report_to=["tensorboard"],
     load_best_model_at_end=True, metric_for_best_model="cer", greater_is_better=False,
     push_to_hub=True, hub_model_id=HUB, hub_strategy="checkpoint",  # checkpoints -> HF
 )
@@ -437,9 +443,11 @@ huggingface-cli download sengtha/whisper-base-khmer --include "last-checkpoint/*
 
 Watch eval **CER** fall in TensorBoard. `max_steps` ~3000 is a start; scale with
 data. If it overfits (train CER ≪ eval CER), use more of DDD's speakers or fewer
-steps. whisper-base trains in **~2–4 h on a 4090** (< $5). If you hit CUDA OOM,
-set `per_device_train_batch_size=16, gradient_accumulation_steps=2` (same effective
-batch of 32).
+steps. whisper-base trains in **~2–4 h on a 4090** (< $5). The `args` block above
+already uses `batch=8, grad_accum=4` (effective 32) to fit a **16 GB** GPU; on a
+**24 GB** card use `batch=32, grad_accum=1` to train ~2× faster. If a 16 GB card
+still OOMs, add `gradient_checkpointing=True` to `args` and `model.config.use_cache
+= False` after the model loads.
 
 ---
 
