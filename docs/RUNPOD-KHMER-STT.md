@@ -544,8 +544,11 @@ then `wrangler deploy`. (Tell me when it's up and I'll wire the mobile download 
 ---
 
 ## Cost / time
-- RunPod RTX 4090: ~$0.5/hr · whisper-base fine-tune ≈ 2–4 h (+ ~15 min CPU
-  preprocessing) → **under ~$5**.
+- RunPod RTX 4090 (24 GB): ~$0.5/hr · whisper-base fine-tune ≈ 2–4 h (+ ~15 min
+  CPU preprocessing) → **under ~$5**. Use `batch=32, grad_accum=1`.
+- A **16 GB** card (T4 / A4000) is cheaper (~$0.2–0.4/hr) but ~2–3× slower
+  (~6–8 h) and needs `batch=8, grad_accum=4`. Fine for an overnight run —
+  checkpoints push to HF, so disconnects/pod death are recoverable.
 - Convert + upload: minutes.
 
 ## Recap
