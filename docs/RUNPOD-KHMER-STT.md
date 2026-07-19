@@ -348,10 +348,13 @@ NP = 16
 ds = ds.map(prepare, remove_columns=ds["train"].column_names,
             num_proc=NP, writer_batch_size=100)
 # Whisper's decoder caps labels at 448 tokens; Khmer tokenizes densely, so a few
-# long clips exceed it and would crash training. Drop them. Run this SINGLE-process
-# (no num_proc): it's just a length check — trivially fast over the cached features —
-# and filter+num_proc can throw a multiprocessing/pickling error for no benefit.
-ds = ds.filter(lambda b: len(b["labels"]) <= 448)
+# long clips exceed it and would crash training. Drop them. Two musts here:
+#  - input_columns=["labels"]: otherwise filter loads the whole row incl. the ~1 MB
+#    input_features PER example just to check a length → I/O-bound, ~2 h. Reading
+#    only the tiny labels column makes it finish in under a minute.
+#  - no num_proc: it's already trivial single-process, and filter+num_proc can throw
+#    a multiprocessing/pickling error for no benefit.
+ds = ds.filter(lambda labels: len(labels) <= 448, input_columns=["labels"])
 
 @dataclass
 class Collator:
