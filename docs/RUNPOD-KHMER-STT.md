@@ -338,16 +338,23 @@ def prepare(b):
     return b
 # Parallelize this one-time preprocessing pass — it's CPU-only (mel features +
 # tokenize; the GPU stays idle until trainer.train() below). With num_proc=2 it
-# can take ~24 h on 60k+ clips; with many workers it's ~10-30 min. Results are
+# can take ~24 h on 60k+ clips; with several workers it's ~10-30 min. Results are
 # cached to disk, so a later restart skips this and goes straight to GPU.
-# Cap the worker count: past ~64 you mostly add process-spawn + disk-I/O
-# contention (reading tens of thousands of small WAVs) and RAM use, not speed —
-# so on a big pod (e.g. 128 vCPUs) 64 is the sweet spot, not all of them.
-NP = min(64, os.cpu_count() or 8)
-ds = ds.map(prepare, remove_columns=ds["train"].column_names, num_proc=NP)
+#
+# TWO memory footguns on a big pod, both fixed below:
+#  1. Worker count: 16 is plenty here. Higher mostly adds RAM + I/O contention,
+#     and each extra worker multiplies the write-buffer cost in (2). (Don't just
+#     use os.cpu_count() — 64+ workers is how you OOM.)
+#  2. writer_batch_size: each Whisper feature array is 80×3000 ≈ 1 MB, and map
+#     buffers writer_batch_size of them PER WORKER (default 1000) before flushing
+#     → 1000×1MB×16 ≈ 16 GB, ×64 workers ≈ 60 GB → "a subprocess abruptly died"
+#     (OOM kill). Cap it small so peak RAM stays a couple GB.
+NP = 16
+ds = ds.map(prepare, remove_columns=ds["train"].column_names,
+            num_proc=NP, writer_batch_size=100)
 # Whisper's decoder caps labels at 448 tokens; Khmer tokenizes densely, so a few
 # long clips exceed it and would crash training. Drop them (cheap; map stays cached).
-ds = ds.filter(lambda b: len(b["labels"]) <= 448, num_proc=NP)
+ds = ds.filter(lambda b: len(b["labels"]) <= 448, num_proc=NP, writer_batch_size=200)
 
 @dataclass
 class Collator:
