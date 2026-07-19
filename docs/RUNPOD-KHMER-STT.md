@@ -32,6 +32,19 @@ Two practical facts drive §2:
   the TTS pipeline (`Audio(decode=False)` + decode with `soundfile`) — see
   `docs/RUNPOD-TTS-KHMER.md`.
 
+### Your own `/voice` data — now on Hugging Face
+
+The clips collected at [iany.app/voice](https://iany.app/voice) are published as a
+dataset:
+**[`sengtha/iany-khmer-voice`](https://huggingface.co/datasets/sengtha/iany-khmer-voice)**
+(~5.1 h, ~76 speakers as of this writing — real phone/room audio, CC-BY-SA-4.0).
+This is your **most valuable** signal: it matches how the app is actually used, in
+the acoustic conditions the model must survive. It's small, so §2 pulls it
+**straight from HF** (no export/upload step) and **oversamples** it so the model
+weights real-world audio above the big read-speech corpora. It grows every time
+people contribute — re-publish it (Actions → *Publish dataset to Hugging Face*) and
+re-run §2 to fold in the newer clips.
+
 ---
 
 ## 1. Rent a GPU on RunPod
@@ -91,7 +104,8 @@ SOURCES = [
     # (line_index.tsv + wavs) and append those rows to `meta` instead.
     {"repo": "openslr/openslr", "config": "SLR42", "split": "train", "hours": 6, "license": "CC-BY-SA-4.0"},
     # NOTE: Common Voice has NO Khmer set on HF, so it's not usable here.
-    # Your consented /voice classroom clips: fold in later (already 16 kHz WAV).
+    # Your consented /voice clips (sengtha/iany-khmer-voice) are added + oversampled
+    # by a dedicated block AFTER this loop, not here — see below.
 ]
 OUT = "/workspace/clips"; os.makedirs(OUT, exist_ok=True)
 MIN_SEC, MAX_SEC = 0.5, 20
@@ -144,22 +158,37 @@ for s in SOURCES:
         if got >= s["hours"] * 3600: break
     print(f"DONE {repo}: {got/3600:.1f} h ({s['license']})", flush=True)
 
-# --- Your consented /voice classroom clips (the most valuable: real phones /
-# rooms). Export first with scripts/export-voice.mjs, upload out/ to the pod as
-# /workspace/voice/. This block is a no-op until that file exists, so the same
-# script runs before AND after you've collected voices.
-# VOICE_REPEAT oversamples them (they're few but high-value) so the model
-# weights real-world audio more heavily. 1 = no oversampling; 3 is a good start.
-import csv
-VOICE_CSV = "/workspace/voice/metadata.csv"
+# --- Your consented /voice clips — the most valuable signal (real phones/rooms).
+# Now a published HF dataset, so it pulls straight from the Hub like the others:
+#   https://huggingface.co/datasets/sengtha/iany-khmer-voice
+# It's small, so we DON'T cap it by hours — we take all of it and OVERSAMPLE it
+# VOICE_REPEAT× so the model weights real-world audio above the big read corpora.
+# 1 = no oversampling; 3 is a good start (raise it if real-clip CER lags).
+# The whole block is wrapped in try/except so the pipeline still runs if the
+# dataset is briefly unavailable — it just trains on the public corpora that run.
 VOICE_REPEAT = 3
-if os.path.exists(VOICE_CSV):
-    rows = list(csv.DictReader(open(VOICE_CSV, encoding="utf-8")))
+try:
+    vraw = load_dataset("sengtha/iany-khmer-voice", split="train").cast_column("audio", Audio(decode=False))
+    vsub = os.path.join(OUT, "iany_voice"); os.makedirs(vsub, exist_ok=True)
+    vbase = []
+    for ex in vraw:
+        try:
+            y = load16k(ex["audio"])
+        except Exception:
+            continue
+        dur = len(y) / 16000
+        if not (MIN_SEC <= dur <= MAX_SEC): continue
+        txt = text_of(ex)                          # 'sentence' column, already in TEXT_KEYS
+        if not txt: continue
+        p = f"{vsub}/{i:06d}.wav"; sf.write(p, y, 16000)
+        vbase.append({"path": p, "sentence": txt, "source": "iany/voice"})
+        i += 1
     for _ in range(VOICE_REPEAT):
-        for r in rows:
-            meta.append({"path": os.path.join("/workspace/voice", r["file_name"]),
-                         "sentence": r["sentence"], "source": "iany/voice"})
-    print(f"DONE iany/voice: {len(rows)} clips x{VOICE_REPEAT} (consented, CC-BY-SA-4.0)", flush=True)
+        meta.extend(vbase)
+    print(f"DONE iany/voice: {len(vbase)} unique clips x{VOICE_REPEAT} = "
+          f"{len(vbase)*VOICE_REPEAT} rows (consented, CC-BY-SA-4.0)", flush=True)
+except Exception as e:
+    print("skip iany/voice (unavailable?):", e, flush=True)
 
 ds = (Dataset.from_list(meta)
         .cast_column("path", Audio(sampling_rate=16000))
@@ -173,20 +202,31 @@ This yields a diverse, license-clean set (DDD + km-speech-corpus + FLEURS +
 OpenSLR SLR42 ≈ 115–120 h — read + multi-domain, many speakers). The mp3
 fallback in `load16k` stays harmless and ready for any future mp3-based source.
 
-**Adding your `/voice` classroom data later** (the block after the SOURCES loop):
-export it with `scripts/export-voice.mjs`, upload `out/` to the pod as
-`/workspace/voice/`, and rerun this script — the `/voice` block auto-detects the
-file and folds the clips in, oversampled `VOICE_REPEAT×` because real phone/room
-audio is your most valuable signal. Until that file exists the block is a no-op,
-so this same script runs fine now (public corpora only) and again after you've
-collected voices. No separate per-source training — you always build one
-combined set and train once.
+**Your `/voice` data is already folded in** (the block after the SOURCES loop):
+it pulls `sengtha/iany-khmer-voice` from HF, takes every clip (no hours cap), and
+oversamples it `VOICE_REPEAT×` because real phone/room audio is your most valuable
+signal. Nothing to upload to the pod. When more people contribute, re-publish the
+dataset (**Actions → Publish dataset to Hugging Face**) and re-run this script to
+pick up the newer clips — one combined set, train once.
+
+> **Dedup / no double-counting:** re-running §2 rebuilds `/workspace/ds` from
+> scratch, so re-publishing the dataset and re-running never double-adds clips —
+> `VOICE_REPEAT` is the *only* multiplier. (If you keep an old `/workspace/ds` and
+> also build a new one, train on just one.)
+>
+> **One eval caveat from oversampling:** because each `/voice` clip is duplicated
+> `VOICE_REPEAT×` *before* `train_test_split`, a held-out `/voice` clip can have a
+> twin in train — so the headline eval CER slightly *flatters* `/voice`. Judge real
+> accuracy on the §4 real-noisy-clip check. To measure `/voice` cleanly, hold out a
+> few of its clips *before* the oversampling loop and oversample only the rest.
 
 With this much data, train **whisper-base** (§3, just change `BASE`) — base +
-more data is the real quality jump over tiny.
+more data is the real quality jump over tiny. With ~5 h of real `/voice` audio now
+in the mix, base is the recommended target for this round.
 
-**Credits:** list every `SOURCES` entry + its license in the model README, and
-keep the release **CC-BY-SA-4.0**.
+**Credits:** list every `SOURCES` entry + its license in the model README, **plus
+`sengtha/iany-khmer-voice`** (the folded-in `/voice` data) and its contributors,
+and keep the release **CC-BY-SA-4.0**.
 
 ---
 
