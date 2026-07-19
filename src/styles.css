@@ -2109,3 +2109,69 @@ progress {
 .trace-tier-badge.lvl-2 { color: #4d7c0f; background: rgba(132, 204, 22, 0.12); }
 .trace-tier-badge.lvl-3 { color: #16a34a; background: rgba(22, 163, 74, 0.12); }
 .trace-tier-badge.lvl-4 { color: #0284c7; background: rgba(14, 165, 233, 0.12); }
+
+/* "Experiment" pill next to the Trace wordmark (header + footer). */
+.trace-exp {
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #b45309;
+  background: rgba(245, 158, 11, 0.16);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+@media (prefers-color-scheme: dark) {
+  .trace-exp { color: #fcd34d; }
+}
+
+/* Trace standalone footer — mirrors the iAny landing footer, kept simple. */
+.trace-foot {
+  margin-top: 12px;
+  padding: 26px 18px calc(30px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--bg-softer);
+  text-align: center;
+  color: var(--fg-muted);
+}
+.trace-foot-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 800;
+  font-size: 1.02rem;
+  color: var(--fg);
+  margin-bottom: 8px;
+}
+.trace-foot-note {
+  margin: 0 auto 14px;
+  max-width: 440px;
+  font-size: 0.85rem;
+  line-height: 1.55;
+}
+.trace-foot-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.trace-foot-links a:hover {
+  color: var(--accent);
+}
+.trace-foot-co {
+  margin: 16px auto 0;
+  font-size: 0.78rem;
+  opacity: 0.85;
+}
+.trace-foot-co a {
+  color: var(--accent);
+  font-weight: 600;
+}
+.trace-foot-co a:hover {
+  text-decoration: underline;
+}
