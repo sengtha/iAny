@@ -1617,3 +1617,141 @@ progress {
   color: var(--fg-muted);
   margin: 10px 0 4px;
 }
+
+/* iAny Trace (/trace) — proof of origin trust score */
+.trace-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.trace-tabs button {
+  flex: 1;
+  background: var(--bg-soft);
+}
+.trace-tabs button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+}
+.trace-row {
+  display: flex;
+  gap: 10px;
+}
+.trace-row .voice-field {
+  flex: 1;
+}
+.trace-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 6px 0;
+}
+.trace-thumbs img {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid var(--bg-softer);
+}
+.trace-add {
+  width: 72px;
+  height: 72px;
+  border: 1px dashed var(--bg-softer);
+  border-radius: 10px;
+  font-size: 1.6rem;
+  color: var(--fg-muted);
+  background: var(--bg-soft);
+}
+.trace-gps {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0;
+  font-size: 0.85rem;
+  color: var(--fg-muted);
+}
+.trace-done {
+  text-align: center;
+}
+.trace-badge {
+  width: 56px;
+  height: 56px;
+  margin: 4px auto 8px;
+  border-radius: 50%;
+  background: #16a34a;
+  color: #fff;
+  font-size: 1.8rem;
+  display: grid;
+  place-items: center;
+}
+.trace-id {
+  font-family: ui-monospace, monospace;
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+}
+.trace-origin {
+  border: 1px solid var(--bg-softer);
+  background: var(--bg-soft);
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+.trace-ctx {
+  font-size: 0.85rem;
+  color: var(--fg-muted);
+  display: grid;
+  gap: 2px;
+  margin-top: 6px;
+}
+.trace-score {
+  margin-top: 16px;
+  padding: 18px;
+  border-radius: 14px;
+  text-align: center;
+  border: 1px solid var(--bg-softer);
+}
+.trace-score.band-strong { background: rgba(22, 163, 74, 0.12); border-color: #16a34a; }
+.trace-score.band-good { background: rgba(101, 163, 13, 0.12); border-color: #65a30d; }
+.trace-score.band-partial { background: rgba(217, 119, 6, 0.12); border-color: #d97706; }
+.trace-score.band-low { background: rgba(220, 38, 38, 0.12); border-color: #dc2626; }
+.trace-score-num {
+  font-size: 3rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.trace-score-num span {
+  font-size: 1rem;
+  color: var(--fg-muted);
+  font-weight: 600;
+}
+.trace-score-band {
+  font-weight: 700;
+  margin: 4px 0 12px;
+}
+.trace-signals {
+  display: grid;
+  gap: 8px;
+  text-align: left;
+}
+.trace-sig {
+  display: grid;
+  grid-template-columns: 90px 1fr 42px;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+}
+.trace-sig.na {
+  opacity: 0.45;
+}
+.trace-bar {
+  height: 8px;
+  background: var(--bg-softer);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.trace-bar i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+}

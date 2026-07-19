@@ -78,6 +78,7 @@ export default defineConfig({
           /^\/scan(\/|\.html|$)/,
           /^\/braille(\/|\.html|$)/,
           /^\/sign(\/|\.html|$)/,
+          /^\/trace(\/|\.html|$)/,
         ],
         runtimeCaching: [
           {
@@ -141,6 +142,7 @@ export default defineConfig({
         scan: path.resolve(root, 'scan.html'),
         braille: path.resolve(root, 'braille.html'),
         sign: path.resolve(root, 'sign.html'),
+        trace: path.resolve(root, 'trace.html'),
       },
     },
   },
