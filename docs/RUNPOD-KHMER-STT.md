@@ -110,10 +110,13 @@ SOURCES = [
     #   try/except below just SKIPS them — the run still succeeds on DDD +
     #   km-speech-corpus + /voice. Delete these rows if you prefer datasets>=4.
     {"repo": "google/fleurs", "config": "km_kh",  "split": "train", "hours": 12, "license": "CC-BY-4.0"},
-    # OpenSLR SLR42 (Google Khmer, ~3-4 h read speech): CC-BY-SA-4.0. If you're on
-    # datasets>=4 and want these hours, download directly from
-    # https://www.openslr.org/42/ (line_index.tsv + wavs) and append those rows to
-    # `meta` instead of loading the script-based repo.
+    # OpenSLR SLR42 (Google Khmer, ~3-4 h read speech): CC-BY-SA-4.0. HEADS-UP:
+    # this one serves audio as paths inside tar archives, which STREAMING doesn't
+    # extract — so it decodes to 0 clips here ("DONE openslr/openslr: 0.0 h") and
+    # is harmlessly skipped. It's only ~4 h of read speech DDD already covers, so
+    # the simplest choice is to DELETE this row. If you truly want it, load just
+    # this source with streaming=False (small, full download is fine) or grab it
+    # directly from https://www.openslr.org/42/ and append rows to `meta`.
     {"repo": "openslr/openslr", "config": "SLR42", "split": "train", "hours": 6, "license": "CC-BY-SA-4.0"},
     # NOTE: Common Voice has NO Khmer set on HF, so it's not usable here.
     # Your consented /voice clips (sengtha/iany-khmer-voice) are added + oversampled
