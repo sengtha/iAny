@@ -1619,19 +1619,110 @@ progress {
 }
 
 /* iAny Trace (/trace) — proof of origin trust score */
-.trace-tabs {
+/* Two big, plain choices — a maker vs. a buyer — instead of a row of tabs. */
+.trace-modes {
   display: flex;
-  gap: 8px;
-  margin-bottom: 14px;
+  gap: 10px;
+  margin-bottom: 16px;
 }
-.trace-tabs button {
+.trace-modes button {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  text-align: center;
+  padding: 14px 10px;
   background: var(--bg-soft);
+  border: 1px solid var(--bg-softer);
+  border-radius: 14px;
 }
-.trace-tabs button.active {
+.trace-modes button .trace-mode-ic {
+  font-size: 1.7rem;
+  line-height: 1;
+}
+.trace-modes button b {
+  font-size: 0.98rem;
+}
+.trace-modes button small {
+  font-size: 0.76rem;
+  color: var(--fg-muted);
+}
+.trace-modes button.active {
   background: var(--accent);
   border-color: var(--accent);
+}
+.trace-modes button.active b,
+.trace-modes button.active small {
   color: var(--accent-fg);
+}
+
+/* Friendly one-line instruction at the top of Create. */
+.trace-lead {
+  margin: 0 0 12px;
+  font-size: 0.98rem;
+  line-height: 1.5;
+  color: var(--fg);
+}
+
+/* Optional / advanced sections — collapsed by default so the default path is
+   just: photo → create. */
+.trace-more {
+  margin: 12px 0;
+  border: 1px solid var(--bg-softer);
+  border-radius: 12px;
+  background: var(--bg-soft);
+  overflow: hidden;
+}
+.trace-more > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 13px 14px;
+  font-weight: 600;
+  font-size: 0.92rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.trace-more > summary::-webkit-details-marker {
+  display: none;
+}
+.trace-more > summary::after {
+  content: '＋';
+  margin-left: auto;
+  color: var(--fg-muted);
+  font-weight: 400;
+}
+.trace-more[open] > summary::after {
+  content: '−';
+}
+.trace-more > summary span {
+  font-weight: 400;
+  font-size: 0.74rem;
+  color: var(--fg-muted);
+  border: 1px solid var(--bg-softer);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+.trace-more-body {
+  padding: 4px 14px 14px;
+  border-top: 1px solid var(--bg-softer);
+}
+
+/* Subtle full-width link to the exporter-only journey/compliance view. */
+.trace-adv-link {
+  display: block;
+  width: 100%;
+  margin-top: 14px;
+  background: none;
+  border: 0;
+  color: var(--fg-muted);
+  font-size: 0.85rem;
+  text-align: center;
+  cursor: pointer;
+}
+.trace-adv-link:hover {
+  color: var(--accent);
 }
 .trace-row {
   display: flex;
@@ -1654,13 +1745,36 @@ progress {
   border: 1px solid var(--bg-softer);
 }
 .trace-add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
   width: 72px;
   height: 72px;
   border: 1px dashed var(--bg-softer);
   border-radius: 10px;
-  font-size: 1.6rem;
+  font-size: 1.4rem;
   color: var(--fg-muted);
   background: var(--bg-soft);
+}
+.trace-add small {
+  font-size: 0.66rem;
+}
+/* Prominent capture target — the one action a maker must take. */
+.trace-thumbs.big .trace-add {
+  width: 108px;
+  height: 108px;
+  font-size: 2rem;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.trace-thumbs.big .trace-add small {
+  font-size: 0.78rem;
+}
+.trace-thumbs.big img {
+  width: 108px;
+  height: 108px;
 }
 .trace-gps {
   display: flex;

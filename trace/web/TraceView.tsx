@@ -70,18 +70,33 @@ export function TraceView({ lang }: { lang: 'en' | 'km' }) {
 
   return (
     <div className="contribute trace">
-      <div className="trace-tabs">
+      {/* Two plain choices instead of a row of tabs — a maker vs. a buyer. */}
+      <div className="trace-modes">
         <button className={mode === 'create' ? 'active' : ''} onClick={() => setMode('create')}>
-          ➕ {L('Create', 'បង្កើត')}
+          <span className="trace-mode-ic" aria-hidden>🏷️</span>
+          <b>{L('Make a proof', 'បង្កើតភស្តុតាង')}</b>
+          <small>{L("I'm the maker / seller", 'ខ្ញុំជាអ្នកផលិត / លក់')}</small>
         </button>
         <button className={mode === 'verify' ? 'active' : ''} onClick={() => setMode('verify')}>
-          ✓ {L('Verify', 'ផ្ទៀងផ្ទាត់')}
-        </button>
-        <button className={mode === 'journey' ? 'active' : ''} onClick={() => setMode('journey')}>
-          🧭 {L('Journey', 'ដំណើរ')}
+          <span className="trace-mode-ic" aria-hidden>🔍</span>
+          <b>{L('Check a proof', 'ពិនិត្យភស្តុតាង')}</b>
+          <small>{L('I received a product', 'ខ្ញុំបានទទួលផលិតផល')}</small>
         </button>
       </div>
+
       {mode === 'create' ? <Create L={L} /> : mode === 'verify' ? <Verify L={L} /> : <Journey L={L} />}
+
+      {/* Journey / compliance is an exporter feature — tucked away, not a top tab. */}
+      {mode === 'journey' ? (
+        <button className="trace-adv-link" onClick={() => setMode('create')}>
+          ← {L('Back', 'ត្រឡប់')}
+        </button>
+      ) : (
+        <button className="trace-adv-link" onClick={() => setMode('journey')}>
+          🧭 {L('Advanced: verify a full journey & export compliance', 'កម្រិតខ្ពស់៖ ផ្ទៀងផ្ទាត់ដំណើរពេញ និងនាំចេញអនុលោមភាព')} →
+        </button>
+      )}
+
       <p className="voice-minor-note">
         {L(
           'Trust score = combined evidence that the product matches its documented origin — not a guarantee of authenticity. 100% offline.',
@@ -230,70 +245,96 @@ function Create({ L }: { L: LFn }) {
           e.target.value = ''
         }} />
 
-      <label className="voice-field"><span>🧭 {L('Journey step', 'ជំហានដំណើរ')}</span></label>
-      <div className="trace-events">
-        {EVENT_TYPES.map((t) => (
-          <button key={t} type="button" className={eventType === t ? 'active' : ''} onClick={() => setEventType(t)}>
-            {eventLabel(t, L)}
-          </button>
-        ))}
-      </div>
-      {prev ? (
-        <p className="voice-tip">🔗 {L('Continues step', 'បន្តជំហាន')} {prev.step} → {prev.step + 1}
-          {' '}<button className="trace-linkclear" onClick={() => setPrev(null)}>✕</button></p>
-      ) : (
-        <button className="voice-ghost trace-scan" onClick={() => prevRef.current?.click()}>
-          🔗 {L('Continue a previous event (link)', 'បន្តព្រឹត្តិការណ៍មុន (ភ្ជាប់)')}
-        </button>
-      )}
-
-      <label className="voice-field"><span>📸 {L('Product photos', 'រូបថតផលិតផល')}</span></label>
-      <div className="trace-thumbs">
+      {/* Step 1 — the only thing a maker must do: photograph the product. */}
+      <p className="trace-lead">
+        {L('Take a photo of your product. That is your proof. Everything else is optional — add it only if you want a stronger proof.',
+           'ថតរូបផលិតផលរបស់អ្នក។ នោះជាភស្តុតាងរបស់អ្នក។ អ្វីផ្សេងទៀតជាជម្រើស — បន្ថែមតែពេលអ្នកចង់បានភស្តុតាងកាន់តែរឹងមាំ។')}
+      </p>
+      <div className="trace-thumbs big">
         {photos.map((p, i) => <img key={i} src={p.sig.thumb} alt="" />)}
-        <button className="trace-add" onClick={() => fileRef.current?.click()}>＋</button>
+        <button className="trace-add" onClick={() => fileRef.current?.click()}>
+          <span aria-hidden>📷</span>
+          <small>{photos.length ? L('Add photo', 'បន្ថែមរូប') : L('Take photo', 'ថតរូប')}</small>
+        </button>
       </div>
-      <div className="trace-angles">
-        {[L('Front', 'ខាងមុខ'), L('Back / label', 'ខាងក្រោយ / ស្លាក'), L('Close-up texture', 'វាយនភាពជិត')].map((a, i) => (
-          <span key={i} className={photos.length > i ? 'done' : ''}>{photos.length > i ? '✓' : i + 1} {a}</span>
-        ))}
-      </div>
-      <small className="hint">{L('More angles = a stronger, harder-to-fake match. A close-up of texture helps most.', 'មុំកាន់តែច្រើន = ការផ្គូផ្គងកាន់តែរឹងមាំ។ រូបជិតនៃវាយនភាពជួយច្រើនបំផុត។')}</small>
-
-      <label className="voice-field">
-        <span>🏷️ {L('Text on the box / label', 'អក្សរនៅលើប្រអប់ / ស្លាក')}</span>
-        <textarea lang="km" rows={2} value={boxText} onChange={(e) => setBoxText(e.target.value)}
-          placeholder={L('brand, batch, weight, dates…', 'ម៉ាក បាច់ ទម្ងន់ កាលបរិច្ឆេទ…')} />
-      </label>
-      <ScanLabel L={L} onText={(t) => setBoxText((b) => (b ? b + ' ' : '') + t)} />
+      {photos.length > 0 && (
+        <div className="trace-angles">
+          {[L('Front', 'ខាងមុខ'), L('Back / label', 'ខាងក្រោយ / ស្លាក'), L('Close-up', 'រូបជិត')].map((a, i) => (
+            <span key={i} className={photos.length > i ? 'done' : ''}>{photos.length > i ? '✓' : i + 1} {a}</span>
+          ))}
+        </div>
+      )}
       <small className="hint">
-        {L('The same model reads the label at create and verify, so it matches by rate — the Khmer need not be perfect.',
-           'ម៉ូឌែលដូចគ្នាអានស្លាកពេលបង្កើត និងផ្ទៀងផ្ទាត់ ដូច្នេះវាផ្គូផ្គងតាមអត្រា — អក្សរខ្មែរមិនចាំបាច់ត្រឹមត្រូវ ១០០%។')}
+        {L('Tip: a few angles — especially a close-up of texture — make the match stronger and harder to fake.',
+           'គន្លឹះ៖ ថតពីរបីមុំ — ជាពិសេសរូបជិតនៃវាយនភាព — ធ្វើឲ្យការផ្គូផ្គងកាន់តែរឹងមាំ និងពិបាកក្លែងបន្លំ។')}
       </small>
 
-      <div className="trace-row">
-        <label className="voice-field"><span>{L('Producer', 'អ្នកផលិត')}</span>
-          <input value={producer} onChange={(e) => setProducer(e.target.value)} /></label>
-        <label className="voice-field"><span>{L('Product', 'ផលិតផល')}</span>
-          <input value={product} onChange={(e) => setProduct(e.target.value)} /></label>
-      </div>
+      {/* Step 2 — optional details, hidden until asked for. */}
+      <details className="trace-more">
+        <summary>🏷️ {L('Add product details', 'បន្ថែមព័ត៌មានផលិតផល')} <span>{L('optional', 'ស្រេចចិត្ត')}</span></summary>
+        <div className="trace-more-body">
+          <div className="trace-row">
+            <label className="voice-field"><span>{L('Producer', 'អ្នកផលិត')}</span>
+              <input value={producer} onChange={(e) => setProducer(e.target.value)}
+                placeholder={L('your name / farm', 'ឈ្មោះ / កសិដ្ឋាន')} /></label>
+            <label className="voice-field"><span>{L('Product', 'ផលិតផល')}</span>
+              <input value={product} onChange={(e) => setProduct(e.target.value)}
+                placeholder={L('what it is', 'ជាអ្វី')} /></label>
+          </div>
 
-      <label className="voice-field">
-        <span>🤝 {L('Witness — co-op / buyer (optional)', 'សាក្សី — សហករណ៍ / អ្នកទិញ (ស្រេចចិត្ត)')}</span>
-        <input value={witness} onChange={(e) => setWitness(e.target.value)}
-          placeholder={L('who can vouch for this origin', 'អ្នកដែលអាចធានាប្រភពនេះ')} />
-      </label>
+          <label className="voice-field">
+            <span>{L('Text on the box / label', 'អក្សរនៅលើប្រអប់ / ស្លាក')}</span>
+            <textarea lang="km" rows={2} value={boxText} onChange={(e) => setBoxText(e.target.value)}
+              placeholder={L('brand, batch, weight, dates…', 'ម៉ាក បាច់ ទម្ងន់ កាលបរិច្ឆេទ…')} />
+          </label>
+          <ScanLabel L={L} onText={(t) => setBoxText((b) => (b ? b + ' ' : '') + t)} />
 
-      <label className="voice-field">
-        <span>{L('Note / story (optional)', 'កំណត់ចំណាំ / រឿង (ស្រេចចិត្ត)')}</span>
-        <textarea lang="km" rows={2} value={note} onChange={(e) => setNote(e.target.value)}
-          placeholder={L('harvest date, origin, anything…', 'ថ្ងៃប្រមូលផល ប្រភព អ្វីៗ…')} />
-      </label>
-      <VoiceStory L={L} onText={(t) => setNote((n) => (n ? n + ' ' : '') + t)} />
+          <label className="voice-field">
+            <span>{L('Note / story', 'កំណត់ចំណាំ / រឿង')}</span>
+            <textarea lang="km" rows={2} value={note} onChange={(e) => setNote(e.target.value)}
+              placeholder={L('harvest date, origin, anything…', 'ថ្ងៃប្រមូលផល ប្រភព អ្វីៗ…')} />
+          </label>
+          <VoiceStory L={L} onText={(t) => setNote((n) => (n ? n + ' ' : '') + t)} />
+        </div>
+      </details>
 
-      <div className="trace-gps">
-        <button className="voice-ghost" onClick={locate}>📍 {L('Add location', 'បញ្ចូលទីតាំង')}</button>
-        {gps && <span>{gps.lat}, {gps.lng} (±{gps.acc}m)</span>}
-      </div>
+      {/* Step 3 — optional trust boosters (witness, location). */}
+      <details className="trace-more">
+        <summary>🤝 {L('Make it more trusted', 'ធ្វើឲ្យគួរឲ្យទុកចិត្តជាង')} <span>{L('optional', 'ស្រេចចិត្ត')}</span></summary>
+        <div className="trace-more-body">
+          <label className="voice-field">
+            <span>{L('Witness — a co-op or buyer who vouches', 'សាក្សី — សហករណ៍ ឬអ្នកទិញដែលធានា')}</span>
+            <input value={witness} onChange={(e) => setWitness(e.target.value)}
+              placeholder={L('who can vouch for this origin', 'អ្នកដែលអាចធានាប្រភពនេះ')} />
+          </label>
+          <div className="trace-gps">
+            <button className="voice-ghost" onClick={locate}>📍 {L('Add location', 'បញ្ចូលទីតាំង')}</button>
+            {gps && <span>{gps.lat}, {gps.lng} (±{gps.acc}m)</span>}
+          </div>
+        </div>
+      </details>
+
+      {/* Advanced — journeys are for exporters/co-ops; hidden by default. */}
+      <details className="trace-more">
+        <summary>🧭 {L('Part of a journey?', 'ជាផ្នែកនៃដំណើរ?')} <span>{L('advanced', 'កម្រិតខ្ពស់')}</span></summary>
+        <div className="trace-more-body">
+          <div className="trace-events">
+            {EVENT_TYPES.map((t) => (
+              <button key={t} type="button" className={eventType === t ? 'active' : ''} onClick={() => setEventType(t)}>
+                {eventLabel(t, L)}
+              </button>
+            ))}
+          </div>
+          {prev ? (
+            <p className="voice-tip">🔗 {L('Continues step', 'បន្តជំហាន')} {prev.step} → {prev.step + 1}
+              {' '}<button className="trace-linkclear" onClick={() => setPrev(null)}>✕</button></p>
+          ) : (
+            <button className="voice-ghost trace-scan" onClick={() => prevRef.current?.click()}>
+              🔗 {L('Continue a previous event (link its file)', 'បន្តព្រឹត្តិការណ៍មុន (ភ្ជាប់ឯកសារ)')}
+            </button>
+          )}
+        </div>
+      </details>
 
       <StrengthMeter L={L} tier={proofTier({
         photos: photos.length,
@@ -304,7 +345,9 @@ function Create({ L }: { L: LFn }) {
       })} />
 
       <button className="voice-primary big" disabled={busy || photos.length === 0} onClick={create}>
-        {busy ? `${L('Processing', 'កំពុងដំណើរការ')}…` : `➕ ${L('Create proof', 'បង្កើតភស្តុតាង')}`}
+        {busy ? `${L('Processing', 'កំពុងដំណើរការ')}…`
+          : photos.length === 0 ? `📷 ${L('Add a photo to start', 'បន្ថែមរូបដើម្បីចាប់ផ្តើម')}`
+          : `✓ ${L('Create proof', 'បង្កើតភស្តុតាង')}`}
       </button>
     </>
   )
