@@ -1,6 +1,6 @@
-# Khmer STT on-device: fine-tune whisper-tiny on DDD → deploy (RunPod guide)
+# Khmer STT on-device: fine-tune whisper-base on Khmer speech → deploy (RunPod guide)
 
-Goal: turn `whisper-tiny` into a Khmer STT you own, then ship it to your
+Goal: turn `whisper-base` into a Khmer STT you own, then ship it to your
 targets:
 
 - **Mobile (whisper.rn)** ← GGML `.bin`  (the phone / edge model)
@@ -50,7 +50,7 @@ re-run §2 to fold in the newer clips.
 ## 1. Rent a GPU on RunPod
 
 1. runpod.io → sign in → add a few $ credit.
-2. **Pods → Deploy → GPU Cloud.** whisper-tiny is tiny, so a cheap card is plenty:
+2. **Pods → Deploy → GPU Cloud.** whisper-base is small, so a cheap card is plenty:
    pick **RTX A4000 / RTX 4090** (~$0.2–0.7/hr).
 3. Template: **RunPod PyTorch 2.x**. Set a **Volume ~150 GB** at `/workspace`
    (the streamed audio subset + checkpoints need room) so it persists.
@@ -182,110 +182,105 @@ for s in SOURCES:
         if got >= s["hours"] * 3600: break
     print(f"DONE {repo}: {got/3600:.1f} h ({s['license']})", flush=True)
 
-# --- Your consented /voice clips — the most valuable signal (real phones/rooms).
-# Now a published HF dataset:
-#   https://huggingface.co/datasets/sengtha/iany-khmer-voice
-# It's small, so we DON'T cap it by hours — we take all of it and OVERSAMPLE it
-# VOICE_REPEAT× so the model weights real-world audio above the big read corpora.
-# 1 = no oversampling; 3 is a good start (raise it if real-clip CER lags).
-#
-# ⚠️ IMPORTANT — it's THOUSANDS of tiny WAVs, and Hugging Face's Xet backend
-# stalls / rate-limits (429) on many small files: it fetches a per-file
-# "xet-read-token", so 5k+ files => 5k+ token calls => "reconstructing file: 0%
-# … 0.00B" stuck at ~18%, then a 429. Fix: DON'T use Xet. The surest way is to
-# uninstall it so HF falls back to plain LFS CDN downloads — run ONCE, then
-# RESTART THE KERNEL:
-#     !pip uninstall -y hf_xet
-# The env var below is belt-and-suspenders (must be set before hf_xet loads).
-# We snapshot_download the whole repo in one RESUMABLE pass and load it as a
-# local audiofolder — not the loose-file loader that hangs. Re-run if it stalls;
-# it resumes. (If you still 429, wait ~5–10 min for the limit to reset.)
-# We snapshot_download the repo in one RESUMABLE pass, then read its metadata.csv
-# DIRECTLY (file_name → sentence) instead of the `audiofolder` loader — audiofolder
-# is finicky ("file_name must be present in metadata files") and needless here,
-# since we decode the wavs ourselves anyway. Re-run if a download stalls; it
-# resumes. (If you still 429, wait ~5–10 min for the limit to reset.)
-# The whole block is wrapped in try/except so the pipeline still runs if the
-# dataset is unavailable — it just trains on the public corpora that loaded.
-os.environ["HF_HUB_DISABLE_XET"] = "1"      # set BEFORE the download; plain HTTPS is reliable here
-import csv
-from huggingface_hub import snapshot_download
-VOICE_REPEAT = 3
-try:
-    vdir = snapshot_download("sengtha/iany-khmer-voice", repo_type="dataset",
-                             local_dir="/workspace/iany_voice_dl", max_workers=8)
-    meta_path = next(os.path.join(vdir, c) for c in ("metadata.csv", "data/metadata.csv")
-                     if os.path.exists(os.path.join(vdir, c)))
-    rows = list(csv.DictReader(open(meta_path, encoding="utf-8-sig")))   # utf-8-sig strips BOM
-    cols = list(rows[0].keys())
-    FN  = next(c for c in cols if "file" in c.lower())                   # 'file_name'
-    TXT = next(c for c in ("sentence", "transcript", "text", "transcription") if c in cols)
-    print(f"iany/voice rows on HF: {len(rows)} | columns: {cols}", flush=True)
-    vsub = os.path.join(OUT, "iany_voice"); os.makedirs(vsub, exist_ok=True)
-    vbase, miss = [], 0
-    for r in rows:
-        fp = os.path.join(vdir, r[FN])
-        if not os.path.exists(fp): miss += 1; continue
-        try:
-            y, sr = sf.read(fp, dtype="float32")
-            if y.ndim > 1: y = y.mean(1)
-            if sr != 16000: y = librosa.resample(y, orig_sr=sr, target_sr=16000)
-        except Exception:
-            miss += 1; continue
-        if not (MIN_SEC <= len(y)/16000 <= MAX_SEC): continue
-        txt = (r.get(TXT) or "").strip()
-        if not txt: continue
-        p = f"{vsub}/{i:06d}.wav"; sf.write(p, y, 16000)
-        vbase.append({"path": p, "sentence": txt, "source": "iany/voice"})
-        i += 1
-    for _ in range(VOICE_REPEAT):
-        meta.extend(vbase)
-    print(f"DONE iany/voice: {len(vbase)} unique clips x{VOICE_REPEAT} = "
-          f"{len(vbase)*VOICE_REPEAT} rows (missing/failed {miss}, consented, CC-BY-SA-4.0)", flush=True)
-except Exception as e:
-    print("skip iany/voice (unavailable?):", e, flush=True)
-
 ds = (Dataset.from_list(meta)
         .cast_column("path", Audio(sampling_rate=16000))
         .rename_column("path", "audio"))
-ds = ds.train_test_split(test_size=0.01, seed=42)          # ~1% held out for eval
-ds.save_to_disk("/workspace/ds")
+ds = ds.train_test_split(test_size=0.01, seed=42)          # public held-out eval set
+ds.save_to_disk("/workspace/ds")                           # PUBLIC corpora only (voice added in §2b)
 print(ds)
 ```
 
-This yields a diverse, license-clean set (DDD + km-speech-corpus + FLEURS +
-OpenSLR SLR42 ≈ 115–120 h — read + multi-domain, many speakers). The mp3
-fallback in `load16k` stays harmless and ready for any future mp3-based source.
-
-**Your `/voice` data is already folded in** (the block after the SOURCES loop):
-it pulls `sengtha/iany-khmer-voice` from HF, takes every clip (no hours cap), and
-oversamples it `VOICE_REPEAT×` because real phone/room audio is your most valuable
-signal. Nothing to upload to the pod. When more people contribute, re-publish the
-dataset (**Actions → Publish dataset to Hugging Face**) and re-run this script to
-pick up the newer clips — one combined set, train once.
-
-> **Dedup / no double-counting:** re-running §2 rebuilds `/workspace/ds` from
-> scratch, so re-publishing the dataset and re-running never double-adds clips —
-> `VOICE_REPEAT` is the *only* multiplier. (If you keep an old `/workspace/ds` and
-> also build a new one, train on just one.)
->
-> **One eval caveat from oversampling:** because each `/voice` clip is duplicated
-> `VOICE_REPEAT×` *before* `train_test_split`, a held-out `/voice` clip can have a
-> twin in train — so the headline eval CER slightly *flatters* `/voice`. Judge real
-> accuracy on the §4 real-noisy-clip check. To measure `/voice` cleanly, hold out a
-> few of its clips *before* the oversampling loop and oversample only the rest.
-
-With this much data, train **whisper-base** (§3, just change `BASE`) — base +
-more data is the real quality jump over tiny. With ~5 h of real `/voice` audio now
-in the mix, base is the recommended target for this round.
+This yields a diverse, license-clean **public** set (DDD + km-speech-corpus +
+FLEURS ≈ 115–120 h — read + multi-domain, many speakers) at `/workspace/ds`. The
+mp3 fallback in `load16k` stays harmless and ready for any future mp3-based source.
+Your own `/voice` data is added **separately** in §2b — decoupling it keeps the big
+public build from failing if the voice download hiccups, and makes re-adding newer
+voice clips a one-step job.
 
 **Credits:** list every `SOURCES` entry + its license in the model README, **plus
-`sengtha/iany-khmer-voice`** (the folded-in `/voice` data) and its contributors,
-and keep the release **CC-BY-SA-4.0**.
+`sengtha/iany-khmer-voice`** (the §2b `/voice` data) and its contributors, and keep
+the release **CC-BY-SA-4.0**.
 
 ---
 
-## 3. Fine-tune whisper-tiny — as a background job
+## 2b. Fold in your `/voice` data → `ds_v2`
+
+Your consented clips from [iany.app/voice](https://iany.app/voice) are the **most
+valuable** signal (real phones/rooms). We add them to the public set and
+**oversample** them `VOICE_REPEAT×` so the model weights real-world audio above the
+big read corpora. They go into **train only** — that keeps the eval set purely
+public, so the CER isn't flattered by an oversampled twin leaking into eval.
+
+> **⚠️ Hugging Face Xet gotcha.** The voice dataset is thousands of tiny WAVs, and
+> HF's Xet backend fetches a per-file token — 5k+ files ⇒ 5k+ token calls ⇒
+> `reconstructing file: 0% … 0.00B` stuck ~18%, then a **429**. Fix: remove Xet so
+> downloads use the plain LFS CDN. Run once, then **restart the kernel**:
+> ```bash
+> pip uninstall -y hf_xet
+> ```
+
+```python
+import os, csv, io, soundfile as sf, librosa
+os.environ["HF_HUB_DISABLE_XET"] = "1"        # belt-and-suspenders; set before the download
+from huggingface_hub import snapshot_download
+from datasets import load_from_disk, Dataset, Audio, concatenate_datasets
+
+VOICE_REPEAT = 3
+MIN_SEC, MAX_SEC = 0.5, 20
+
+# 1) Resumable, non-Xet download of the whole voice repo (re-run if it stalls).
+vdir = snapshot_download("sengtha/iany-khmer-voice", repo_type="dataset",
+                         local_dir="/workspace/iany_voice_dl", max_workers=8)
+
+# 2) Read metadata.csv DIRECTLY (file_name → sentence) — simpler + more robust than
+#    the `audiofolder` loader (which errors "file_name must be present …").
+meta_path = next(os.path.join(vdir, c) for c in ("metadata.csv", "data/metadata.csv")
+                 if os.path.exists(os.path.join(vdir, c)))
+rows = list(csv.DictReader(open(meta_path, encoding="utf-8-sig")))     # utf-8-sig strips BOM
+cols = list(rows[0].keys())
+FN  = next(c for c in cols if "file" in c.lower())                     # 'file_name'
+TXT = next(c for c in ("sentence", "transcript", "text", "transcription") if c in cols)
+print(f"iany/voice rows on HF: {len(rows)} | columns: {cols}", flush=True)
+
+VOUT = "/workspace/clips/iany_voice"; os.makedirs(VOUT, exist_ok=True)
+vbase, i, miss = [], 0, 0
+for r in rows:
+    fp = os.path.join(vdir, r[FN])
+    if not os.path.exists(fp): miss += 1; continue
+    try:
+        y, sr = sf.read(fp, dtype="float32")
+        if y.ndim > 1: y = y.mean(1)
+        if sr != 16000: y = librosa.resample(y, orig_sr=sr, target_sr=16000)
+    except Exception:
+        miss += 1; continue
+    if not (MIN_SEC <= len(y)/16000 <= MAX_SEC): continue
+    txt = (r.get(TXT) or "").strip()
+    if not txt: continue
+    p = f"{VOUT}/{i:06d}.wav"; sf.write(p, y, 16000)
+    vbase.append({"audio": p, "sentence": txt, "source": "iany/voice"}); i += 1
+print(f"usable voice clips: {len(vbase)} | missing/failed: {miss}", flush=True)   # want ~5488, miss ~0
+
+# 3) Oversample ×VOICE_REPEAT and append to TRAIN only → save ds_v2.
+vds = (Dataset.from_list([r for _ in range(VOICE_REPEAT) for r in vbase])
+       .cast_column("audio", Audio(sampling_rate=16000)))
+ds = load_from_disk("/workspace/ds")
+ds["train"] = concatenate_datasets([ds["train"], vds])
+ds.save_to_disk("/workspace/ds_v2")
+print(ds)
+
+# 4) Confirm the mix (want 'iany/voice' with a big count in train, and NOT in test).
+from collections import Counter
+print("train:", Counter(load_from_disk("/workspace/ds_v2")["train"]["source"]))
+```
+
+`train` should grow by ~`VOICE_REPEAT × 5488` rows, and `test` stays public-only.
+**When more people contribute**, re-publish the dataset (**Actions → Publish dataset
+to Hugging Face**) and just re-run §2b — it rebuilds `ds_v2` from the public `ds`
+(no double-counting; `VOICE_REPEAT` is the only multiplier). §3 trains on `ds_v2`.
+
+---
+
+## 3. Fine-tune whisper-base — as a background job
 
 An hours-long train must **not** die when your phone or browser disconnects.
 Same pattern as the TTS run: write the script to a file, log in once so
@@ -313,21 +308,21 @@ from transformers import (WhisperProcessor, WhisperForConditionalGeneration,
                           Seq2SeqTrainingArguments, Seq2SeqTrainer)
 from transformers.trainer_utils import get_last_checkpoint
 
-# Starting point — two valid choices (it's cheap, so try both and keep the lower CER):
-#   "openai/whisper-tiny"  -> clean base, learns Khmer from DDD.  DEFAULT & recommended.
-#   a Khmer whisper checkpoint -> warm-start (can converge faster), IF you find one that:
-#     (a) is a TRANSFORMERS/HF checkpoint — NOT a *-ct2 (CTranslate2 = inference-only,
-#         can't be fine-tuned), and
-#     (b) is actually whisper-TINY — many Khmer repos are named "tiny" but are Whisper
-#         SMALL (check the card's real base), which would defeat the on-phone size goal.
-#   If you can't confirm both, just use the openai base — DDD is large enough to do great.
-BASE = "openai/whisper-tiny"
-OUT  = "/workspace/whisper-tiny-khmer"
-HUB  = "sengtha/whisper-tiny-khmer"        # your HF repo (auto-created on first push)
+# Starting point. whisper-BASE is the recommended target once you've folded in the
+# public corpora + your /voice data (§2 + §2b) — base + more data is the real
+# quality jump over tiny, and its GGML q5_1 is still only ~55-60 MB on-phone.
+#   "openai/whisper-base"  -> DEFAULT & recommended for this round.
+#   "openai/whisper-tiny"  -> smallest on-phone (~30 MB) if size matters more than CER.
+#   a Khmer whisper checkpoint -> warm-start ONLY if it's a TRANSFORMERS/HF checkpoint
+#     (NOT a *-ct2, which is inference-only) AND actually the same size class you want.
+BASE = "openai/whisper-base"
+OUT  = "/workspace/whisper-base-khmer"
+HUB  = "sengtha/whisper-base-khmer"        # your HF repo (auto-created on first push)
 processor = WhisperProcessor.from_pretrained(BASE, language="Khmer", task="transcribe")
 # decode=False + soundfile: newer `datasets` needs `torchcodec` to decode an
 # Audio column, which isn't installed — decode the wavs ourselves (same as §2).
-ds = load_from_disk("/workspace/ds").cast_column("audio", Audio(decode=False))
+# ds_v2 = public /workspace/ds + your oversampled /voice data (built in §2b).
+ds = load_from_disk("/workspace/ds_v2").cast_column("audio", Audio(decode=False))
 
 def prepare(b):
     a = b["audio"]
@@ -431,13 +426,15 @@ deliberately with `pkill -f train.py`.
 redo §1–2, pull the last checkpoint back, then relaunch — it resumes exactly:
 
 ```bash
-huggingface-cli download sengtha/whisper-tiny-khmer --include "last-checkpoint/*" \
-  --local-dir /workspace/whisper-tiny-khmer
+huggingface-cli download sengtha/whisper-base-khmer --include "last-checkpoint/*" \
+  --local-dir /workspace/whisper-base-khmer
 ```
 
 Watch eval **CER** fall in TensorBoard. `max_steps` ~3000 is a start; scale with
 data. If it overfits (train CER ≪ eval CER), use more of DDD's speakers or fewer
-steps. whisper-tiny trains in **~1–3 h on a 4090** (< $5).
+steps. whisper-base trains in **~2–4 h on a 4090** (< $5). If you hit CUDA OOM,
+set `per_device_train_batch_size=16, gradient_accumulation_steps=2` (same effective
+batch of 32).
 
 ---
 
@@ -445,7 +442,7 @@ steps. whisper-tiny trains in **~1–3 h on a 4090** (< $5).
 
 ```python
 from transformers import pipeline
-asr = pipeline("automatic-speech-recognition", model="/workspace/whisper-tiny-khmer",
+asr = pipeline("automatic-speech-recognition", model="/workspace/whisper-base-khmer",
                generate_kwargs={"language": "km", "task": "transcribe"})
 print(asr("/workspace/clips/0001.wav")["text"])
 ```
@@ -460,26 +457,26 @@ Also transcribe a few **real, noisy** clips — that's your true accuracy.
 cd /workspace
 git clone https://github.com/openai/whisper
 git clone https://github.com/ggml-org/whisper.cpp
-python whisper.cpp/models/convert-h5-to-ggml.py ./whisper-tiny-khmer ./whisper .
+python whisper.cpp/models/convert-h5-to-ggml.py ./whisper-base-khmer ./whisper .
 # -> ggml-model.bin
 # build tools + quantize (q5_1 = small & good for phones)
 cmake -S whisper.cpp -B whisper.cpp/build && cmake --build whisper.cpp/build -j --config Release
-./whisper.cpp/build/bin/quantize ggml-model.bin ggml-tiny-khmer-q5_1.bin q5_1
+./whisper.cpp/build/bin/quantize ggml-model.bin ggml-base-khmer-q5_1.bin q5_1
 ```
 
 **B) CTranslate2 for IoT-Linux / server (faster-whisper)**
 ```bash
 pip install ctranslate2
-ct2-transformers-converter --model ./whisper-tiny-khmer \
-  --output_dir whisper-tiny-khmer-ct2 --quantization int8 \
+ct2-transformers-converter --model ./whisper-base-khmer \
+  --output_dir whisper-base-khmer-ct2 --quantization int8 \
   --copy_files tokenizer_config.json preprocessor_config.json
 ```
 
 **C) ONNX for the PWA (transformers.js)**
 ```bash
 pip install "optimum[onnxruntime]"
-optimum-cli export onnx --model ./whisper-tiny-khmer \
-  --task automatic-speech-recognition-with-past ./whisper-tiny-khmer-onnx
+optimum-cli export onnx --model ./whisper-base-khmer \
+  --task automatic-speech-recognition-with-past ./whisper-base-khmer-onnx
 ```
 
 ---
@@ -490,11 +487,11 @@ optimum-cli export onnx --model ./whisper-tiny-khmer \
 from huggingface_hub import login, HfApi
 from getpass import getpass
 login(getpass("HF write token: "))         # typed at the prompt, not stored
-api = HfApi(); REPO = "sengtha/whisper-tiny-khmer"
+api = HfApi(); REPO = "sengtha/whisper-base-khmer"
 api.create_repo(REPO, exist_ok=True)
-api.upload_folder(folder_path="/workspace/whisper-tiny-khmer", repo_id=REPO)   # HF model
-api.upload_file(path_or_fileobj="/workspace/ggml-tiny-khmer-q5_1.bin",
-                path_in_repo="ggml-tiny-khmer-q5_1.bin", repo_id=REPO)         # mobile
+api.upload_folder(folder_path="/workspace/whisper-base-khmer", repo_id=REPO)   # HF model
+api.upload_file(path_or_fileobj="/workspace/ggml-base-khmer-q5_1.bin",
+                path_in_repo="ggml-base-khmer-q5_1.bin", repo_id=REPO)         # mobile
 # (upload the ct2 folder / onnx folder too if you want them hosted)
 ```
 Add a README with **CC-BY-SA-4.0 + credit to DDD-Cambodia**.
@@ -523,21 +520,23 @@ Then feed `result` straight into your RAG `ask()`. Voice → text → LLM → (T
 **Serve the model through your worker mirror:** add the repo to the allowlist in
 `worker/index.ts` (same as we did for OCR):
 ```ts
-'sengtha/whisper-tiny-khmer/', // Khmer STT (whisper.rn ggml + ct2)
+'sengtha/whisper-base-khmer/', // Khmer STT (whisper.rn ggml + ct2)
 ```
 then `wrangler deploy`. (Tell me when it's up and I'll wire the mobile download + record→transcribe screen.)
 
-**PWA:** load the ONNX with transformers.js (`pipeline('automatic-speech-recognition', 'sengtha/whisper-tiny-khmer', { device:'wasm' })`), Web Audio to capture the mic.
+**PWA:** load the ONNX with transformers.js (`pipeline('automatic-speech-recognition', 'sengtha/whisper-base-khmer', { device:'wasm' })`), Web Audio to capture the mic.
 
 **IoT (Linux):** `faster-whisper` with the ct2 folder — done.
 
 ---
 
 ## Cost / time
-- RunPod RTX 4090: ~$0.5/hr · whisper-tiny fine-tune ≈ 1–3 h → **under ~$5**.
+- RunPod RTX 4090: ~$0.5/hr · whisper-base fine-tune ≈ 2–4 h (+ ~15 min CPU
+  preprocessing) → **under ~$5**.
 - Convert + upload: minutes.
 
 ## Recap
-Train `whisper-tiny` once → GGML (mobile) + ct2 (IoT) + ONNX (PWA). DDD (+ diverse
-Khmer speech) is your fuel; CER on real clips is your scoreboard; CC-BY-SA is your
-license. That completes the offline trio: **STT → LLM → TTS**, all on-device.
+Train `whisper-base` once → GGML (mobile) + ct2 (IoT) + ONNX (PWA). Public Khmer
+corpora + your oversampled `/voice` data (`ds_v2`) are your fuel; CER on real clips
+is your scoreboard; CC-BY-SA is your license. That completes the offline trio:
+**STT → LLM → TTS**, all on-device.
