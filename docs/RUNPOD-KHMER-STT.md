@@ -327,11 +327,14 @@ def prepare(b):
     b["input_features"] = processor.feature_extractor(y, sampling_rate=16000).input_features[0]
     b["labels"] = processor.tokenizer(b["sentence"]).input_ids
     return b
-# Use ALL vCPUs for this one-time preprocessing pass — it's CPU-only (mel features
-# + tokenize; the GPU stays idle until trainer.train() below). With num_proc=2 it
-# can take ~24 h on 60k+ clips; with all cores it's ~1-2 h. Results are cached to
-# disk, so a later restart skips this and goes straight to GPU.
-NP = os.cpu_count() or 8
+# Parallelize this one-time preprocessing pass — it's CPU-only (mel features +
+# tokenize; the GPU stays idle until trainer.train() below). With num_proc=2 it
+# can take ~24 h on 60k+ clips; with many workers it's ~10-30 min. Results are
+# cached to disk, so a later restart skips this and goes straight to GPU.
+# Cap the worker count: past ~64 you mostly add process-spawn + disk-I/O
+# contention (reading tens of thousands of small WAVs) and RAM use, not speed —
+# so on a big pod (e.g. 128 vCPUs) 64 is the sweet spot, not all of them.
+NP = min(64, os.cpu_count() or 8)
 ds = ds.map(prepare, remove_columns=ds["train"].column_names, num_proc=NP)
 # Whisper's decoder caps labels at 448 tokens; Khmer tokenizes densely, so a few
 # long clips exceed it and would crash training. Drop them (cheap; map stays cached).
