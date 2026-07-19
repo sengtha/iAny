@@ -161,6 +161,7 @@ export function LandingView() {
           <Feature icon="⠿" title={L('Khmer Braille', 'អក្សរផុសខ្មែរ')}
             desc={L('Convert Khmer text to Braille dots and BRF files.', 'បម្លែងអក្សរខ្មែរទៅជាចំណុចផុស និងឯកសារ BRF។')} link="/braille" linkLabel={L('Open /braille', 'បើក /braille')} />
           <Feature icon="🤟" title={L('Khmer Sign Language', 'ភាសាសញ្ញាខ្មែរ')}
+            badge={L('Collecting data', 'កំពុងប្រមូលទិន្នន័យ')} badgeTone="collecting"
             desc={L('Building an open sign-language dataset, with the Deaf community.', 'កំពុងបង្កើតទិន្នន័យភាសាសញ្ញាបើកចំហ ជាមួយសហគមន៍ថ្លង់។')} link="/sign" linkLabel={L('Open /sign', 'បើក /sign')} />
           <Feature icon="🎤" title={L('Contribute your voice', 'ចូលរួមសំឡេងរបស់អ្នក')}
             desc={L('Help train a better open Khmer speech model.', 'ជួយបង្រៀនម៉ូឌែលសំឡេងខ្មែរបើកចំហ ឲ្យប្រសើរ។')} link="/voice" linkLabel={L('Open /voice', 'បើក /voice')} />
@@ -257,6 +258,7 @@ function Feature({
   link,
   linkLabel,
   badge,
+  badgeTone,
 }: {
   icon: string
   title: string
@@ -264,6 +266,7 @@ function Feature({
   link?: string
   linkLabel?: string
   badge?: string
+  badgeTone?: 'experiment' | 'collecting'
 }) {
   return (
     <div className="lp-card">
@@ -272,7 +275,9 @@ function Feature({
       </div>
       <h3>
         {title}
-        {badge ? <span className="lp-badge">{badge}</span> : null}
+        {badge ? (
+          <span className={`lp-badge${badgeTone === 'collecting' ? ' lp-badge-info' : ''}`}>{badge}</span>
+        ) : null}
       </h3>
       <p>{desc}</p>
       {link ? (

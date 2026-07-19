@@ -379,6 +379,12 @@ body {
   background: color-mix(in srgb, #f59e0b 16%, transparent);
   border: 1px solid color-mix(in srgb, #f59e0b 45%, transparent);
 }
+/* "Collecting data" — an active dataset-building stage (soft blue, not amber). */
+.lp-badge-info {
+  color: #7dd3fc;
+  background: color-mix(in srgb, var(--lp-accent) 16%, transparent);
+  border-color: color-mix(in srgb, var(--lp-accent) 45%, transparent);
+}
 .lp-card p {
   margin: 0;
   color: var(--lp-muted);
@@ -500,5 +506,12 @@ body {
     --lp-muted: #566076;
     --lp-accent: #0284c7;
     --lp-accent2: #4f46e5;
+  }
+  /* Darker pill text so the labels stay readable on light tints. */
+  .lp-badge {
+    color: #b45309;
+  }
+  .lp-badge-info {
+    color: #0369a1;
   }
 }
