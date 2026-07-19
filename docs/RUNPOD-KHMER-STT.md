@@ -296,7 +296,16 @@ checkpoints push to HF (they survive even a pod deletion), then launch it
 
 ```python
 %%writefile /workspace/train.py
-import os, io, evaluate, torch, soundfile as sf
+import os
+# Cap BLAS threads BEFORE importing numpy/torch. Otherwise each of the num_proc=64
+# preprocessing workers spawns its own thread pool sized to every core — on a big
+# pod (e.g. 128 vCPUs) that's 64×128 ≈ 8k threads thrashing over 128 cores, and
+# the Map crawls at ~1 example/s no matter how many workers you add. One thread
+# per worker gives clean parallelism (Map finishes in minutes, not hours).
+for _v in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "NUMEXPR_NUM_THREADS"):
+    os.environ[_v] = "1"
+import io, evaluate, torch, soundfile as sf
+torch.set_num_threads(1)
 from dataclasses import dataclass
 from typing import Any
 from datasets import load_from_disk, Audio
