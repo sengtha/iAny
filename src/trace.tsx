@@ -1,41 +1,34 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { I18nProvider, useI18n } from './i18n'
-import { TraceView } from './views/TraceView'
+import { TraceApp } from '../trace/web/TraceApp'
+import type { OcrAdapter, SttAdapter } from '../trace/web/adapters'
+import { khmerOcr } from './ai/khmerOcr'
+import { khmerStt } from './ai/khmerStt'
 import './styles.css'
 
 /**
- * Standalone "iAny Trace" page (served at /trace) — keyless, offline
- * proof-of-origin as a trust score. Separate route like /voice, /scan.
+ * iAny's host for the standalone Trace app (served at /trace). Trace itself
+ * lives in ../trace and knows nothing about iAny; here we inject iAny's
+ * on-device Khmer OCR + STT as optional capabilities.
  */
-function TraceApp() {
-  const { lang, setLang } = useI18n()
-  const km = lang === 'km'
-  return (
-    <div className="voice-shell">
-      <header className="voice-topbar">
-        <div className="voice-brand">
-          <span aria-hidden>🔖</span>
-          <div>
-            <h1>{km ? 'iAny Trace — ប្រភពដើម' : 'iAny Trace'}</h1>
-            <p>{km ? 'ភស្តុតាងប្រភពដើម ក្រៅបណ្ដាញ ១០០%' : 'Offline proof of origin — a trust score'}</p>
-          </div>
-        </div>
-        <button className="voice-lang" onClick={() => setLang(km ? 'en' : 'km')}>
-          {km ? 'EN' : 'ខ្មែរ'}
-        </button>
-      </header>
-      <main className="voice-main">
-        <TraceView />
-      </main>
-    </div>
-  )
+const ocr: OcrAdapter = { recognizeImage: (b) => khmerOcr.recognizeImage(b) }
+
+// The chat STT is gated to desktop for latency; Trace's one-off voice story is
+// fine on phones, so we only require a microphone here.
+const micSupported = () =>
+  typeof navigator !== 'undefined' &&
+  !!navigator.mediaDevices?.getUserMedia &&
+  typeof WebAssembly !== 'undefined'
+
+const stt: SttAdapter = {
+  supported: micSupported,
+  subscribe: (cb) => khmerStt.subscribe((s) => cb({ phase: s.phase, download: s.download })),
+  startRecording: () => khmerStt.startRecording(),
+  stopAndTranscribe: () => khmerStt.stopAndTranscribe(),
 }
 
 createRoot(document.getElementById('trace-root')!).render(
   <StrictMode>
-    <I18nProvider>
-      <TraceApp />
-    </I18nProvider>
+    <TraceApp ocr={ocr} stt={stt} />
   </StrictMode>,
 )

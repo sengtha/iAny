@@ -1,15 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { useI18n } from '../i18n'
-import { khmerOcr } from '../ai/khmerOcr'
-import { khmerStt, type SttState } from '../ai/khmerStt'
-
-// The app gates its chat STT to desktop (pointer:fine) for latency reasons, but
-// the Trace voice story is a one-off, opt-in capture meant for producers on
-// phones — so here we only require a microphone. First use downloads the model.
-const micStorySupported = () =>
-  typeof navigator !== 'undefined' &&
-  !!navigator.mediaDevices?.getUserMedia &&
-  typeof WebAssembly !== 'undefined'
+import { useTraceCaps } from './context'
+import type { SttState } from './adapters'
 import {
   addAttestation,
   capsuleId,
@@ -34,15 +25,14 @@ import {
   type RegistryInfo,
   type TraceCapsule,
   type VerifyResult,
-} from '../lib/trace'
+} from '../core/trace'
 
 /**
  * iAny Trace (/trace) — keyless, offline proof-of-origin as a trust score.
  * Two modes: Create a capsule from a product, or Verify a received product
  * against a capsule. All on-device. Bilingual EN/KM.
  */
-export function TraceView() {
-  const { lang } = useI18n()
+export function TraceView({ lang }: { lang: 'en' | 'km' }) {
   const km = lang === 'km'
   const L = (en: string, khmer: string) => (km ? khmer : en)
   const [mode, setMode] = useState<'create' | 'verify' | 'journey'>('create')
@@ -428,8 +418,10 @@ function Verify({ L, preload }: { L: LFn; preload?: TraceCapsule }) {
 /* ------------------------------------------------------ scan-label (OCR) --- */
 
 function ScanLabel({ onText, L }: { onText: (t: string) => void; L: LFn }) {
+  const { ocr } = useTraceCaps()
   const ref = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
+  if (!ocr) return null // no OCR engine injected → user types the label
   return (
     <>
       <input ref={ref} type="file" accept="image/*" capture="environment" hidden
@@ -438,7 +430,7 @@ function ScanLabel({ onText, L }: { onText: (t: string) => void; L: LFn }) {
           if (!f) return
           setBusy(true)
           try {
-            const t = await khmerOcr.recognizeImage(f)
+            const t = await ocr.recognizeImage(f)
             if (t.trim()) onText(t.trim())
           } catch {
             /* OCR unavailable — user can type instead */
@@ -457,18 +449,19 @@ function ScanLabel({ onText, L }: { onText: (t: string) => void; L: LFn }) {
 /* ------------------------------------------------ voice story (Khmer STT) --- */
 
 function VoiceStory({ onText, L }: { onText: (t: string) => void; L: LFn }) {
-  const [st, setSt] = useState<SttState>({ phase: 'idle', level: 0 })
-  useEffect(() => khmerStt.subscribe(setSt), [])
-  if (!micStorySupported()) return null
+  const { stt } = useTraceCaps()
+  const [st, setSt] = useState<SttState>({ phase: 'idle' })
+  useEffect(() => (stt ? stt.subscribe(setSt) : undefined), [stt])
+  if (!stt || !stt.supported()) return null // no STT engine injected
 
   const rec = st.phase === 'recording'
   const busy = st.phase === 'loading' || st.phase === 'transcribing'
   const toggle = async () => {
     if (rec) {
-      const t = await khmerStt.stopAndTranscribe()
+      const t = await stt.stopAndTranscribe()
       if (t.trim()) onText(t.trim())
     } else {
-      await khmerStt.startRecording()
+      await stt.startRecording()
     }
   }
   const label = rec

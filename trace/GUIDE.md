@@ -154,7 +154,7 @@ evidence that a product matches its documented origin, backed by a witness"* —
 Offline works with no setup. To enable the registry (trusted time + double-use):
 
 ```bash
-npx wrangler d1 execute iany-radio --remote --file worker/schema.sql   # trace_capsules
+npx wrangler d1 execute <your-db> --remote --file trace/worker/schema.sql   # trace_capsules
 npx wrangler deploy
 ```
 
@@ -218,5 +218,7 @@ be believed** — cheaply, offline, on a phone.
 ---
 
 Part of [iAny](https://iany.app) · Apache-2.0 · E-KHMER Technology Co., Ltd.
-Code: `src/lib/trace.ts` (engine), `src/views/TraceView.tsx` (UI),
-`worker/index.ts` (registry).
+Code (self-contained in this folder): `core/trace.ts` (engine),
+`web/TraceView.tsx` (UI), `worker/handlers.ts` + `worker/schema.sql` (registry).
+See [`SPEC.md`](./SPEC.md) for the capsule format and [`README.md`](./README.md)
+for embedding Trace in your own app.
