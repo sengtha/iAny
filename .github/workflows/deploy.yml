@@ -1,0 +1,63 @@
+name: Deploy to Cloudflare
+
+# Terminal-free deploy of iany.app (Worker + static assets in ./dist).
+# Runs automatically on every push to main, and can be triggered by hand:
+#   GitHub → Actions → "Deploy to Cloudflare" → Run workflow.
+# No local machine or `wrangler` terminal needed.
+#
+# One-time setup (all in the browser — Settings → Secrets and variables → Actions):
+#   - CLOUDFLARE_API_TOKEN : a Cloudflare API token with the "Edit Cloudflare
+#       Workers" template (Workers Scripts + Workers R2 + D1 edit, Account +
+#       Zone read). Create it at dash.cloudflare.com → My Profile → API Tokens.
+#   - CLOUDFLARE_ACCOUNT_ID : your account id (Cloudflare dashboard → Workers &
+#       Pages → the right-hand "Account ID").
+#
+# This deploys code + assets only. It does NOT run D1 schema migrations; those
+# are one-offs (worker/schema.sql, trace/worker/schema.sql) — run them once from
+# any machine with wrangler, or via a separate manual step.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Never run two deploys at once; let the newest win.
+concurrency:
+  group: deploy-cloudflare
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (tsc + vite)
+        run: npm run build
+
+      - name: Deploy with Wrangler
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # `npm run build` already produced ./dist; deploy without rebuilding.
+          command: deploy
+
+      - name: Summary
+        run: |
+          echo "### ✅ Deployed iany.app" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Commit: \`${{ github.sha }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Live routes: /, /app, /trace, /voice, /scan, /sign, /braille" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "If a page still looks stale on your phone, hard-refresh once to update the service worker." >> "$GITHUB_STEP_SUMMARY"
