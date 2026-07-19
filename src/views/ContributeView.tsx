@@ -84,6 +84,14 @@ function ConsentGate({
         <div className="voice-openrow">🗂️ {t('voiceOpenData')}</div>
         <div className="voice-openrow">🏅 {t('voiceOpenCredit')}</div>
         <div className="voice-openrow">🆓 {t('voiceOpenModel')}</div>
+        <a
+          className="voice-dataset-link"
+          href="https://huggingface.co/datasets/sengtha/iany-khmer-voice"
+          target="_blank"
+          rel="noreferrer"
+        >
+          🤗 {t('voiceDatasetLive')} →
+        </a>
       </div>
 
       <fieldset className="voice-fields">

@@ -417,6 +417,19 @@ body {
   text-align: left;
   margin-left: 0;
 }
+.lp-band-note {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--lp-fg);
+}
+.lp-band-note a {
+  color: var(--lp-accent);
+  font-weight: 700;
+}
+.lp-band-note a:hover {
+  text-decoration: underline;
+}
 .lp-band-links {
   display: flex;
   flex-wrap: wrap;

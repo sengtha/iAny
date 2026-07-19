@@ -28,13 +28,23 @@ community and for the community.** The community data collectors (`/voice`,
 
 ## Datasets
 
-Open Khmer training data used and produced by the project:
+### Released by iAny (from community contributions)
+
+Open Khmer data collected through the community tools, released **CC-BY-SA-4.0**
+with opt-in contributor credit:
+
+- 🎤 **[sengtha/iany-khmer-voice](https://huggingface.co/datasets/sengtha/iany-khmer-voice)**
+  — Khmer read speech (audio + transcript) from [`/voice`](https://iany.app/voice),
+  for training open Khmer STT. **Live now** and growing as people contribute; it's
+  folded into the whisper-base fine-tune (see `docs/RUNPOD-KHMER-STT.md`).
+- 📷 `/scan` (Khmer OCR) and 🤟 `/sign` (Khmer Sign Language landmarks) — collecting
+  now, to be released the same way.
+
+### External data used
 
 - [DDD-Cambodia/khmer-speech-dataset](https://huggingface.co/datasets/DDD-Cambodia/khmer-speech-dataset) — CC-BY-SA-4.0 (TTS/STT)
+- [seanghay/km-speech-corpus](https://huggingface.co/datasets/seanghay/km-speech-corpus) — CC-BY-4.0 (STT)
 - [Sokheng/khmer-synthetic-ocr-v1-100k](https://huggingface.co/datasets/Sokheng/khmer-synthetic-ocr-v1-100k) — CC-BY-4.0 (OCR)
-- seanghay/km-speech-corpus — CC-BY-4.0 (STT)
-- **Community contributions** via `/voice`, `/scan`, `/sign` — released
-  **CC-BY-SA-4.0** with opt-in contributor credit.
 
 ## Help improve them
 

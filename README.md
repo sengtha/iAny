@@ -88,9 +88,15 @@ above; the full catalog (purpose, format, license lineage) is in
 | [khmer-tts-female-v2](https://huggingface.co/sengtha/khmer-tts-female-v2) | Khmer text-to-speech (TTS) |
 | [khmer-ocr](https://huggingface.co/sengtha/khmer-ocr) | Khmer OCR (detector + recognizer) |
 
+**Open datasets** (released from community contributions, CC-BY-SA-4.0):
+
+| Dataset | Purpose |
+|---|---|
+| 🎤 [sengtha/iany-khmer-voice](https://huggingface.co/datasets/sengtha/iany-khmer-voice) | Khmer read speech from `/voice`, for open STT — **live & growing** |
+
 > Models and datasets carry their **own licenses**, separate from iAny's
 > Apache-2.0 **code** license — each Hugging Face repo card is authoritative.
-> Help improve them by contributing at `/voice`, `/scan`, and `/sign`.
+> Help grow them by contributing at `/voice`, `/scan`, and `/sign`.
 
 ## Development
 

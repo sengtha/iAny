@@ -1179,6 +1179,19 @@ progress {
   line-height: 1.45;
   font-size: 0.95rem;
 }
+/* Link to the released open dataset on Hugging Face. */
+.voice-dataset-link {
+  margin-top: 2px;
+  padding-top: 10px;
+  border-top: 1px solid var(--bg-softer);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+}
+.voice-dataset-link:hover {
+  text-decoration: underline;
+}
 .voice-fields {
   border: none;
   padding: 0;

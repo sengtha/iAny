@@ -181,6 +181,12 @@ export function LandingView() {
                 'រាល់ការថត រូបភាព និងសញ្ញាដែលអ្នកចូលរួម ក្លាយជាទិន្នន័យបើកចំហ — ហើយម៉ូឌែលដែលបង្រៀនចេញពីវា ត្រូវបានចេញផ្សាយឥតគិតថ្លៃសម្រាប់អ្នកគ្រប់គ្នា។ អ្នកចូលរួមត្រូវបានផ្ដល់កិត្តិនាម។',
               )}
             </p>
+            <p className="lp-band-note">
+              🤗 {L('First open dataset released — Khmer voice: ', 'ទិន្នន័យបើកចំហដំបូងបានចេញផ្សាយ — សំឡេងខ្មែរ៖ ')}
+              <a href="https://huggingface.co/datasets/sengtha/iany-khmer-voice" target="_blank" rel="noreferrer">
+                sengtha/iany-khmer-voice
+              </a>
+            </p>
           </div>
           <div className="lp-band-links">
             <a className="lp-chip" href="/voice">🎤 {L('Voice', 'សំឡេង')}</a>
@@ -209,7 +215,7 @@ export function LandingView() {
               ★ {L('Star on GitHub', 'ផ្ដល់ផ្កាយនៅ GitHub')}
             </a>
             <a className="lp-btn lp-btn-ghost lp-btn-lg" href={HF_URL} target="_blank" rel="noreferrer">
-              🤗 {L('Models on Hugging Face', 'ម៉ូឌែលនៅ Hugging Face')}
+              🤗 {L('Models & datasets on Hugging Face', 'ម៉ូឌែល & ទិន្នន័យនៅ Hugging Face')}
             </a>
           </div>
         </div>

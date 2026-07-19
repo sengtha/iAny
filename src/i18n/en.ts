@@ -167,6 +167,7 @@ export const en = {
   voiceOpenData: 'Recordings are released as an open, free dataset for anyone to use.',
   voiceOpenCredit: 'Everyone who contributes is credited by name in the dataset (if you add one below).',
   voiceOpenModel: 'The speech-to-text model built from it is released free for everyone.',
+  voiceDatasetLive: 'The first open dataset is already live on Hugging Face — browse it',
   voiceCreditName: 'Your name for the credits (optional)',
   voiceCreditPlaceholder: 'e.g. Sok Dara',
   voiceCreditHint: 'Shown in the public dataset credits. Leave blank to stay anonymous.',
