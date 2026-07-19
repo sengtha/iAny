@@ -59,8 +59,16 @@ re-run §2 to fold in the newer clips.
 Install deps (terminal):
 
 ```bash
-pip install -U "transformers>=4.44" datasets accelerate evaluate jiwer librosa soundfile tensorboard huggingface_hub
+pip install -U "transformers>=4.44" "datasets>=2.18,<4" accelerate evaluate jiwer librosa soundfile tensorboard huggingface_hub
 ```
+
+> **Why `datasets<4`:** version **4.0 dropped loading-script support** (and the
+> `trust_remote_code` flag). Two of our sources — **`openslr/openslr` and
+> `google/fleurs`** — are still script-based, so on `datasets>=4` they fail with
+> *"`trust_remote_code` is not supported anymore … based on a loading script."*
+> Pinning `<4` keeps them working; everything else in this guide is unchanged. (If
+> you'd rather stay on `datasets>=4`, just delete those two rows from `SOURCES` —
+> DDD + km-speech-corpus + your `/voice` data are plenty. See the §2 note.)
 
 ---
 
@@ -97,11 +105,15 @@ login(getpass("HF token: "))            # typed at the prompt, not stored in cod
 SOURCES = [
     {"repo": "DDD-Cambodia/khmer-speech-dataset", "split": "train", "hours": 80, "license": "CC-BY-SA-4.0"},
     {"repo": "seanghay/km-speech-corpus",         "split": "train", "hours": 40, "license": "CC-BY-4.0"},
+    # ↓ These two are SCRIPT-BASED, so they need datasets<4 (see §1). On
+    #   datasets>=4 they raise "trust_remote_code is not supported anymore" and the
+    #   try/except below just SKIPS them — the run still succeeds on DDD +
+    #   km-speech-corpus + /voice. Delete these rows if you prefer datasets>=4.
     {"repo": "google/fleurs", "config": "km_kh",  "split": "train", "hours": 12, "license": "CC-BY-4.0"},
-    # OpenSLR SLR42 (Google Khmer, ~3-4 h read speech): CC-BY-SA-4.0. Script-
-    # based HF loader — trust_remote_code is already passed. If it errors in your
-    # `datasets` version, download directly from https://www.openslr.org/42/
-    # (line_index.tsv + wavs) and append those rows to `meta` instead.
+    # OpenSLR SLR42 (Google Khmer, ~3-4 h read speech): CC-BY-SA-4.0. If you're on
+    # datasets>=4 and want these hours, download directly from
+    # https://www.openslr.org/42/ (line_index.tsv + wavs) and append those rows to
+    # `meta` instead of loading the script-based repo.
     {"repo": "openslr/openslr", "config": "SLR42", "split": "train", "hours": 6, "license": "CC-BY-SA-4.0"},
     # NOTE: Common Voice has NO Khmer set on HF, so it's not usable here.
     # Your consented /voice clips (sengtha/iany-khmer-voice) are added + oversampled
@@ -137,10 +149,16 @@ meta, i = [], 0
 for s in SOURCES:
     repo = s["repo"]
     sub = os.path.join(OUT, repo.replace("/", "_")); os.makedirs(sub, exist_ok=True)
-    raw = (load_dataset(repo, s.get("config"), split=s["split"],
-                        streaming=True, trust_remote_code=True)
-           .cast_column("audio", Audio(decode=False))     # sidestep the audio-codec dep
-           .shuffle(seed=42, buffer_size=10000))
+    # One bad source must not kill the whole build (a script-based dataset on
+    # datasets>=4, a moved repo, a transient 5xx). Skip it and keep the rest.
+    try:
+        raw = (load_dataset(repo, s.get("config"), split=s["split"],
+                            streaming=True, trust_remote_code=True)
+               .cast_column("audio", Audio(decode=False))     # sidestep the audio-codec dep
+               .shuffle(seed=42, buffer_size=10000))
+    except Exception as e:
+        print(f"SKIP {repo}: {e}", flush=True)
+        continue
     got = 0.0
     for ex in raw:
         try:
