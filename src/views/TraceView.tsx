@@ -20,12 +20,15 @@ import {
   fetchAttestations,
   fetchPage,
   photoSignature,
+  proofTier,
   publishCapsule,
   registerCapsule,
+  tierFromCapsule,
   verifyChain,
   type Attestation,
   type ChainResult,
   type EventType,
+  type Tier,
   type FreshCapture,
   type PhotoSig,
   type RegistryInfo,
@@ -168,6 +171,7 @@ function Create({ L }: { L: LFn }) {
       <div className="trace-done">
         <div className="trace-badge">✓</div>
         <h3>{L('Proof created', 'បង្កើតភស្តុតាងរួចរាល់')}</h3>
+        <TierBadge tier={tierFromCapsule(capsule)} L={L} />
         <p className="trace-id">ID: {capsule.id.slice(0, 16)}…</p>
         <div className="trace-thumbs">
           {capsule.match.photos.map((p, i) => (
@@ -301,6 +305,14 @@ function Create({ L }: { L: LFn }) {
         {gps && <span>{gps.lat}, {gps.lng} (±{gps.acc}m)</span>}
       </div>
 
+      <StrengthMeter L={L} tier={proofTier({
+        photos: photos.length,
+        hasLabel: !!boxText.trim(),
+        hasGeo: !!gps,
+        hasWitness: !!witness.trim(),
+        inChain: !!prev,
+      })} />
+
       <button className="voice-primary big" disabled={busy || photos.length === 0} onClick={create}>
         {busy ? `${L('Processing', 'កំពុងដំណើរការ')}…` : `➕ ${L('Create proof', 'បង្កើតភស្តុតាង')}`}
       </button>
@@ -376,6 +388,7 @@ function Verify({ L, preload }: { L: LFn; preload?: TraceCapsule }) {
           {capsule.context.witness && <div>🤝 {capsule.context.witness}</div>}
           {capsule.context.gps && <div>📍 {capsule.context.gps.lat}, {capsule.context.gps.lng}</div>}
           <div>🕒 {new Date(capsule.context.capturedAt).toLocaleDateString()}</div>
+          <div><TierBadge tier={tierFromCapsule(capsule)} L={L} /></div>
         </div>
       </div>
 
@@ -546,6 +559,7 @@ function ProvenancePage({
       {hero && <img className="trace-page-hero" src={hero} alt="" />}
       <div className="trace-page-body">
         <h2>{c.product || L('Product', 'ផលិតផល')}</h2>
+        <div style={{ margin: '4px 0 8px' }}><TierBadge tier={tierFromCapsule(capsule)} L={L} /></div>
         {c.producer && <div className="trace-page-producer">👤 {c.producer}</div>}
 
         {capsule.match.photos.length > 1 && (
@@ -590,6 +604,50 @@ function ProvenancePage({
         </p>
       </div>
     </div>
+  )
+}
+
+/* --------------------------------------------------- proof-strength tiers --- */
+
+function tierName(level: number, L: LFn): string {
+  return [
+    '',
+    L('Basic', 'មូលដ្ឋាន'),
+    L('Good', 'ល្អ'),
+    L('Strong', 'រឹងមាំ'),
+    L('Full journey', 'ដំណើរពេញ'),
+  ][level] ?? ''
+}
+
+function tierHint(key: Tier['nextKey'], L: LFn): string {
+  return {
+    photo2label: L('Add another photo + the label to reach "Good".', 'បន្ថែមរូបមួយទៀត + ស្លាក ដើម្បីទៅ "ល្អ"។'),
+    geowitness: L('Add location or a witness to reach "Strong".', 'បន្ថែមទីតាំង ឬសាក្សី ដើម្បីទៅ "រឹងមាំ"។'),
+    journey: L('Link it into a journey for the top level.', 'ភ្ជាប់ទៅដំណើរ សម្រាប់កម្រិតខ្ពស់បំផុត។'),
+  }[key ?? 'journey'] ?? ''
+}
+
+/** Live strength meter (shown in Create). Encourages, never blocks. */
+function StrengthMeter({ tier, L }: { tier: Tier; L: LFn }) {
+  return (
+    <div className={`trace-strength lvl-${tier.level}`}>
+      <div className="trace-strength-top">
+        <div className="trace-strength-dots">
+          {[1, 2, 3, 4].map((n) => <i key={n} className={n <= tier.level ? 'on' : ''} />)}
+        </div>
+        <b>{L('Level', 'កម្រិត')} {tier.level} · {tierName(tier.level, L)}</b>
+      </div>
+      {tier.nextKey && <small>{tierHint(tier.nextKey, L)}</small>}
+    </div>
+  )
+}
+
+/** Compact badge (shown on a finished proof / verify / provenance). */
+function TierBadge({ tier, L }: { tier: Tier; L: LFn }) {
+  return (
+    <span className={`trace-tier-badge lvl-${tier.level}`}>
+      🛡️ {L('Level', 'កម្រិត')} {tier.level} · {tierName(tier.level, L)}
+    </span>
   )
 }
 

@@ -25,6 +25,24 @@ phone browser; no account.
 
 ---
 
+## Proof-strength levels (simple → strong)
+
+Verification is **tiered**, so a farmer's simplest action is already a valid
+proof and stronger proof is *optional*, never required. A live meter on the
+Create screen shows the current level and the cheapest thing to add next.
+
+| Level | What it needs | Who it's for |
+|---|---|---|
+| **1 · Basic** | 1 photo | any farmer, 10 seconds |
+| **2 · Good** | 2+ photos + the label | a bit more care |
+| **3 · Strong** | + location **or** a witness | serious sellers |
+| **4 · Full journey** | linked into an event chain | exporters / co-ops |
+
+Higher levels don't change *how* verification works — they add independent
+signals, so the trust score has a higher ceiling and more people vouch. Farmers
+stay at Level 1–2; exporters climb. The level is shown as a 🛡️ badge on the
+finished proof, at verify, and on the provenance page.
+
 ## How it works
 
 ### 1. Create proof (100% offline)

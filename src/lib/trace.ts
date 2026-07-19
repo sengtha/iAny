@@ -63,6 +63,46 @@ export interface TraceCapsule {
 export const EVENT_TYPES = ['harvest', 'process', 'pack', 'ship', 'receive', 'other'] as const
 export type EventType = (typeof EVENT_TYPES)[number]
 
+/* --------------------------------------------------- proof-strength tiers --- */
+
+/**
+ * Proof levels, simple → strong. The minimum (Level 1) is ONE photo — so a
+ * farmer's simplest action is already a valid proof; everything else is
+ * optional "make it stronger". `nextKey` names the cheapest thing to add to
+ * reach the next level (the UI turns it into a friendly hint).
+ */
+export interface TierInput {
+  photos: number
+  hasLabel: boolean
+  hasGeo: boolean
+  hasWitness: boolean
+  inChain: boolean
+}
+export interface Tier {
+  level: 1 | 2 | 3 | 4
+  nextKey?: 'photo2label' | 'geowitness' | 'journey'
+}
+
+export function proofTier(i: TierInput): Tier {
+  let level: Tier['level'] = 1
+  if (i.photos >= 2 && i.hasLabel) level = 2
+  if (level >= 2 && (i.hasGeo || i.hasWitness)) level = 3
+  if (level >= 3 && i.inChain) level = 4
+  const nextKey: Tier['nextKey'] =
+    level === 1 ? 'photo2label' : level === 2 ? 'geowitness' : level === 3 ? 'journey' : undefined
+  return { level, nextKey }
+}
+
+export function tierFromCapsule(c: TraceCapsule): Tier {
+  return proofTier({
+    photos: c.match.photos.length,
+    hasLabel: !!c.match.boxText.trim(),
+    hasGeo: !!c.context.gps,
+    hasWitness: !!c.context.witness,
+    inChain: !!c.prev || (c.event?.step ?? 1) > 1,
+  })
+}
+
 export interface SignalScore {
   key: string
   label: string
