@@ -60,6 +60,9 @@ Install deps (terminal):
 
 ```bash
 pip install -U "transformers>=4.44" "datasets>=2.18,<4" accelerate evaluate jiwer librosa soundfile tensorboard huggingface_hub
+# Your /voice dataset is thousands of tiny files; HF's Xet backend rate-limits
+# (429) on those. Remove it so downloads use the plain LFS CDN (see §2):
+pip uninstall -y hf_xet
 ```
 
 > **Why `datasets<4`:** version **4.0 dropped loading-script support** (and the
@@ -180,16 +183,34 @@ for s in SOURCES:
     print(f"DONE {repo}: {got/3600:.1f} h ({s['license']})", flush=True)
 
 # --- Your consented /voice clips — the most valuable signal (real phones/rooms).
-# Now a published HF dataset, so it pulls straight from the Hub like the others:
+# Now a published HF dataset:
 #   https://huggingface.co/datasets/sengtha/iany-khmer-voice
 # It's small, so we DON'T cap it by hours — we take all of it and OVERSAMPLE it
 # VOICE_REPEAT× so the model weights real-world audio above the big read corpora.
 # 1 = no oversampling; 3 is a good start (raise it if real-clip CER lags).
+#
+# ⚠️ IMPORTANT — it's THOUSANDS of tiny WAVs, and Hugging Face's Xet backend
+# stalls / rate-limits (429) on many small files: it fetches a per-file
+# "xet-read-token", so 5k+ files => 5k+ token calls => "reconstructing file: 0%
+# … 0.00B" stuck at ~18%, then a 429. Fix: DON'T use Xet. The surest way is to
+# uninstall it so HF falls back to plain LFS CDN downloads — run ONCE, then
+# RESTART THE KERNEL:
+#     !pip uninstall -y hf_xet
+# The env var below is belt-and-suspenders (must be set before hf_xet loads).
+# We snapshot_download the whole repo in one RESUMABLE pass and load it as a
+# local audiofolder — not the loose-file loader that hangs. Re-run if it stalls;
+# it resumes. (If you still 429, wait ~5–10 min for the limit to reset.)
 # The whole block is wrapped in try/except so the pipeline still runs if the
-# dataset is briefly unavailable — it just trains on the public corpora that run.
+# dataset is unavailable — it just trains on the public corpora that loaded.
+os.environ["HF_HUB_DISABLE_XET"] = "1"      # set BEFORE the download; plain HTTPS is reliable here
+from huggingface_hub import snapshot_download
 VOICE_REPEAT = 3
 try:
-    vraw = load_dataset("sengtha/iany-khmer-voice", split="train").cast_column("audio", Audio(decode=False))
+    vdir = snapshot_download("sengtha/iany-khmer-voice", repo_type="dataset",
+                             local_dir="/workspace/iany_voice_dl", max_workers=8)
+    vraw = (load_dataset("audiofolder", data_dir=vdir, split="train")
+            .cast_column("audio", Audio(decode=False)))
+    print(f"iany/voice rows on HF: {vraw.num_rows}", flush=True)
     vsub = os.path.join(OUT, "iany_voice"); os.makedirs(vsub, exist_ok=True)
     vbase = []
     for ex in vraw:
