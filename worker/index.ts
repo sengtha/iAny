@@ -920,6 +920,14 @@ async function serveTrace(url: URL, request: Request, env: Env): Promise<Respons
     if (path.startsWith('check/') && request.method === 'GET') {
       return await traceCheck(path.slice('check/'.length), env)
     }
+    if (path === 'publish' && request.method === 'POST') return await tracePublish(request, env)
+    if (path.startsWith('page/') && request.method === 'GET') {
+      return await tracePage(path.slice('page/'.length), env)
+    }
+    if (path === 'attest' && request.method === 'POST') return await traceAttest(request, env)
+    if (path.startsWith('attest/') && request.method === 'GET') {
+      return await traceAttestList(path.slice('attest/'.length), env)
+    }
     return json({ error: 'not found' }, 404)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
@@ -968,6 +976,79 @@ async function traceCheck(id: string, env: Env): Promise<Response> {
     'UPDATE trace_capsules SET verify_count = verify_count + 1, last_verified = ? WHERE id = ?',
   ).bind(now, id).run()
   return json({ registered: true, firstSeen: row.firstSeen, verifyCount: row.verifyCount + 1 })
+}
+
+const TRACE_PAGE_MAX = 2 * 1024 * 1024 // published capsule incl. thumbnails
+
+// Publish a capsule's display data as a shareable provenance page (opt-in — the
+// maker chose to make it public). Stored in R2; the page is served read-only.
+async function tracePublish(request: Request, env: Env): Promise<Response> {
+  let capsule: { id?: string; context?: { producer?: string; product?: string; capturedAt?: string } }
+  const raw = await request.text()
+  if (raw.length > TRACE_PAGE_MAX) return json({ error: 'too large' }, 413)
+  try {
+    capsule = JSON.parse(raw)
+  } catch {
+    return json({ error: 'expected json' }, 400)
+  }
+  const id = String(capsule.id ?? '').toLowerCase()
+  if (!TRACE_ID_RE.test(id)) return json({ error: 'bad capsule id' }, 400)
+
+  await env.MODELS.put(`trace/pages/${id}.json`, raw, {
+    httpMetadata: { contentType: 'application/json' },
+  })
+  const now = new Date().toISOString()
+  const trim = (v: unknown, n: number) => (v ? String(v).slice(0, n) : null)
+  await env.DB.prepare(
+    `INSERT INTO trace_capsules (id, producer, product, created_at, first_seen, verify_count, published)
+     VALUES (?,?,?,?,?,0,1)
+     ON CONFLICT(id) DO UPDATE SET published = 1`,
+  ).bind(id, trim(capsule.context?.producer, 80), trim(capsule.context?.product, 80),
+    trim(capsule.context?.capturedAt, 40), now).run()
+  return json({ published: true, url: `/trace?p=${id}` })
+}
+
+// Public: fetch a published provenance page (the capsule display JSON).
+async function tracePage(id: string, env: Env): Promise<Response> {
+  id = id.toLowerCase()
+  if (!TRACE_ID_RE.test(id)) return json({ error: 'bad capsule id' }, 400)
+  const obj = await env.MODELS.get(`trace/pages/${id}.json`)
+  if (!obj) return json({ error: 'not found' }, 404)
+  return new Response(obj.body, {
+    headers: { ...JSON_HEADERS, 'cache-control': 'public, max-age=60' },
+  })
+}
+
+// A witness (co-op / buyer) adds a confirmation to a capsule — turns a
+// self-claim into a witnessed one. Server-timestamped; shown on the page.
+async function traceAttest(request: Request, env: Env): Promise<Response> {
+  let body: { id?: string; name?: string; role?: string; note?: string }
+  try {
+    body = await request.json()
+  } catch {
+    return json({ error: 'expected json' }, 400)
+  }
+  const id = String(body.id ?? '').toLowerCase()
+  const name = String(body.name ?? '').trim()
+  if (!TRACE_ID_RE.test(id)) return json({ error: 'bad capsule id' }, 400)
+  if (!name || name.length > 80) return json({ error: 'name required' }, 400)
+  const trim = (v: unknown, n: number) => (v ? String(v).slice(0, n) : null)
+  await env.DB.prepare(
+    `INSERT INTO trace_attestations (id, name, role, note, created_at) VALUES (?,?,?,?,?)`,
+  ).bind(id, name.slice(0, 80), trim(body.role, 40), trim(body.note, 200), new Date().toISOString()).run()
+  return json({ ok: true })
+}
+
+async function traceAttestList(id: string, env: Env): Promise<Response> {
+  id = id.toLowerCase()
+  if (!TRACE_ID_RE.test(id)) return json({ error: 'bad capsule id' }, 400)
+  const { results } = await env.DB.prepare(
+    `SELECT name, role, note, created_at AS createdAt FROM trace_attestations
+      WHERE id = ? ORDER BY created_at ASC LIMIT 50`,
+  ).bind(id).all()
+  return new Response(JSON.stringify({ attestations: results ?? [] }), {
+    headers: { ...JSON_HEADERS, 'cache-control': 'public, max-age=30' },
+  })
 }
 
 /* ------------------------------------------------------------------ *

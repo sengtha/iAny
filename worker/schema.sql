@@ -107,6 +107,20 @@ CREATE TABLE IF NOT EXISTS trace_capsules (
   created_at    TEXT,                  -- device-claimed capture time (untrusted)
   first_seen    TEXT NOT NULL,         -- server time at first registration (trusted)
   verify_count  INTEGER NOT NULL DEFAULT 0,
-  last_verified TEXT
+  last_verified TEXT,
+  published     INTEGER NOT NULL DEFAULT 0  -- has a shareable provenance page
 );
 CREATE INDEX IF NOT EXISTS idx_trace_first_seen ON trace_capsules (first_seen);
+-- Migration for an existing DB (safe to run once):
+--   ALTER TABLE trace_capsules ADD COLUMN published INTEGER NOT NULL DEFAULT 0;
+
+-- Witness confirmations for a capsule (co-op / buyer vouching). Turns a
+-- self-claim into a witnessed one; server-timestamped, shown on the page.
+CREATE TABLE IF NOT EXISTS trace_attestations (
+  id          TEXT NOT NULL,           -- capsule id being vouched for
+  name        TEXT NOT NULL,           -- who vouches
+  role        TEXT,                    -- e.g. "Kampot Pepper Co-op"
+  note        TEXT,
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_trace_attest ON trace_attestations (id);

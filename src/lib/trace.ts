@@ -389,3 +389,66 @@ export async function checkCapsule(id: string): Promise<RegistryInfo | null> {
     return null
   }
 }
+
+/* ----------------------------------------------- shareable provenance page --- */
+
+export interface Attestation {
+  name: string
+  role?: string
+  note?: string
+  createdAt: string
+}
+
+/** Publish a capsule as a shareable provenance page. Returns the public path. */
+export async function publishCapsule(capsule: TraceCapsule): Promise<string | null> {
+  try {
+    const res = await fetch('/api/trace/publish', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(capsule),
+    })
+    if (!res.ok) return null
+    const d = (await res.json()) as { url: string }
+    return d.url
+  } catch {
+    return null
+  }
+}
+
+/** Fetch a published provenance capsule by id (for /trace?p=<id>). */
+export async function fetchPage(id: string): Promise<TraceCapsule | null> {
+  try {
+    const res = await fetch(`/api/trace/page/${id}`)
+    if (!res.ok) return null
+    return (await res.json()) as TraceCapsule
+  } catch {
+    return null
+  }
+}
+
+/** A witness (co-op/buyer) adds a confirmation to a capsule. */
+export async function addAttestation(
+  id: string,
+  a: { name: string; role?: string; note?: string },
+): Promise<boolean> {
+  try {
+    const res = await fetch('/api/trace/attest', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ id, ...a }),
+    })
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
+export async function fetchAttestations(id: string): Promise<Attestation[]> {
+  try {
+    const res = await fetch(`/api/trace/attest/${id}`)
+    if (!res.ok) return []
+    return ((await res.json()) as { attestations: Attestation[] }).attestations ?? []
+  } catch {
+    return []
+  }
+}

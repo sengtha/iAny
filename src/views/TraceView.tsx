@@ -1,12 +1,17 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useI18n } from '../i18n'
 import { khmerOcr } from '../ai/khmerOcr'
 import {
+  addAttestation,
   capsuleId,
   checkCapsule,
   computeTrust,
+  fetchAttestations,
+  fetchPage,
   photoSignature,
+  publishCapsule,
   registerCapsule,
+  type Attestation,
   type FreshCapture,
   type PhotoSig,
   type RegistryInfo,
@@ -24,6 +29,37 @@ export function TraceView() {
   const km = lang === 'km'
   const L = (en: string, khmer: string) => (km ? khmer : en)
   const [mode, setMode] = useState<'create' | 'verify'>('create')
+
+  // Consumer provenance page: /trace?p=<capsule id>
+  const [pageId, setPageId] = useState<string | null>(null)
+  const [pageCapsule, setPageCapsule] = useState<TraceCapsule | null>(null)
+  const [pageAtt, setPageAtt] = useState<Attestation[]>([])
+  const [pageState, setPageState] = useState<'off' | 'loading' | 'ready' | 'missing'>('off')
+
+  useEffect(() => {
+    const id = new URLSearchParams(location.search).get('p')
+    if (!id || !/^[0-9a-f]{64}$/.test(id)) return
+    setPageId(id)
+    setPageState('loading')
+    void fetchPage(id).then((c) => {
+      setPageCapsule(c)
+      setPageState(c ? 'ready' : 'missing')
+    })
+    void fetchAttestations(id).then(setPageAtt)
+  }, [])
+
+  if (pageState !== 'off') {
+    return (
+      <ProvenancePage
+        id={pageId!}
+        capsule={pageCapsule}
+        attestations={pageAtt}
+        state={pageState}
+        L={L}
+        onAttested={() => pageId && void fetchAttestations(pageId).then(setPageAtt)}
+      />
+    )
+  }
 
   return (
     <div className="contribute trace">
@@ -61,6 +97,7 @@ function Create({ L }: { L: LFn }) {
   const [busy, setBusy] = useState(false)
   const [capsule, setCapsule] = useState<TraceCapsule | null>(null)
   const [reg, setReg] = useState<RegistryInfo | null>(null)
+  const [pageUrl, setPageUrl] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   async function addPhotos(files: FileList) {
@@ -129,7 +166,19 @@ function Create({ L }: { L: LFn }) {
             🌐 {L('Register online (optional, trusted timestamp)', 'ចុះបញ្ជីលើបណ្ដាញ (ស្រេចចិត្ត ពេលវេលាដែលទុកចិត្ត)')}
           </button>
         )}
-        <button className="voice-ghost" onClick={() => { setCapsule(null); setReg(null); setPhotos([]); setBoxText(''); }}>
+        {pageUrl ? (
+          <div className="trace-share">
+            <div className="trace-share-url">{location.origin}{pageUrl}</div>
+            <button className="voice-ghost" onClick={() => void navigator.clipboard?.writeText(location.origin + pageUrl)}>
+              ⧉ {L('Copy public link', 'ចម្លងតំណសាធារណៈ')}
+            </button>
+          </div>
+        ) : (
+          <button className="voice-ghost" onClick={async () => setPageUrl(await publishCapsule(capsule))}>
+            🔗 {L('Publish shareable page (for buyers)', 'ផ្សាយទំព័រចែករំលែក (សម្រាប់អ្នកទិញ)')}
+          </button>
+        )}
+        <button className="voice-ghost" onClick={() => { setCapsule(null); setReg(null); setPageUrl(null); setPhotos([]); setBoxText(''); }}>
           {L('Create another', 'បង្កើតថ្មី')}
         </button>
       </div>
@@ -193,8 +242,8 @@ function Create({ L }: { L: LFn }) {
 
 /* ------------------------------------------------------------------ verify */
 
-function Verify({ L }: { L: LFn }) {
-  const [capsule, setCapsule] = useState<TraceCapsule | null>(null)
+function Verify({ L, preload }: { L: LFn; preload?: TraceCapsule }) {
+  const [capsule, setCapsule] = useState<TraceCapsule | null>(preload ?? null)
   const [integrityOk, setIntegrityOk] = useState(true)
   const [photos, setPhotos] = useState<PhotoSig[]>([])
   const [boxText, setBoxText] = useState('')
@@ -356,4 +405,122 @@ function ScoreCard({ result, L }: { result: VerifyResult; L: LFn }) {
 
 function signalLabel(key: string, L: LFn): string {
   return { visual: L('Appearance', 'រូបរាង'), color: L('Colour', 'ពណ៌'), text: L('Box text', 'អក្សរប្រអប់') }[key] ?? key
+}
+
+/* -------------------------------------------------- consumer provenance --- */
+
+function ProvenancePage({
+  id, capsule, attestations, state, L, onAttested,
+}: {
+  id: string
+  capsule: TraceCapsule | null
+  attestations: Attestation[]
+  state: 'loading' | 'ready' | 'missing' | 'off'
+  L: LFn
+  onAttested: () => void
+}) {
+  const [verifying, setVerifying] = useState(false)
+
+  if (state === 'loading') {
+    return <div className="contribute trace"><p className="voice-tip">{L('Loading…', 'កំពុងផ្ទុក…')}</p></div>
+  }
+  if (state === 'missing' || !capsule) {
+    return (
+      <div className="contribute trace">
+        <p className="voice-error">{L('This provenance page was not found (or you are offline).', 'រកមិនឃើញទំព័រប្រភពនេះ (ឬអ្នកនៅក្រៅបណ្ដាញ)។')}</p>
+      </div>
+    )
+  }
+  if (verifying) {
+    return (
+      <div className="contribute trace">
+        <button className="voice-ghost" onClick={() => setVerifying(false)}>← {L('Back to page', 'ត្រឡប់ទៅទំព័រ')}</button>
+        <Verify L={L} preload={capsule} />
+      </div>
+    )
+  }
+
+  const c = capsule.context
+  const hero = capsule.match.photos[0]?.thumb
+  return (
+    <div className="trace-page">
+      {hero && <img className="trace-page-hero" src={hero} alt="" />}
+      <div className="trace-page-body">
+        <h2>{c.product || L('Product', 'ផលិតផល')}</h2>
+        {c.producer && <div className="trace-page-producer">👤 {c.producer}</div>}
+
+        {capsule.match.photos.length > 1 && (
+          <div className="trace-thumbs">
+            {capsule.match.photos.slice(1).map((p, i) => <img key={i} src={p.thumb} alt="" />)}
+          </div>
+        )}
+
+        {c.note && <p className="trace-page-story" lang="km">{c.note}</p>}
+
+        <div className="trace-page-facts">
+          {c.gps && (
+            <a href={`https://www.google.com/maps?q=${c.gps.lat},${c.gps.lng}`} target="_blank" rel="noreferrer">
+              📍 {c.gps.lat}, {c.gps.lng}
+            </a>
+          )}
+          <span>🕒 {new Date(c.capturedAt).toLocaleDateString()}</span>
+        </div>
+
+        {(c.witness || attestations.length > 0) && (
+          <div className="trace-page-witness">
+            <h3>🤝 {L('Vouched for by', 'ធានាដោយ')}</h3>
+            {c.witness && <div className="trace-witness-row">{c.witness} <em>({L('named at origin', 'មានឈ្មោះនៅប្រភព')})</em></div>}
+            {attestations.map((a, i) => (
+              <div key={i} className="trace-witness-row">
+                <b>{a.name}</b>{a.role ? ` · ${a.role}` : ''}{a.note ? ` — ${a.note}` : ''}
+                <em> · {new Date(a.createdAt).toLocaleDateString()}</em>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <button className="voice-primary big" onClick={() => setVerifying(true)}>
+          ✓ {L('Verify this product yourself', 'ផ្ទៀងផ្ទាត់ផលិតផលនេះដោយខ្លួនឯង')}
+        </button>
+
+        <AttestForm id={id} L={L} onAttested={onAttested} />
+
+        <p className="voice-minor-note">
+          {L('This is a self-published origin story, strengthened by the witnesses above. Verify it yourself with the button.',
+             'នេះជារឿងប្រភពដែលបានផ្សាយដោយខ្លួនឯង ព្រងឹងដោយសាក្សីខាងលើ។ សូមផ្ទៀងផ្ទាត់ដោយប៊ូតុង។')}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function AttestForm({ id, L, onAttested }: { id: string; L: LFn; onAttested: () => void }) {
+  const [open, setOpen] = useState(false)
+  const [name, setName] = useState('')
+  const [role, setRole] = useState('')
+  const [note, setNote] = useState('')
+  const [done, setDone] = useState(false)
+
+  if (done) return <p className="voice-tip">✓ {L('Thank you — your confirmation was added.', 'អរគុណ — ការបញ្ជាក់របស់អ្នកត្រូវបានបន្ថែម។')}</p>
+  if (!open) {
+    return (
+      <button className="voice-ghost" onClick={() => setOpen(true)}>
+        🤝 {L('I can vouch for this (co-op / buyer)', 'ខ្ញុំអាចធានារឿងនេះ (សហករណ៍ / អ្នកទិញ)')}
+      </button>
+    )
+  }
+  return (
+    <div className="trace-attest">
+      <label className="voice-field"><span>{L('Your name', 'ឈ្មោះរបស់អ្នក')}</span>
+        <input value={name} onChange={(e) => setName(e.target.value)} /></label>
+      <label className="voice-field"><span>{L('Role (co-op, buyer…)', 'តួនាទី (សហករណ៍ អ្នកទិញ…)')}</span>
+        <input value={role} onChange={(e) => setRole(e.target.value)} /></label>
+      <label className="voice-field"><span>{L('Note (optional)', 'កំណត់ចំណាំ (ស្រេចចិត្ត)')}</span>
+        <input value={note} onChange={(e) => setNote(e.target.value)} /></label>
+      <button className="voice-primary" disabled={!name.trim()}
+        onClick={async () => { if (await addAttestation(id, { name: name.trim(), role, note })) { setDone(true); onAttested() } }}>
+        {L('Add my confirmation', 'បន្ថែមការបញ្ជាក់')}
+      </button>
+    </div>
+  )
 }

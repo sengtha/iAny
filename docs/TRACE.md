@@ -53,6 +53,14 @@ Nearby, a chat app, or upload. No printing. (Reuses iAny's pack-file pattern.)
 - **Online add-on (optional):** cross-check the registry for a **trusted
   first-seen timestamp** and a **verify count** (a soft "copied many times" hint).
 
+### 4. Share a provenance page (optional, online)
+The maker can **publish** a capsule as a shareable **consumer page** at
+`/trace?p=<id>`: hero photo, product, story, farm-map link, witnesses, and a
+**"Verify this product yourself"** button. Buyers/co-ops can add a **witness
+confirmation** on the page (server-timestamped) — turning a self-claim into a
+witnessed one. This is the piece that earns a **price premium**: the buyer sees
+the human story *and* can verify the physical product on the spot.
+
 ---
 
 ## What it CAN do
@@ -134,13 +142,15 @@ Khmer OCR label scan; witness/GPS/story context; optional registry (trusted time
   classical descriptor keeps Trace instant and download-free. A **grade/quality
   classifier** can be added as an extra scored signal the same way.
 
-**v3 — credibility & reach.**
-- **Witness co-attestation flow** (co-op/buyer adds their confirmation P2P, then
-  registers it) — turning "self-claim" into "witnessed."
-- **Consumer provenance page**: scan → see the farmer, farm map, story, journey,
-  and the trust score — the piece that earns a price premium.
-- **Khmer voice story** at capture (on-device STT) so low-literacy producers just
-  talk; auto-translate for export buyers.
+**v3 (now) — credibility & reach.** ✅
+- **Consumer provenance page** (`/trace?p=<id>`): publish a capsule as a
+  shareable page — hero photo, product, story, farm-map link, witnesses, and a
+  "Verify this product yourself" button. The piece that earns a price premium.
+- **Witness co-attestation:** any viewer (co-op/buyer) adds a server-timestamped
+  confirmation on the page — self-claim → witnessed.
+- *Optional next:* **Khmer voice story** at capture (on-device STT — already in
+  iAny) so low-literacy producers just talk, auto-translated for export buyers;
+  a QR of the page link for packaging; a richer journey timeline.
 
 **v4 — trust network & standards.**
 - **EPCIS-style event chain** (harvest → process → ship → receive), each event a
