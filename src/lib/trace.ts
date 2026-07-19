@@ -44,6 +44,9 @@ export interface TraceCapsule {
     producer: string
     product: string
     note: string
+    /** Optional witness (co-op/buyer) who vouches — authenticity comes from
+     *  people, not matching. Self-reported unless registered online. */
+    witness: string
   }
   /** Content id = SHA-256 of everything above (keyless integrity). */
   id: string
@@ -253,4 +256,45 @@ export function computeTrust(capsule: TraceCapsule, fresh: FreshCapture, integri
     score >= 85 ? 'strong' : score >= 70 ? 'good' : score >= 45 ? 'partial' : 'low'
 
   return { score, band, signals, integrityOk, usedSignals: avail.length }
+}
+
+/* ----------------------------------------------- optional online registry --- */
+
+export interface RegistryInfo {
+  registered: boolean
+  firstSeen: string | null // TRUSTED server timestamp (upgrades the device clock)
+  verifyCount: number // how many times checked (soft double-use signal)
+}
+
+/** Register a capsule online (near origin) for a trusted first-seen time.
+ *  No-op offline — returns null and the offline flow is unaffected. */
+export async function registerCapsule(capsule: TraceCapsule): Promise<RegistryInfo | null> {
+  try {
+    const res = await fetch('/api/trace/register', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        id: capsule.id,
+        producer: capsule.context.producer,
+        product: capsule.context.product,
+        createdAt: capsule.context.capturedAt,
+      }),
+    })
+    if (!res.ok) return null
+    const d = (await res.json()) as { firstSeen: string }
+    return { registered: true, firstSeen: d.firstSeen, verifyCount: 0 }
+  } catch {
+    return null
+  }
+}
+
+/** Check a capsule online: trusted first-seen + verify count. Null offline. */
+export async function checkCapsule(id: string): Promise<RegistryInfo | null> {
+  try {
+    const res = await fetch(`/api/trace/check/${id}`)
+    if (!res.ok) return null
+    return (await res.json()) as RegistryInfo
+  } catch {
+    return null
+  }
 }

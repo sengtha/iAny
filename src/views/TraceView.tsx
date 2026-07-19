@@ -1,11 +1,15 @@
 import { useRef, useState } from 'react'
 import { useI18n } from '../i18n'
+import { khmerOcr } from '../ai/khmerOcr'
 import {
   capsuleId,
+  checkCapsule,
   computeTrust,
   photoSignature,
+  registerCapsule,
   type FreshCapture,
   type PhotoSig,
+  type RegistryInfo,
   type TraceCapsule,
   type VerifyResult,
 } from '../lib/trace'
@@ -51,10 +55,12 @@ function Create({ L }: { L: LFn }) {
   const [boxText, setBoxText] = useState('')
   const [producer, setProducer] = useState('')
   const [product, setProduct] = useState('')
+  const [witness, setWitness] = useState('')
   const [note, setNote] = useState('')
   const [gps, setGps] = useState<{ lat: number; lng: number; acc: number } | null>(null)
   const [busy, setBusy] = useState(false)
   const [capsule, setCapsule] = useState<TraceCapsule | null>(null)
+  const [reg, setReg] = useState<RegistryInfo | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   async function addPhotos(files: FileList) {
@@ -80,7 +86,7 @@ function Create({ L }: { L: LFn }) {
       context: {
         gps,
         capturedAt: new Date().toISOString(),
-        producer, product, note,
+        producer, product, note, witness,
       },
     }
     const id = await capsuleId(body)
@@ -116,7 +122,14 @@ function Create({ L }: { L: LFn }) {
           {L('Send this file with the product (share, Bluetooth, upload). The receiver verifies it offline.',
              'ផ្ញើឯកសារនេះជាមួយផលិតផល (ចែករំលែក ប៊្លូធូស អាប់ឡូត)។ អ្នកទទួលអាចផ្ទៀងផ្ទាត់ក្រៅបណ្ដាញ។')}
         </p>
-        <button className="voice-ghost" onClick={() => { setCapsule(null); setPhotos([]); setBoxText(''); }}>
+        {reg?.firstSeen ? (
+          <p className="voice-tip">✓ {L('Registered online', 'ចុះបញ្ជីលើបណ្ដាញ')}: {new Date(reg.firstSeen).toLocaleString()}</p>
+        ) : (
+          <button className="voice-ghost" onClick={async () => setReg(await registerCapsule(capsule))}>
+            🌐 {L('Register online (optional, trusted timestamp)', 'ចុះបញ្ជីលើបណ្ដាញ (ស្រេចចិត្ត ពេលវេលាដែលទុកចិត្ត)')}
+          </button>
+        )}
+        <button className="voice-ghost" onClick={() => { setCapsule(null); setReg(null); setPhotos([]); setBoxText(''); }}>
           {L('Create another', 'បង្កើតថ្មី')}
         </button>
       </div>
@@ -140,6 +153,7 @@ function Create({ L }: { L: LFn }) {
         <textarea lang="km" rows={2} value={boxText} onChange={(e) => setBoxText(e.target.value)}
           placeholder={L('brand, batch, weight, dates…', 'ម៉ាក បាច់ ទម្ងន់ កាលបរិច្ឆេទ…')} />
       </label>
+      <ScanLabel L={L} onText={(t) => setBoxText((b) => (b ? b + ' ' : '') + t)} />
 
       <div className="trace-row">
         <label className="voice-field"><span>{L('Producer', 'អ្នកផលិត')}</span>
@@ -147,6 +161,12 @@ function Create({ L }: { L: LFn }) {
         <label className="voice-field"><span>{L('Product', 'ផលិតផល')}</span>
           <input value={product} onChange={(e) => setProduct(e.target.value)} /></label>
       </div>
+
+      <label className="voice-field">
+        <span>🤝 {L('Witness — co-op / buyer (optional)', 'សាក្សី — សហករណ៍ / អ្នកទិញ (ស្រេចចិត្ត)')}</span>
+        <input value={witness} onChange={(e) => setWitness(e.target.value)}
+          placeholder={L('who can vouch for this origin', 'អ្នកដែលអាចធានាប្រភពនេះ')} />
+      </label>
 
       <label className="voice-field">
         <span>{L('Note / story (optional)', 'កំណត់ចំណាំ / រឿង (ស្រេចចិត្ត)')}</span>
@@ -175,6 +195,7 @@ function Verify({ L }: { L: LFn }) {
   const [boxText, setBoxText] = useState('')
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<VerifyResult | null>(null)
+  const [registry, setRegistry] = useState<RegistryInfo | null>(null)
   const capRef = useRef<HTMLInputElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -201,6 +222,8 @@ function Verify({ L }: { L: LFn }) {
     if (!capsule) return
     const fresh: FreshCapture = { photos, boxText }
     setResult(computeTrust(capsule, fresh, integrityOk))
+    // Optional online cross-check (trusted time + double-use). No-op offline.
+    void checkCapsule(capsule.id).then(setRegistry)
   }
 
   if (!capsule) {
@@ -228,6 +251,7 @@ function Verify({ L }: { L: LFn }) {
         <div className="trace-ctx">
           {capsule.context.producer && <div>👤 {capsule.context.producer}</div>}
           {capsule.context.product && <div>📦 {capsule.context.product}</div>}
+          {capsule.context.witness && <div>🤝 {capsule.context.witness}</div>}
           {capsule.context.gps && <div>📍 {capsule.context.gps.lat}, {capsule.context.gps.lng}</div>}
           <div>🕒 {new Date(capsule.context.capturedAt).toLocaleDateString()}</div>
         </div>
@@ -244,12 +268,53 @@ function Verify({ L }: { L: LFn }) {
         <span>🏷️ {L('Text on the box now', 'អក្សរនៅលើប្រអប់ឥឡូវ')}</span>
         <textarea lang="km" rows={2} value={boxText} onChange={(e) => setBoxText(e.target.value)} />
       </label>
+      <ScanLabel L={L} onText={(t) => setBoxText((b) => (b ? b + ' ' : '') + t)} />
 
       <button className="voice-primary big" disabled={busy || photos.length === 0} onClick={verify}>
         {busy ? `${L('Processing', 'កំពុងដំណើរការ')}…` : `✓ ${L('Check match', 'ពិនិត្យការផ្គូផ្គង')}`}
       </button>
 
       {result && <ScoreCard result={result} L={L} />}
+      {result && registry && (
+        registry.registered ? (
+          <p className="voice-tip">
+            ✓ {L('Registered at origin', 'ចុះបញ្ជីនៅប្រភព')}: {registry.firstSeen ? new Date(registry.firstSeen).toLocaleDateString() : ''}
+            {' · '}{L('verified', 'ផ្ទៀងផ្ទាត់')} {registry.verifyCount}×
+            {registry.verifyCount > 8 && ` ⚠ ${L('(checked many times — may be copied)', '(ពិនិត្យច្រើនដង — អាចត្រូវបានចម្លង)')}`}
+          </p>
+        ) : (
+          <p className="voice-minor-note">{L('Not in the online registry (offline proof only).', 'មិននៅក្នុងបញ្ជីលើបណ្ដាញ (ភស្តុតាងក្រៅបណ្ដាញតែប៉ុណ្ណោះ)។')}</p>
+        )
+      )}
+    </>
+  )
+}
+
+/* ------------------------------------------------------ scan-label (OCR) --- */
+
+function ScanLabel({ onText, L }: { onText: (t: string) => void; L: LFn }) {
+  const ref = useRef<HTMLInputElement>(null)
+  const [busy, setBusy] = useState(false)
+  return (
+    <>
+      <input ref={ref} type="file" accept="image/*" capture="environment" hidden
+        onChange={async (e) => {
+          const f = e.target.files?.[0]
+          if (!f) return
+          setBusy(true)
+          try {
+            const t = await khmerOcr.recognizeImage(f)
+            if (t.trim()) onText(t.trim())
+          } catch {
+            /* OCR unavailable — user can type instead */
+          } finally {
+            setBusy(false)
+            e.target.value = ''
+          }
+        }} />
+      <button type="button" className="voice-ghost trace-scan" disabled={busy} onClick={() => ref.current?.click()}>
+        {busy ? `${L('Reading label', 'កំពុងអានស្លាក')}…` : `📷 ${L('Scan label', 'ស្កេនស្លាក')}`}
+      </button>
     </>
   )
 }

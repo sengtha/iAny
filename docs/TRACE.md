@@ -1,0 +1,156 @@
+# iAny Trace — offline proof of origin (trust score)
+
+**Goal:** help *honest* makers and farmers prove their product's origin with just
+a phone — **simple, no printing, offline, no keys** — and give a buyer a clear
+**trust score**, not a fake yes/no. It is deliberately **not** an anti-counterfeit
+fortress; it's a tool to make an honest producer's claim credible and cheap.
+
+Route: **`/trace`** (a standalone page, like `/voice` and `/scan`). Runs on any
+phone browser; no account.
+
+---
+
+## The core idea
+
+> No single signal is treated as proof of truth. We capture **many weak signals**
+> from the product at origin, bundle them into a tamper-evident **capsule**, and
+> at verify time re-capture the matchable signals and combine them into **one
+> trust score (0–100)** with a transparent breakdown.
+
+- **Keyless.** A capsule's **ID is the SHA-256 of its own contents** (content
+  addressing). Change any pixel or field and the ID changes — tamper-evidence
+  with **no signing keys** for farmers to manage or lose.
+- **Offline-first.** Create and Verify run 100% on-device. An optional online
+  registry *adds* two things connectivity can give (trusted time, double-use).
+
+---
+
+## How it works
+
+### 1. Create proof (100% offline)
+Capture into a capsule:
+- **Product photos** → on-device perceptual signature (difference-hash + colour
+  histogram). *Matchable.*
+- **Box / label text** → typed, or **📷 Scan label** (on-device Khmer OCR).
+  *Matchable.*
+- **Witness** (co-op / buyer who vouches), **producer**, **product**, **GPS**,
+  **note/story**, device time. *Context — shown, not scored.*
+- Capsule **ID = SHA-256(contents)**. Saved as a small `.json`.
+
+### 2. Transfer (P2P or online)
+The capsule is just a file — send it **with the goods**: share sheet, Bluetooth/
+Nearby, a chat app, or upload. No printing. (Reuses iAny's pack-file pattern.)
+
+### 3. Verify proof (100% offline, or online)
+- **Integrity:** re-hash the capsule; if it ≠ its ID, it was modified → flagged
+  and the score is capped.
+- **Match:** re-photograph the received product (and scan its label). Each fresh
+  signal is compared to the capsule → per-signal similarity.
+- **Trust score:** weighted over the **available** signals (appearance 50 % /
+  colour 25 % / box-text 25 %), with a **coverage penalty** (fewer signals →
+  lower ceiling). Result is banded: Strong / Good / Partial / Low.
+- **Online add-on (optional):** cross-check the registry for a **trusted
+  first-seen timestamp** and a **verify count** (a soft "copied many times" hint).
+
+---
+
+## What it CAN do
+
+- ✅ **Create a tamper-evident origin record on any phone, fully offline**, no
+  keys, no printing.
+- ✅ **Measure consistency** between the received product and its documented
+  origin, as a transparent 0–100 score with a per-signal breakdown.
+- ✅ **Near per-item identity for unique, textured goods** (silk/krama, wood
+  carving, ceramics, silverwork) — the visual signature is distinctive.
+- ✅ **Detect tampering of the record** (content hash) offline.
+- ✅ **Auto-read the label** with on-device Khmer OCR (less typing for farmers).
+- ✅ **Record a witness + story + GPS** to make an honest claim credible.
+- ✅ **Work with poor/no connectivity**; the online registry only *adds* value.
+
+## What it CANNOT do (honest limits)
+
+- ❌ **Prove authenticity of the origin claim.** Matching says "received ≈
+  documented," not "the documented origin is true." A liar can photograph a nice
+  farm. **Authenticity comes from witnesses**, not from matching.
+- ❌ **Per-item verify fungible goods** (rice, pepper, sugar). Grains aren't
+  re-identifiable — for bulk goods the score means *consistency* (same grade/
+  colour/packaging), not "this exact item."
+- ❌ **Prevent copying offline.** The same valid capsule can be attached to many
+  items; **offline verification can't know it was reused.** Detecting reuse needs
+  the **online registry** (verify count) — and even that is a hint, not proof.
+- ❌ **Trust the capture time offline.** The device clock is a claim; a **trusted
+  timestamp requires the online registry** (server first-seen).
+- ❌ **Guarantee a match under bad conditions.** Very different lighting/angle/
+  camera lowers the score; guide the framing and use multiple angles.
+
+**One-line honest summary:** iAny Trace gives *"tamper-evident, offline-verifiable
+evidence that a product matches its documented origin, backed by a witness"* —
+**not** *"impossible to fake."*
+
+---
+
+## Privacy
+
+- No account. The capsule holds only what the maker captured (product photos,
+  label text, optional GPS/witness/story).
+- The optional online registry stores **only** the capsule hash + a short origin
+  summary (producer/product) + timestamps — **no images, no personal data**.
+- GPS is optional and only as precise as the maker chooses.
+
+---
+
+## Deploying the online registry (optional)
+
+Offline works with no setup. To enable the registry (trusted time + double-use):
+
+```bash
+npx wrangler d1 execute iany-radio --remote --file worker/schema.sql   # trace_capsules
+npx wrangler deploy
+```
+
+Endpoints (public, keyless): `POST /api/trace/register`, `GET /api/trace/check/:id`.
+
+---
+
+## Roadmap
+
+**v1 (now) — offline trust score.** ✅ Keyless content-addressed capsule; dHash +
+colour + box-text matching; weighted score with coverage penalty; tamper cap;
+Khmer OCR label scan; witness/GPS/story context; optional registry (trusted time
++ verify count); P2P transfer by file.
+
+**v2 — better matching.**
+- Swap the perceptual signature for a **learned on-device image embedding**
+  (MobileCLIP / DINO via ONNX) — `photoSignature()` is the single swap-in point;
+  capsule shape and scoring stay the same. Big accuracy jump for both unique and
+  bulk goods.
+- **Guided multi-angle capture** (framing prompts) to cut lighting/angle noise.
+- **Grade/quality + crop classifier** as extra scored signals.
+
+**v3 — credibility & reach.**
+- **Witness co-attestation flow** (co-op/buyer adds their confirmation P2P, then
+  registers it) — turning "self-claim" into "witnessed."
+- **Consumer provenance page**: scan → see the farmer, farm map, story, journey,
+  and the trust score — the piece that earns a price premium.
+- **Khmer voice story** at capture (on-device STT) so low-literacy producers just
+  talk; auto-translate for export buyers.
+
+**v4 — trust network & standards.**
+- **EPCIS-style event chain** (harvest → process → ship → receive), each event a
+  content-addressed capsule linked to the previous.
+- **Anchoring** the registry's daily Merkle root to a public chain for
+  independent verifiability (still no per-farmer keys).
+- **Export compliance** exports (e.g. geolocation for EU due-diligence) so an
+  exporter gets a compliance tool and the farmer gets a premium.
+- Optional **NFC / object-fingerprint** tiers for makers who want stronger
+  binding — same capsule format, stronger physical link.
+
+**Non-goals (kept honest):** we do not claim to defeat determined counterfeiters,
+and we won't market Trace as "unfakeable." The mission is to **help honest makers
+be believed** — cheaply, offline, on a phone.
+
+---
+
+Part of [iAny](https://iany.app) · Apache-2.0 · E-KHMER Technology Co., Ltd.
+Code: `src/lib/trace.ts` (engine), `src/views/TraceView.tsx` (UI),
+`worker/index.ts` (registry).

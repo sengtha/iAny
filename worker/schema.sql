@@ -95,3 +95,18 @@ CREATE TABLE IF NOT EXISTS sign_samples (
 );
 CREATE INDEX IF NOT EXISTS idx_sign_created ON sign_samples (created_at);
 CREATE INDEX IF NOT EXISTS idx_sign_label ON sign_samples (label);
+
+-- iAny Trace — optional online registry for proof-of-origin capsules (/trace).
+-- Offline verification works without this; the registry only adds a TRUSTED
+-- first-seen timestamp and double-use transparency (verify_count). `id` is a
+-- capsule's content hash (SHA-256). No personal data — just the origin summary.
+CREATE TABLE IF NOT EXISTS trace_capsules (
+  id            TEXT PRIMARY KEY,      -- capsule content hash (64 hex)
+  producer      TEXT,                  -- self-reported origin summary
+  product       TEXT,
+  created_at    TEXT,                  -- device-claimed capture time (untrusted)
+  first_seen    TEXT NOT NULL,         -- server time at first registration (trusted)
+  verify_count  INTEGER NOT NULL DEFAULT 0,
+  last_verified TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_trace_first_seen ON trace_capsules (first_seen);

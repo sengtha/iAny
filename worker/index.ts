@@ -106,6 +106,9 @@ export default {
     if (url.pathname.startsWith('/download/')) {
       return serveApk(request, env)
     }
+    if (url.pathname.startsWith('/api/trace/')) {
+      return serveTrace(url, request, env)
+    }
     // The standalone "Contribute your voice" page (voice.html) is served
     // directly by the asset layer at the clean URL /voice — Cloudflare maps
     // /voice → voice.html natively, so the worker must NOT intercept it (doing
@@ -891,6 +894,80 @@ async function signAdminDelete(id: string, env: Env): Promise<Response> {
   await env.MODELS.delete(row.r2Key)
   await env.DB.prepare('DELETE FROM sign_samples WHERE id = ?').bind(id).run()
   return json({ id, deleted: true })
+}
+
+/* ------------------------------------------------------------------ *
+ * iAny Trace — optional online registry for proof-of-origin capsules. *
+ * Fully offline verification still works; this adds two things that    *
+ * need connectivity: a TRUSTED first-seen timestamp (upgrading the     *
+ * device clock), and DOUBLE-USE transparency (how many times / where a *
+ * capsule id has been verified). Keyless: a capsule id is the SHA-256  *
+ * of its own contents. Served under /api/trace/*. See docs/TRACE.md.   *
+ * ------------------------------------------------------------------ */
+
+const TRACE_ID_RE = /^[0-9a-f]{64}$/
+
+async function serveTrace(url: URL, request: Request, env: Env): Promise<Response> {
+  const path = url.pathname.slice('/api/trace/'.length)
+  if (request.method === 'OPTIONS') {
+    return new Response(null, {
+      headers: { ...JSON_HEADERS, 'access-control-allow-methods': 'GET,POST,OPTIONS',
+        'access-control-allow-headers': 'content-type' },
+    })
+  }
+  try {
+    if (path === 'register' && request.method === 'POST') return await traceRegister(request, env)
+    if (path.startsWith('check/') && request.method === 'GET') {
+      return await traceCheck(path.slice('check/'.length), env)
+    }
+    return json({ error: 'not found' }, 404)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    const hint = /no such table|trace_/i.test(msg)
+      ? 'trace registry not initialised — run the D1 schema migration (worker/schema.sql)'
+      : 'server error'
+    return json({ error: hint, detail: msg }, 500)
+  }
+}
+
+// Register a capsule at (or near) origin — records a trusted first-seen time.
+// Idempotent: re-registering the same id keeps the original first_seen.
+async function traceRegister(request: Request, env: Env): Promise<Response> {
+  let body: { id?: string; producer?: string; product?: string; createdAt?: string }
+  try {
+    body = await request.json()
+  } catch {
+    return json({ error: 'expected json' }, 400)
+  }
+  const id = String(body.id ?? '').toLowerCase()
+  if (!TRACE_ID_RE.test(id)) return json({ error: 'bad capsule id' }, 400)
+  const now = new Date().toISOString()
+  const trim = (v: unknown, n: number) => (v ? String(v).slice(0, n) : null)
+  await env.DB.prepare(
+    `INSERT INTO trace_capsules (id, producer, product, created_at, first_seen, verify_count)
+     VALUES (?,?,?,?,?,0)
+     ON CONFLICT(id) DO NOTHING`,
+  ).bind(id, trim(body.producer, 80), trim(body.product, 80), trim(body.createdAt, 40), now).run()
+  const row = await env.DB.prepare('SELECT first_seen AS firstSeen FROM trace_capsules WHERE id = ?')
+    .bind(id).first<{ firstSeen: string }>()
+  return json({ registered: true, firstSeen: row?.firstSeen ?? now })
+}
+
+// Check a capsule: trusted first-seen time + how many times it's been verified.
+// Each check increments the counter (a soft double-use signal — the same proof
+// showing up many times, far apart, may mean it was copied onto many items).
+async function traceCheck(id: string, env: Env): Promise<Response> {
+  id = id.toLowerCase()
+  if (!TRACE_ID_RE.test(id)) return json({ error: 'bad capsule id' }, 400)
+  const row = await env.DB.prepare(
+    'SELECT first_seen AS firstSeen, verify_count AS verifyCount FROM trace_capsules WHERE id = ?',
+  ).bind(id).first<{ firstSeen: string; verifyCount: number }>()
+  if (!row) return json({ registered: false, firstSeen: null, verifyCount: 0 })
+  const now = new Date().toISOString()
+  await env.DB.prepare(
+    'UPDATE trace_capsules SET verify_count = verify_count + 1, last_verified = ? WHERE id = ?',
+  ).bind(now, id).run()
+  return json({ registered: true, firstSeen: row.firstSeen, verifyCount: row.verifyCount + 1 })
 }
 
 /* ------------------------------------------------------------------ *
