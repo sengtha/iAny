@@ -14,13 +14,18 @@ import {
   addAttestation,
   capsuleId,
   checkCapsule,
+  complianceReport,
   computeTrust,
+  EVENT_TYPES,
   fetchAttestations,
   fetchPage,
   photoSignature,
   publishCapsule,
   registerCapsule,
+  verifyChain,
   type Attestation,
+  type ChainResult,
+  type EventType,
   type FreshCapture,
   type PhotoSig,
   type RegistryInfo,
@@ -37,7 +42,7 @@ export function TraceView() {
   const { lang } = useI18n()
   const km = lang === 'km'
   const L = (en: string, khmer: string) => (km ? khmer : en)
-  const [mode, setMode] = useState<'create' | 'verify'>('create')
+  const [mode, setMode] = useState<'create' | 'verify' | 'journey'>('create')
 
   // Consumer provenance page: /trace?p=<capsule id>
   const [pageId, setPageId] = useState<string | null>(null)
@@ -79,8 +84,11 @@ export function TraceView() {
         <button className={mode === 'verify' ? 'active' : ''} onClick={() => setMode('verify')}>
           ✓ {L('Verify', 'ផ្ទៀងផ្ទាត់')}
         </button>
+        <button className={mode === 'journey' ? 'active' : ''} onClick={() => setMode('journey')}>
+          🧭 {L('Journey', 'ដំណើរ')}
+        </button>
       </div>
-      {mode === 'create' ? <Create L={L} /> : <Verify L={L} />}
+      {mode === 'create' ? <Create L={L} /> : mode === 'verify' ? <Verify L={L} /> : <Journey L={L} />}
       <p className="voice-minor-note">
         {L(
           'Trust score = combined evidence that the product matches its documented origin — not a guarantee of authenticity. 100% offline.',
@@ -107,7 +115,10 @@ function Create({ L }: { L: LFn }) {
   const [capsule, setCapsule] = useState<TraceCapsule | null>(null)
   const [reg, setReg] = useState<RegistryInfo | null>(null)
   const [pageUrl, setPageUrl] = useState<string | null>(null)
+  const [eventType, setEventType] = useState<EventType>('harvest')
+  const [prev, setPrev] = useState<{ id: string; step: number } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const prevRef = useRef<HTMLInputElement>(null)
 
   async function addPhotos(files: FileList) {
     setBusy(true)
@@ -134,6 +145,8 @@ function Create({ L }: { L: LFn }) {
         capturedAt: new Date().toISOString(),
         producer, product, note, witness,
       },
+      event: { type: eventType, step: (prev?.step ?? 0) + 1 },
+      prev: prev?.id ?? null,
     }
     const id = await capsuleId(body)
     setCapsule({ ...body, id })
@@ -187,9 +200,21 @@ function Create({ L }: { L: LFn }) {
             🔗 {L('Publish shareable page (for buyers)', 'ផ្សាយទំព័រចែករំលែក (សម្រាប់អ្នកទិញ)')}
           </button>
         )}
-        <button className="voice-ghost" onClick={() => { setCapsule(null); setReg(null); setPageUrl(null); setPhotos([]); setBoxText(''); }}>
-          {L('Create another', 'បង្កើតថ្មី')}
-        </button>
+        <div className="voice-controls">
+          <button className="voice-ghost" onClick={() => {
+            // Continue the journey: the next event links to the one just made.
+            setPrev({ id: capsule.id, step: capsule.event?.step ?? 1 })
+            setCapsule(null); setReg(null); setPageUrl(null); setPhotos([]); setBoxText('')
+          }}>
+            ↳ {L('Add next step', 'បន្ថែមជំហានបន្ទាប់')}
+          </button>
+          <button className="voice-ghost" onClick={() => {
+            setPrev(null); setEventType('harvest')
+            setCapsule(null); setReg(null); setPageUrl(null); setPhotos([]); setBoxText('')
+          }}>
+            {L('New journey', 'ដំណើរថ្មី')}
+          </button>
+        </div>
       </div>
     )
   }
@@ -198,6 +223,35 @@ function Create({ L }: { L: LFn }) {
     <>
       <input ref={fileRef} type="file" accept="image/*" capture="environment" multiple hidden
         onChange={(e) => e.target.files && addPhotos(e.target.files)} />
+      <input ref={prevRef} type="file" accept="application/json,.json" hidden
+        onChange={async (e) => {
+          const f = e.target.files?.[0]
+          if (!f) return
+          try {
+            const c = JSON.parse(await f.text()) as TraceCapsule
+            setPrev({ id: c.id, step: c.event?.step ?? 1 })
+            if (!producer && c.context.producer) setProducer(c.context.producer)
+            if (!product && c.context.product) setProduct(c.context.product)
+          } catch { /* not a capsule */ }
+          e.target.value = ''
+        }} />
+
+      <label className="voice-field"><span>🧭 {L('Journey step', 'ជំហានដំណើរ')}</span></label>
+      <div className="trace-events">
+        {EVENT_TYPES.map((t) => (
+          <button key={t} type="button" className={eventType === t ? 'active' : ''} onClick={() => setEventType(t)}>
+            {eventLabel(t, L)}
+          </button>
+        ))}
+      </div>
+      {prev ? (
+        <p className="voice-tip">🔗 {L('Continues step', 'បន្តជំហាន')} {prev.step} → {prev.step + 1}
+          {' '}<button className="trace-linkclear" onClick={() => setPrev(null)}>✕</button></p>
+      ) : (
+        <button className="voice-ghost trace-scan" onClick={() => prevRef.current?.click()}>
+          🔗 {L('Continue a previous event (link)', 'បន្តព្រឹត្តិការណ៍មុន (ភ្ជាប់)')}
+        </button>
+      )}
 
       <label className="voice-field"><span>📸 {L('Product photos', 'រូបថតផលិតផល')}</span></label>
       <div className="trace-thumbs">
@@ -536,6 +590,98 @@ function ProvenancePage({
         </p>
       </div>
     </div>
+  )
+}
+
+/* -------------------------------------------------- journey (event chain) --- */
+
+function eventLabel(t: string, L: LFn): string {
+  return {
+    harvest: L('Harvest', 'ប្រមូលផល'),
+    process: L('Process', 'កែច្នៃ'),
+    pack: L('Pack', 'ខ្ចប់'),
+    ship: L('Ship', 'ដឹកជញ្ជូន'),
+    receive: L('Receive', 'ទទួល'),
+    other: L('Other', 'ផ្សេងៗ'),
+  }[t] ?? t
+}
+
+function Journey({ L }: { L: LFn }) {
+  const [result, setResult] = useState<ChainResult | null>(null)
+  const [busy, setBusy] = useState(false)
+  const ref = useRef<HTMLInputElement>(null)
+
+  async function load(files: FileList) {
+    setBusy(true)
+    const caps: TraceCapsule[] = []
+    for (const f of files) {
+      try { caps.push(JSON.parse(await f.text()) as TraceCapsule) } catch { /* skip */ }
+    }
+    setResult(caps.length ? await verifyChain(caps) : null)
+    setBusy(false)
+  }
+
+  function download(kind: 'json' | 'csv') {
+    if (!result) return
+    const rep = complianceReport(result.ordered)
+    const blob = new Blob([kind === 'json' ? rep.json : rep.csv],
+      { type: kind === 'json' ? 'application/json' : 'text/csv' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `trace-journey.${kind}`
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
+
+  return (
+    <>
+      <input ref={ref} type="file" accept="application/json,.json" multiple hidden
+        onChange={(e) => e.target.files && load(e.target.files)} />
+      <p className="voice-tip">
+        {L('Load all the proof files of a journey (harvest → … → receive) to verify the chain and export a compliance report.',
+           'ផ្ទុកឯកសារភស្តុតាងទាំងអស់នៃដំណើរមួយ (ប្រមូលផល → … → ទទួល) ដើម្បីផ្ទៀងផ្ទាត់ខ្សែសង្វាក់ និងនាំចេញរបាយការណ៍អនុលោមភាព។')}
+      </p>
+      <button className="voice-primary big" disabled={busy} onClick={() => ref.current?.click()}>
+        {busy ? `${L('Checking', 'កំពុងពិនិត្យ')}…` : `🧭 ${L('Load journey files', 'ផ្ទុកឯកសារដំណើរ')}`}
+      </button>
+
+      {result && (
+        <>
+          <div className={`trace-chain-status ${result.ok ? 'ok' : 'bad'}`}>
+            {result.ok ? `✓ ${L('Chain verified — tamper-evident end to end', 'ខ្សែសង្វាក់បានផ្ទៀងផ្ទាត់ — គ្មានការកែប្រែ')}`
+              : `⚠ ${L('Chain has problems', 'ខ្សែសង្វាក់មានបញ្ហា')}`}
+          </div>
+          <div className="trace-timeline">
+            {result.ordered.map((n, i) => (
+              <div key={i} className={`trace-tl-node ${n.integrityOk && n.linkOk ? '' : 'bad'}`}>
+                <div className="trace-tl-dot">{n.integrityOk && n.linkOk ? '✓' : '✕'}</div>
+                <div className="trace-tl-body">
+                  <b>{i + 1}. {eventLabel(n.capsule.event?.type ?? 'event', L)}</b>
+                  <div className="trace-tl-meta">
+                    {new Date(n.capsule.context.capturedAt).toLocaleDateString()}
+                    {n.capsule.context.gps && ` · 📍 ${n.capsule.context.gps.lat}, ${n.capsule.context.gps.lng}`}
+                    {n.capsule.context.producer && ` · ${n.capsule.context.producer}`}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          {result.issues.length > 0 && (
+            <ul className="trace-issues">{result.issues.map((s, i) => <li key={i}>{s}</li>)}</ul>
+          )}
+          <div className="voice-controls">
+            <button className="voice-ghost" onClick={() => download('csv')}>⬇ CSV</button>
+            <button className="voice-primary" onClick={() => download('json')}>
+              ⬇ {L('Compliance report', 'របាយការណ៍អនុលោមភាព')}
+            </button>
+          </div>
+          <p className="voice-minor-note">
+            {L('For export due-diligence (e.g. EU EUDR): geolocation + a tamper-evident chain of custody. Geolocation is self-reported at capture.',
+               'សម្រាប់ការត្រួតពិនិត្យនាំចេញ (ឧ. EU EUDR)៖ ទីតាំង + ខ្សែសង្វាក់ការកាន់កាប់ដែលមិនអាចកែប្រែ។ ទីតាំងជាការរាយការណ៍ដោយខ្លួនឯង។')}
+          </p>
+        </>
+      )}
+    </>
   )
 }
 

@@ -928,6 +928,9 @@ async function serveTrace(url: URL, request: Request, env: Env): Promise<Respons
     if (path.startsWith('attest/') && request.method === 'GET') {
       return await traceAttestList(path.slice('attest/'.length), env)
     }
+    if (path.startsWith('chain/') && request.method === 'GET') {
+      return await traceChain(path.slice('chain/'.length), env)
+    }
     return json({ error: 'not found' }, 404)
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
@@ -983,7 +986,12 @@ const TRACE_PAGE_MAX = 2 * 1024 * 1024 // published capsule incl. thumbnails
 // Publish a capsule's display data as a shareable provenance page (opt-in — the
 // maker chose to make it public). Stored in R2; the page is served read-only.
 async function tracePublish(request: Request, env: Env): Promise<Response> {
-  let capsule: { id?: string; context?: { producer?: string; product?: string; capturedAt?: string } }
+  let capsule: {
+    id?: string
+    prev?: string | null
+    event?: { type?: string; step?: number }
+    context?: { producer?: string; product?: string; capturedAt?: string }
+  }
   const raw = await request.text()
   if (raw.length > TRACE_PAGE_MAX) return json({ error: 'too large' }, 413)
   try {
@@ -993,19 +1001,58 @@ async function tracePublish(request: Request, env: Env): Promise<Response> {
   }
   const id = String(capsule.id ?? '').toLowerCase()
   if (!TRACE_ID_RE.test(id)) return json({ error: 'bad capsule id' }, 400)
+  const prev = capsule.prev && TRACE_ID_RE.test(String(capsule.prev).toLowerCase())
+    ? String(capsule.prev).toLowerCase() : null
 
   await env.MODELS.put(`trace/pages/${id}.json`, raw, {
     httpMetadata: { contentType: 'application/json' },
   })
   const now = new Date().toISOString()
   const trim = (v: unknown, n: number) => (v ? String(v).slice(0, n) : null)
+  const step = capsule.event?.step && capsule.event.step > 0 ? Math.round(capsule.event.step) : null
   await env.DB.prepare(
-    `INSERT INTO trace_capsules (id, producer, product, created_at, first_seen, verify_count, published)
-     VALUES (?,?,?,?,?,0,1)
-     ON CONFLICT(id) DO UPDATE SET published = 1`,
+    `INSERT INTO trace_capsules
+       (id, producer, product, created_at, first_seen, verify_count, published, prev, event_type, step)
+     VALUES (?,?,?,?,?,0,1,?,?,?)
+     ON CONFLICT(id) DO UPDATE SET published = 1, prev = excluded.prev,
+       event_type = excluded.event_type, step = excluded.step`,
   ).bind(id, trim(capsule.context?.producer, 80), trim(capsule.context?.product, 80),
-    trim(capsule.context?.capturedAt, 40), now).run()
+    trim(capsule.context?.capturedAt, 40), now, prev, trim(capsule.event?.type, 20), step).run()
   return json({ published: true, url: `/trace?p=${id}` })
+}
+
+// Walk a published journey: back to the root via prev, then forward via
+// children, and return each event's stored page capsule in order.
+async function traceChain(id: string, env: Env): Promise<Response> {
+  id = id.toLowerCase()
+  if (!TRACE_ID_RE.test(id)) return json({ error: 'bad capsule id' }, 400)
+
+  // Back to the root (cap the walk to avoid loops).
+  let root = id
+  for (let i = 0; i < 50; i++) {
+    const row = await env.DB.prepare('SELECT prev FROM trace_capsules WHERE id = ?')
+      .bind(root).first<{ prev: string | null }>()
+    if (!row || !row.prev) break
+    root = row.prev
+  }
+  // Forward from the root by following children.
+  const ids: string[] = []
+  let cur: string | null = root
+  for (let i = 0; i < 50 && cur; i++) {
+    ids.push(cur)
+    const child: { id: string } | null = await env.DB
+      .prepare('SELECT id FROM trace_capsules WHERE prev = ? ORDER BY step ASC LIMIT 1')
+      .bind(cur).first<{ id: string }>()
+    cur = child ? child.id : null
+  }
+  const chain: unknown[] = []
+  for (const cid of ids) {
+    const obj = await env.MODELS.get(`trace/pages/${cid}.json`)
+    if (obj) chain.push(JSON.parse(await obj.text()))
+  }
+  return new Response(JSON.stringify({ chain }), {
+    headers: { ...JSON_HEADERS, 'cache-control': 'public, max-age=30' },
+  })
 }
 
 // Public: fetch a published provenance page (the capsule display JSON).

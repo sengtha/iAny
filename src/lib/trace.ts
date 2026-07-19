@@ -51,9 +51,17 @@ export interface TraceCapsule {
      *  people, not matching. Self-reported unless registered online. */
     witness: string
   }
+  /** EPCIS-style event in a product journey (harvest → process → ship → …). */
+  event?: { type: string; step: number }
+  /** Previous event's capsule id — hash-links the chain (tamper-evident). */
+  prev?: string | null
   /** Content id = SHA-256 of everything above (keyless integrity). */
   id: string
 }
+
+/** Journey event types (EPCIS-style). Labels are localized in the UI. */
+export const EVENT_TYPES = ['harvest', 'process', 'pack', 'ship', 'receive', 'other'] as const
+export type EventType = (typeof EVENT_TYPES)[number]
 
 export interface SignalScore {
   key: string
@@ -451,4 +459,110 @@ export async function fetchAttestations(id: string): Promise<Attestation[]> {
   } catch {
     return []
   }
+}
+
+/** Fetch a whole product journey (chain of linked capsules) from the registry. */
+export async function fetchChain(id: string): Promise<TraceCapsule[] | null> {
+  try {
+    const res = await fetch(`/api/trace/chain/${id}`)
+    if (!res.ok) return null
+    return ((await res.json()) as { chain: TraceCapsule[] }).chain ?? null
+  } catch {
+    return null
+  }
+}
+
+/* --------------------------------------------------- EPCIS-style journey --- */
+
+export interface ChainNode {
+  capsule: TraceCapsule
+  integrityOk: boolean // does it still hash to its id?
+  linkOk: boolean // does prev point to the correct previous node?
+}
+
+export interface ChainResult {
+  ordered: ChainNode[]
+  ok: boolean
+  issues: string[]
+}
+
+/**
+ * Verify a product journey: order the events, re-hash each capsule (keyless
+ * integrity), and check every `prev` hash-links to the previous event. The
+ * whole chain is tamper-evident end to end — change any earlier event and every
+ * later `prev` breaks.
+ */
+export async function verifyChain(capsules: TraceCapsule[]): Promise<ChainResult> {
+  const issues: string[] = []
+  const byId = new Map(capsules.map((c) => [c.id, c]))
+
+  // Order by step when present, else follow prev pointers from the root.
+  const ordered = [...capsules].sort((a, b) => (a.event?.step ?? 0) - (b.event?.step ?? 0))
+
+  const nodes: ChainNode[] = []
+  for (let i = 0; i < ordered.length; i++) {
+    const c = ordered[i]!
+    const { id, ...body } = c
+    const integrityOk = (await capsuleId(body)) === id
+    if (!integrityOk) issues.push(`Step ${i + 1} (${c.event?.type ?? '—'}) was modified.`)
+
+    let linkOk = true
+    if (i === 0) {
+      linkOk = !c.prev // the first event should have no predecessor
+      if (!linkOk) issues.push('The first event references a missing predecessor.')
+    } else {
+      const prevNode = ordered[i - 1]!
+      linkOk = c.prev === prevNode.id
+      if (!linkOk) issues.push(`Step ${i + 1} does not link to the previous event.`)
+      if (c.prev && !byId.has(c.prev) && c.prev !== prevNode.id) {
+        issues.push(`Step ${i + 1}'s predecessor is missing.`)
+      }
+    }
+    nodes.push({ capsule: c, integrityOk, linkOk })
+  }
+  return { ordered: nodes, ok: nodes.every((n) => n.integrityOk && n.linkOk), issues }
+}
+
+/**
+ * Build an export-compliance report from a journey — the geolocation +
+ * traceability trail an exporter needs for due-diligence rules (e.g. the EU
+ * EUDR asks for geolocated production plots + a chain of custody).
+ */
+export function complianceReport(ordered: ChainNode[]): { json: string; csv: string } {
+  const first = ordered[0]?.capsule
+  const events = ordered.map((n, i) => ({
+    step: i + 1,
+    type: n.capsule.event?.type ?? 'event',
+    date: n.capsule.context.capturedAt,
+    gps: n.capsule.context.gps,
+    producer: n.capsule.context.producer || null,
+    witness: n.capsule.context.witness || null,
+    capsuleId: n.capsule.id,
+    integrityOk: n.integrityOk,
+    linkOk: n.linkOk,
+  }))
+  const report = {
+    standard: 'iAny Trace journey (EPCIS-style) — due-diligence export',
+    product: first?.context.product || null,
+    origin_producer: first?.context.producer || null,
+    origin_geolocation: first?.context.gps ?? null,
+    chain_verified: ordered.every((n) => n.integrityOk && n.linkOk),
+    generated_note:
+      'Geolocation is self-reported at capture; the chain is tamper-evident (content-hash linked). Times are device-claimed unless a registry timestamp was obtained.',
+    events,
+  }
+  const esc = (v: unknown) => {
+    const s = String(v ?? '')
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+  }
+  const csv =
+    'step,type,date,lat,lng,producer,witness,capsule_id,integrity_ok\n' +
+    events
+      .map((e) =>
+        [e.step, e.type, e.date, e.gps?.lat ?? '', e.gps?.lng ?? '', e.producer ?? '', e.witness ?? '', e.capsuleId, e.integrityOk]
+          .map(esc)
+          .join(','),
+      )
+      .join('\n') + '\n'
+  return { json: JSON.stringify(report, null, 2), csv }
 }

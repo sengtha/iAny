@@ -73,6 +73,16 @@ the human story *and* can verify the physical product on the spot.
 
 ---
 
+### 5. Journey — a chain of events (optional)
+A product's life is a **chain of linked capsules**: harvest → process → pack →
+ship → receive. Each event is its own capsule whose `prev` field holds the
+previous event's id, so the whole journey is **hash-linked and tamper-evident
+end to end** — change any earlier event and every later link breaks. Load all a
+journey's proof files into **🧭 Journey** to verify the chain and export an
+**export-compliance report** (JSON/CSV: geolocation + chain of custody, for
+due-diligence rules like the EU EUDR). Online, `/api/trace/chain/:id` returns a
+published journey for the provenance page.
+
 ## What it CAN do
 
 - ✅ **Create a tamper-evident origin record on any phone, fully offline**, no
@@ -85,6 +95,9 @@ the human story *and* can verify the physical product on the spot.
 - ✅ **Auto-read the label** with on-device Khmer OCR (less typing for farmers).
 - ✅ **Record a witness + story + GPS** to make an honest claim credible.
 - ✅ **Work with poor/no connectivity**; the online registry only *adds* value.
+- ✅ **Chain a multi-step journey** (harvest → … → receive) that's tamper-evident
+  end to end, and export a **due-diligence / compliance report** (geolocation +
+  chain of custody) an exporter can hand to a buyer or regulator.
 
 ## What it CANNOT do (honest limits)
 
@@ -164,15 +177,21 @@ Khmer OCR label scan; witness/GPS/story context; optional registry (trusted time
 - *Optional next:* auto-translate the story for export buyers; a built-in **QR**
   of the page link for packaging; a richer journey timeline.
 
-**v4 — trust network & standards.**
-- **EPCIS-style event chain** (harvest → process → ship → receive), each event a
-  content-addressed capsule linked to the previous.
-- **Anchoring** the registry's daily Merkle root to a public chain for
-  independent verifiability (still no per-farmer keys).
-- **Export compliance** exports (e.g. geolocation for EU due-diligence) so an
-  exporter gets a compliance tool and the farmer gets a premium.
-- Optional **NFC / object-fingerprint** tiers for makers who want stronger
-  binding — same capsule format, stronger physical link.
+**v4 (now) — trust network & standards.** ✅
+- **EPCIS-style event chain** — each event (harvest → process → ship → receive)
+  is a content-addressed capsule whose `prev` hash-links the previous, so a
+  journey is tamper-evident end to end. The **🧭 Journey** tab verifies a chain
+  from its files (offline); `/api/trace/chain/:id` returns a published journey.
+- **Export-compliance report** — JSON/CSV with geolocation + chain of custody for
+  due-diligence rules (EU EUDR-style); the exporter's tool, the farmer's premium.
+- *Remaining (needs external infra, documented not built):*
+  - **Merkle anchoring** — publish a daily Merkle root of registered capsule ids
+    to a public chain for independent verifiability. The registry already has the
+    ids; anchoring needs a chain wallet/tx (an ops step), so it's intentionally
+    left external. Still keyless for farmers.
+  - **NFC / object-fingerprint tiers** — optional stronger physical binding
+    (NTAG 424 DNA, or the v2 fingerprint at higher fidelity) for makers who want
+    it. Same capsule format; needs hardware, so it's an opt-in tier.
 
 **Non-goals (kept honest):** we do not claim to defeat determined counterfeiters,
 and we won't market Trace as "unfakeable." The mission is to **help honest makers

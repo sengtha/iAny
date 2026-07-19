@@ -108,11 +108,18 @@ CREATE TABLE IF NOT EXISTS trace_capsules (
   first_seen    TEXT NOT NULL,         -- server time at first registration (trusted)
   verify_count  INTEGER NOT NULL DEFAULT 0,
   last_verified TEXT,
-  published     INTEGER NOT NULL DEFAULT 0  -- has a shareable provenance page
+  published     INTEGER NOT NULL DEFAULT 0, -- has a shareable provenance page
+  prev          TEXT,                       -- previous event's capsule id (chain)
+  event_type    TEXT,                       -- harvest / process / ship / …
+  step          INTEGER                     -- 1-based position in the journey
 );
 CREATE INDEX IF NOT EXISTS idx_trace_first_seen ON trace_capsules (first_seen);
+CREATE INDEX IF NOT EXISTS idx_trace_prev ON trace_capsules (prev);
 -- Migration for an existing DB (safe to run once):
 --   ALTER TABLE trace_capsules ADD COLUMN published INTEGER NOT NULL DEFAULT 0;
+--   ALTER TABLE trace_capsules ADD COLUMN prev TEXT;
+--   ALTER TABLE trace_capsules ADD COLUMN event_type TEXT;
+--   ALTER TABLE trace_capsules ADD COLUMN step INTEGER;
 
 -- Witness confirmations for a capsule (co-op / buyer vouching). Turns a
 -- self-claim into a witnessed one; server-timestamped, shown on the page.
