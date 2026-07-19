@@ -35,7 +35,17 @@ Capture into a capsule:
 - **Box / label text** → typed, or **📷 Scan label** (on-device Khmer OCR).
   *Matchable.*
 - **Witness** (co-op / buyer who vouches), **producer**, **product**, **GPS**,
-  **note/story**, device time. *Context — shown, not scored.*
+  **note/story** (typed or **🎤 spoken in Khmer**, on-device STT), device time.
+  *Context — shown, not scored.*
+
+> **Why OCR/STT don't need to be "correct Khmer".** The label is read by the
+> **same model** at create *and* verify, so its systematic quirks **cancel out** —
+> two readings of the same box agree at a high **rate** even if neither is
+> perfect Khmer. That's why the box-text signal is a fuzzy **match rate**, not an
+> exact-string / "is-this-right-Khmer" check. Accuracy is measured as
+> *agreement between the two readings*, not against a ground-truth transcription.
+> (The spoken story is transcribed the same way — imperfect is fine; the maker
+> can edit it.)
 - Capsule **ID = SHA-256(contents)**. Saved as a small `.json`.
 
 ### 2. Transfer (P2P or online)
@@ -148,9 +158,11 @@ Khmer OCR label scan; witness/GPS/story context; optional registry (trusted time
   "Verify this product yourself" button. The piece that earns a price premium.
 - **Witness co-attestation:** any viewer (co-op/buyer) adds a server-timestamped
   confirmation on the page — self-claim → witnessed.
-- *Optional next:* **Khmer voice story** at capture (on-device STT — already in
-  iAny) so low-literacy producers just talk, auto-translated for export buyers;
-  a QR of the page link for packaging; a richer journey timeline.
+- **Khmer voice story** at capture ✅ — the maker just **talks** (on-device STT),
+  and the transcript fills the story (editable). Low-literacy-friendly. Matched/
+  read by **rate**, not correctness (see the OCR/STT note above).
+- *Optional next:* auto-translate the story for export buyers; a built-in **QR**
+  of the page link for packaging; a richer journey timeline.
 
 **v4 — trust network & standards.**
 - **EPCIS-style event chain** (harvest → process → ship → receive), each event a

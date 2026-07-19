@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { useI18n } from '../i18n'
 import { khmerOcr } from '../ai/khmerOcr'
+import { khmerStt, type SttState } from '../ai/khmerStt'
+
+// The app gates its chat STT to desktop (pointer:fine) for latency reasons, but
+// the Trace voice story is a one-off, opt-in capture meant for producers on
+// phones — so here we only require a microphone. First use downloads the model.
+const micStorySupported = () =>
+  typeof navigator !== 'undefined' &&
+  !!navigator.mediaDevices?.getUserMedia &&
+  typeof WebAssembly !== 'undefined'
 import {
   addAttestation,
   capsuleId,
@@ -208,6 +217,10 @@ function Create({ L }: { L: LFn }) {
           placeholder={L('brand, batch, weight, dates…', 'ម៉ាក បាច់ ទម្ងន់ កាលបរិច្ឆេទ…')} />
       </label>
       <ScanLabel L={L} onText={(t) => setBoxText((b) => (b ? b + ' ' : '') + t)} />
+      <small className="hint">
+        {L('The same model reads the label at create and verify, so it matches by rate — the Khmer need not be perfect.',
+           'ម៉ូឌែលដូចគ្នាអានស្លាកពេលបង្កើត និងផ្ទៀងផ្ទាត់ ដូច្នេះវាផ្គូផ្គងតាមអត្រា — អក្សរខ្មែរមិនចាំបាច់ត្រឹមត្រូវ ១០០%។')}
+      </small>
 
       <div className="trace-row">
         <label className="voice-field"><span>{L('Producer', 'អ្នកផលិត')}</span>
@@ -227,6 +240,7 @@ function Create({ L }: { L: LFn }) {
         <textarea lang="km" rows={2} value={note} onChange={(e) => setNote(e.target.value)}
           placeholder={L('harvest date, origin, anything…', 'ថ្ងៃប្រមូលផល ប្រភព អ្វីៗ…')} />
       </label>
+      <VoiceStory L={L} onText={(t) => setNote((n) => (n ? n + ' ' : '') + t)} />
 
       <div className="trace-gps">
         <button className="voice-ghost" onClick={locate}>📍 {L('Add location', 'បញ្ចូលទីតាំង')}</button>
@@ -370,6 +384,37 @@ function ScanLabel({ onText, L }: { onText: (t: string) => void; L: LFn }) {
         {busy ? `${L('Reading label', 'កំពុងអានស្លាក')}…` : `📷 ${L('Scan label', 'ស្កេនស្លាក')}`}
       </button>
     </>
+  )
+}
+
+/* ------------------------------------------------ voice story (Khmer STT) --- */
+
+function VoiceStory({ onText, L }: { onText: (t: string) => void; L: LFn }) {
+  const [st, setSt] = useState<SttState>({ phase: 'idle', level: 0 })
+  useEffect(() => khmerStt.subscribe(setSt), [])
+  if (!micStorySupported()) return null
+
+  const rec = st.phase === 'recording'
+  const busy = st.phase === 'loading' || st.phase === 'transcribing'
+  const toggle = async () => {
+    if (rec) {
+      const t = await khmerStt.stopAndTranscribe()
+      if (t.trim()) onText(t.trim())
+    } else {
+      await khmerStt.startRecording()
+    }
+  }
+  const label = rec
+    ? `⏹ ${L('Stop & add', 'ឈប់ & បន្ថែម')}`
+    : st.phase === 'loading'
+      ? `${L('Loading voice model', 'កំពុងផ្ទុកម៉ូឌែលសំឡេង')}${st.download != null ? ` ${Math.round(st.download * 100)}%` : ''}…`
+      : st.phase === 'transcribing'
+        ? `${L('Transcribing', 'កំពុងបម្លែង')}…`
+        : `🎤 ${L('Speak the story (Khmer)', 'និយាយរឿង (ខ្មែរ)')}`
+  return (
+    <button type="button" className={`voice-ghost trace-scan ${rec ? 'trace-rec' : ''}`} disabled={busy} onClick={toggle}>
+      {label}
+    </button>
   )
 }
 

@@ -1860,3 +1860,13 @@ progress {
 .trace-attest {
   margin-top: 12px;
 }
+
+/* Trace — voice-story recording state */
+.trace-scan.trace-rec {
+  border-color: #dc2626;
+  color: #dc2626;
+  animation: trace-rec-pulse 1s ease-in-out infinite;
+}
+@keyframes trace-rec-pulse {
+  50% { opacity: 0.55; }
+}
