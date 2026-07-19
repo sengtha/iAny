@@ -164,6 +164,8 @@ export function LandingView() {
             desc={L('Building an open sign-language dataset, with the Deaf community.', 'កំពុងបង្កើតទិន្នន័យភាសាសញ្ញាបើកចំហ ជាមួយសហគមន៍ថ្លង់។')} link="/sign" linkLabel={L('Open /sign', 'បើក /sign')} />
           <Feature icon="🎤" title={L('Contribute your voice', 'ចូលរួមសំឡេងរបស់អ្នក')}
             desc={L('Help train a better open Khmer speech model.', 'ជួយបង្រៀនម៉ូឌែលសំឡេងខ្មែរបើកចំហ ឲ្យប្រសើរ។')} link="/voice" linkLabel={L('Open /voice', 'បើក /voice')} />
+          <Feature icon="🔖" title={L('Trace', 'Trace')} badge={L('Experiment', 'ពិសោធន៍')}
+            desc={L('Offline proof of origin for honest makers — a phone-only trust score built on iAny’s on-device OCR & STT.', 'ភស្តុតាងប្រភពដើមក្រៅបណ្ដាញ សម្រាប់អ្នកផលិតស្មោះត្រង់ — ពិន្ទុទំនុកចិត្តដោយប្រើតែទូរស័ព្ទ ផ្អែកលើ OCR និង STT លើឧបករណ៍របស់ iAny។')} link="/trace" linkLabel={L('Try /trace', 'សាកល្បង /trace')} />
         </div>
       </section>
 
@@ -233,6 +235,7 @@ export function LandingView() {
           <a href="/scan">/scan</a>
           <a href="/sign">/sign</a>
           <a href="/braille">/braille</a>
+          <a href="/trace">/trace · {L('experiment', 'ពិសោធន៍')}</a>
         </div>
         <p className="lp-foot-co">
           © {COMPANY_YEAR}{' '}
@@ -253,19 +256,24 @@ function Feature({
   desc,
   link,
   linkLabel,
+  badge,
 }: {
   icon: string
   title: string
   desc: string
   link?: string
   linkLabel?: string
+  badge?: string
 }) {
   return (
     <div className="lp-card">
       <div className="lp-card-icon" aria-hidden>
         {icon}
       </div>
-      <h3>{title}</h3>
+      <h3>
+        {title}
+        {badge ? <span className="lp-badge">{badge}</span> : null}
+      </h3>
       <p>{desc}</p>
       {link ? (
         <a className="lp-card-link" href={link}>
