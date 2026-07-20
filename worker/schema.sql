@@ -169,6 +169,26 @@ CREATE INDEX IF NOT EXISTS idx_water_created ON water_samples (created_at);
 CREATE INDEX IF NOT EXISTS idx_water_test ON water_samples (test);
 CREATE INDEX IF NOT EXISTS idx_water_level ON water_samples (level);
 
+-- Crowd-sourced waste/recyclable item photos (the /waste page). Each row is one
+-- (image, material type) sample for training an offline waste-sorting classifier
+-- (recycling education + sorting help; see docs/ENVIRONMENT-AI.md). Image in R2 at
+-- r2_key (foldered waste/<type>/); device is anonymous; credit_name is opt-in.
+CREATE TABLE IF NOT EXISTS waste_samples (
+  id          TEXT PRIMARY KEY,
+  r2_key      TEXT NOT NULL,          -- R2 key: waste/<type>/<day>-<id>.jpg
+  device      TEXT NOT NULL,          -- anonymous per-device id, e.g. r-3f9a2c71
+  type        TEXT NOT NULL,          -- plastic_bottle / can / glass / paper / …  (classifier target)
+  note        TEXT,
+  credit_name TEXT,                   -- opt-in public credit (dataset contributors)
+  region      TEXT,
+  width       INTEGER,
+  height      INTEGER,
+  bytes       INTEGER,
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_waste_created ON waste_samples (created_at);
+CREATE INDEX IF NOT EXISTS idx_waste_type ON waste_samples (type);
+
 -- iAny Trace — optional online registry for proof-of-origin capsules (/trace).
 -- Offline verification works without this; the registry only adds a TRUSTED
 -- first-seen timestamp and double-use transparency (verify_count). `id` is a

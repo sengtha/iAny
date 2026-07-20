@@ -54,8 +54,11 @@ half the value.
 
 Each is the same collect → train → deploy loop; only the dataset changes.
 
-- **♻️ Waste / litter classification & mapping** — photograph + geotag rubbish and
-  sort recyclables; citizen science for cleaner villages.
+- **♻️ Waste / recyclable classification** — *collector built* ([`/waste`](https://iany.app/waste)):
+  photograph an item, tag its material (plastic bottle, can, glass, paper, …) →
+  open dataset → offline classifier for recycling education, correct sorting, and
+  knowing what a waste-buyer will take. Easy to bootstrap (TrashNet / TACO), no
+  safety failure mode. *Next:* add geotagging for litter mapping.
 - **🐟 Species ID** — plants, birds, insects, fish for biodiversity monitoring
   (iNaturalist-style), and **mosquito-species ID** for dengue/malaria vector
   surveillance (bridges environment ↔ health).

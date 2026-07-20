@@ -122,6 +122,9 @@ export default {
     if (url.pathname.startsWith('/api/water/')) {
       return serveWater(url, request, env)
     }
+    if (url.pathname.startsWith('/api/waste/')) {
+      return serveWaste(url, request, env)
+    }
     if (url.pathname.startsWith('/download/')) {
       return serveApk(request, env)
     }
@@ -1209,6 +1212,101 @@ async function waterStats(env: Env): Promise<Response> {
   ).first<{ samples: number; devices: number }>()
   return new Response(
     JSON.stringify({ samples: row?.samples ?? 0, devices: row?.devices ?? 0 }),
+    { headers: { ...JSON_HEADERS, 'cache-control': 'public, max-age=30' } },
+  )
+}
+
+/* ------------------------------------------------------------------ *
+ * /waste — crowd-sourced waste/recyclable item photos for an OFFLINE   *
+ * classifier (plastic bottle / can / glass / paper / …) — recycling    *
+ * education + sorting help. Image → R2; type → D1.                     *
+ * ------------------------------------------------------------------ */
+
+const WASTE_MAX_BYTES = 8 * 1024 * 1024
+const WASTE_DEVICE_RE = /^r-[0-9a-z]{6,16}$/
+// Keep in sync with src/assets/wasteLabels.ts (server-side allowlist).
+const WASTE_TYPES = new Set([
+  'plastic_bottle', 'plastic_other', 'can', 'glass', 'paper', 'organic', 'ewaste', 'other',
+])
+
+async function serveWaste(url: URL, request: Request, env: Env): Promise<Response> {
+  const path = url.pathname.slice('/api/waste/'.length)
+  if (request.method === 'OPTIONS') {
+    return new Response(null, {
+      headers: { ...JSON_HEADERS, 'access-control-allow-methods': 'GET,POST,OPTIONS',
+        'access-control-allow-headers': 'content-type' },
+    })
+  }
+  try {
+    if (path === 'sample' && request.method === 'POST') return await wastePostSample(request, env)
+    if (path === 'stats' && request.method === 'GET') return await wasteStats(env)
+    return json({ error: 'not found' }, 404)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    const hint = /no such table|waste_samples/i.test(msg)
+      ? 'waste storage not initialised — run the D1 schema migration (worker/schema.sql)'
+      : 'server error'
+    return json({ error: hint, detail: msg }, 500)
+  }
+}
+
+// Public: accept one (image, type) sample. multipart/form-data.
+async function wastePostSample(request: Request, env: Env): Promise<Response> {
+  let form: FormData
+  try {
+    form = await request.formData()
+  } catch {
+    return json({ error: 'expected multipart form' }, 400)
+  }
+  const entry = form.get('image') as unknown
+  const type = String(form.get('type') ?? '').trim()
+  const device = String(form.get('device') ?? '').trim()
+  const consent = String(form.get('consent') ?? '') === '1'
+
+  if (!entry || typeof entry === 'string') return json({ error: 'image required' }, 400)
+  const image = entry as Blob
+  if (!consent) return json({ error: 'consent required' }, 403)
+  if (!WASTE_TYPES.has(type)) return json({ error: 'bad type' }, 400)
+  if (!WASTE_DEVICE_RE.test(device)) return json({ error: 'bad device id' }, 400)
+  const size = image.size
+  if (!size || size > WASTE_MAX_BYTES) return json({ error: 'image too large or empty' }, 413)
+
+  const id = crypto.randomUUID()
+  const now = new Date()
+  const day = now.toISOString().slice(0, 10).replace(/-/g, '')
+  const t = image.type === 'image/png' ? 'png' : 'jpg'
+  const r2Key = `waste/${type}/${day}-${id}.${t}`
+  await env.MODELS.put(r2Key, await image.arrayBuffer(), {
+    httpMetadata: { contentType: image.type || 'image/jpeg' },
+    customMetadata: { device, type },
+  })
+
+  const trim = (k: string, max: number): string | null => {
+    const v = String(form.get(k) ?? '').trim()
+    return v ? v.slice(0, max) : null
+  }
+  const num = (k: string): number | null => {
+    const v = Number(form.get(k) ?? 0)
+    return Number.isFinite(v) && v > 0 ? Math.round(v) : null
+  }
+  await env.DB.prepare(
+    `INSERT INTO waste_samples
+       (id, r2_key, device, type, note, credit_name, region, width, height, bytes, created_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+  ).bind(
+    id, r2Key, device, type, trim('note', 120), trim('creditName', 60),
+    trim('region', 40), num('width'), num('height'), size, now.toISOString(),
+  ).run()
+  return json({ id })
+}
+
+async function wasteStats(env: Env): Promise<Response> {
+  const row = await env.DB.prepare(
+    `SELECT COUNT(*) AS samples, COUNT(DISTINCT device) AS devices,
+            COUNT(DISTINCT type) AS types FROM waste_samples`,
+  ).first<{ samples: number; devices: number; types: number }>()
+  return new Response(
+    JSON.stringify({ samples: row?.samples ?? 0, devices: row?.devices ?? 0, types: row?.types ?? 0 }),
     { headers: { ...JSON_HEADERS, 'cache-control': 'public, max-age=30' } },
   )
 }

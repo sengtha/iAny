@@ -175,6 +175,9 @@ export function LandingView() {
           <Feature icon="💧" title={L('Water quality', 'គុណភាពទឹក')}
             badge={L('Collecting data', 'កំពុងប្រមូលទិន្នន័យ')} badgeTone="collecting"
             desc={L('Building an offline reader for water test strips — check if rural water is safe (esp. arsenic) with just a phone.', 'កំពុងបង្កើតឧបករណ៍អានបន្ទះតេស្តទឹក ក្រៅបណ្ដាញ — ពិនិត្យទឹកជនបទថាមានសុវត្ថិភាព (ជាពិសេសអាសេនិច) ដោយប្រើតែទូរស័ព្ទ។')} link="/water" linkLabel={L('Open /water', 'បើក /water')} />
+          <Feature icon="♻️" title={L('Waste sorting', 'តម្រៀបសំរាម')}
+            badge={L('Collecting data', 'កំពុងប្រមូលទិន្នន័យ')} badgeTone="collecting"
+            desc={L('Building an offline classifier for waste — point at an item to know if it’s recyclable and how to sort it.', 'កំពុងបង្កើតឧបករណ៍ចាត់ថ្នាក់សំណល់ ក្រៅបណ្ដាញ — ចង្អុលទៅវត្ថុ ដើម្បីដឹងថាកែច្នៃបាន និងរបៀបតម្រៀប។')} link="/waste" linkLabel={L('Open /waste', 'បើក /waste')} />
         </div>
       </section>
 
@@ -203,6 +206,7 @@ export function LandingView() {
             <a className="lp-chip" href="/crop">🌱 {L('Crop', 'ដំណាំ')}</a>
             <a className="lp-chip" href="/health-test">🧪 {L('Test', 'តេស្ត')}</a>
             <a className="lp-chip" href="/water">💧 {L('Water', 'ទឹក')}</a>
+            <a className="lp-chip" href="/waste">♻️ {L('Waste', 'សំរាម')}</a>
             <a className="lp-chip" href="/braille">⠿ {L('Braille', 'អក្សរផុស')}</a>
             <a className="lp-chip" href="/contribute">
               {L('All ways to help', 'គ្រប់មធ្យោបាយជួយ')} →
@@ -255,6 +259,7 @@ export function LandingView() {
           <a href="/crop">/crop</a>
           <a href="/health">/health</a>
           <a href="/water">/water</a>
+          <a href="/waste">/waste</a>
           <a href="/braille">/braille</a>
           <a href="/trace">/trace · {L('experiment', 'ពិសោធន៍')}</a>
         </div>

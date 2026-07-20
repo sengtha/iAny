@@ -102,6 +102,9 @@ export function ContributePageView() {
           <Card icon="💧" title={L('Contribute water-test photos', 'ចូលរួមរូបតេស្តទឹក')}
             desc={L('Photograph water test strips + tag the reading — builds an offline water-safety reader for rural areas.', 'ថតបន្ទះតេស្តទឹក + ដាក់ស្លាកលទ្ធផល — បង្កើតឧបករណ៍អានសុវត្ថិភាពទឹកក្រៅបណ្ដាញសម្រាប់ជនបទ។')}
             link="/water" linkLabel={L('Open /water', 'បើក /water')} />
+          <Card icon="♻️" title={L('Contribute waste photos', 'ចូលរួមរូបថតសំរាម')}
+            desc={L('Photograph waste items + tag the material — builds an offline waste-sorting AI for recycling.', 'ថតរូបសំណល់ + ដាក់ស្លាកសម្ភារៈ — បង្កើត AI តម្រៀបសំណល់ក្រៅបណ្ដាញសម្រាប់កែច្នៃ។')}
+            link="/waste" linkLabel={L('Open /waste', 'បើក /waste')} />
           <Card icon="🌐" title={L('Translate & improve Khmer', 'បកប្រែ & កែលម្អខ្មែរ')}
             desc={L('Improve the Khmer wording, prompts, and app text. Great first contribution.', 'កែលម្អពាក្យខ្មែរ ប្រយោគ និងអត្ថបទកម្មវិធី។ ការចូលរួមដំបូងដ៏ល្អ។')}
             link={`${GITHUB_URL}/issues`} linkLabel={L('Good first issues', 'កិច្ចការសម្រាប់អ្នកចាប់ផ្ដើម')} external />

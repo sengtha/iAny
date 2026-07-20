@@ -309,6 +309,21 @@ export const en = {
   waterNotePlaceholder: 'kit brand, exact value, or notes (no personal info)',
   waterHint: 'Tip: read the strip at the time the kit says; good light, no glare, no shadow.',
 
+  // Contribute waste photos (/waste)
+  wasteTitle: 'Contribute waste photos',
+  wasteLead:
+    'Photograph a waste item and tag its material. Helps build a free, offline AI that tells people what is recyclable and how to sort it — and what a waste-buyer will take.',
+  wasteStatSamples: 'photos',
+  wasteOpenModel: 'The waste-sorting model built from it is released free for everyone.',
+  wasteConsent:
+    'I agree these photos may be published in an open dataset and used to train free, open AI models.',
+  wasteTip: 'No personal info is collected — only the item photo and the material you pick.',
+  wasteTake: 'Take / choose a photo of one item',
+  wasteTakeSub: 'one item, filling the frame, on a plain background if you can',
+  wasteWhichType: 'What material is it?',
+  wasteNotePlaceholder: 'anything useful (no personal info)',
+  wasteHint: 'Tip: one item per photo, fill the frame, avoid clutter behind it.',
+
   // Khmer Braille converter (/braille)
   brTitle: 'Khmer Braille',
   brLead:
