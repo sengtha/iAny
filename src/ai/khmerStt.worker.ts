@@ -30,6 +30,21 @@ type InMsg =
 
 let asr: Promise<AutomaticSpeechRecognitionPipeline> | null = null
 
+/**
+ * Tidy a raw transcription. Whisper's byte-level tokenizer can emit byte-fallback
+ * tokens that don't form valid UTF-8 when the model is unsure — they surface as
+ * U+FFFD "�" boxes. Drop those (and other invisible junk) so the box doesn't land
+ * in the text field; a dropped character reads better than tofu. This is cosmetic
+ * — the fix for the underlying uncertainty is more training data.
+ */
+function cleanText(s: string): string {
+  return s
+    .replace(/�/g, '') // replacement char (invalid byte sequences)
+    .replace(/[​‌‍﻿]/g, '') // zero-width chars
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim()
+}
+
 function load(): Promise<AutomaticSpeechRecognitionPipeline> {
   if (!asr) {
     asr = pipeline('automatic-speech-recognition', STT_MODEL_ID, {
@@ -62,10 +77,10 @@ self.onmessage = async (e: MessageEvent<InMsg>) => {
         stride_length_s: 5,
         no_repeat_ngram_size: 3,
       })
-      const text = Array.isArray(out)
+      const raw = Array.isArray(out)
         ? out.map((o) => o.text).join(' ')
         : (out as { text: string }).text
-      self.postMessage({ type: 'result', id: msg.id, text: (text ?? '').trim() })
+      self.postMessage({ type: 'result', id: msg.id, text: cleanText(raw ?? '') })
     }
   } catch (err) {
     const id = 'id' in msg ? msg.id : ''

@@ -741,7 +741,12 @@ progress {
     grid-template-areas:
       'nav header'
       'nav main';
-    max-width: 1100px;
+    /* Fill the viewport: the nav rail hugs the left edge, main spans the rest.
+       Readability is capped on the inner content columns below, not the whole
+       app, so it no longer floats as a centered card. */
+    max-width: none;
+    width: 100%;
+    margin: 0;
     height: 100dvh;
   }
 
@@ -816,12 +821,9 @@ progress {
   }
 }
 
-/* Big desktop: cap line lengths for readability */
-@media (min-width: 1200px) {
-  .app {
-    max-width: 1200px;
-  }
-}
+/* Big desktop: the app fills the width; line lengths are capped on the inner
+   content columns (.chat/.library/… max-width: 860px) rather than the whole app,
+   so the nav rail stays flush to the left edge. */
 
 /* Radio stays full-bleed dark, but its player/list content centers on desktop
    instead of stretching the disc, text and replay rows edge to edge. */
