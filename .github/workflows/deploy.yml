@@ -50,6 +50,10 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # Pin a Wrangler that can read wrangler.jsonc. The action's default
+          # (3.90.0) predates JSONC config support (added in 3.91), so it failed
+          # with "Missing entry-point" — it never found `main`. Latest 3.x fixes it.
+          wranglerVersion: '3'
           # `npm run build` already produced ./dist; deploy without rebuilding.
           command: deploy
 
@@ -58,6 +62,6 @@ jobs:
           echo "### ✅ Deployed iany.app" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "- Commit: \`${{ github.sha }}\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Live routes: /, /app, /trace, /voice, /scan, /sign, /braille" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Routes: /, /app, /trace, /voice, /scan, /sign, /braille, /crop, /health, /water, /waste, /species, /report, /traffic, /street, /label" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "If a page still looks stale on your phone, hard-refresh once to update the service worker." >> "$GITHUB_STEP_SUMMARY"
