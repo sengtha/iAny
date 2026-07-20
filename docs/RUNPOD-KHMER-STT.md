@@ -470,6 +470,11 @@ Also transcribe a few **real, noisy** clips — that's your true accuracy.
 cd /workspace
 git clone https://github.com/openai/whisper
 git clone https://github.com/ggml-org/whisper.cpp
+# convert-h5-to-ggml.py needs the tokenizer's vocab.json/merges.txt IN the model
+# dir. Training usually saves only the model, so drop the processor files in first
+# (the tokenizer is unchanged from whisper-base) — otherwise you get
+# FileNotFoundError: whisper-base-khmer/vocab.json and no ggml-model.bin is made:
+python -c "from transformers import WhisperProcessor; WhisperProcessor.from_pretrained('openai/whisper-base').save_pretrained('./whisper-base-khmer')"
 python whisper.cpp/models/convert-h5-to-ggml.py ./whisper-base-khmer ./whisper .
 # -> ggml-model.bin
 # build tools + quantize (q5_1 = small & good for phones)
