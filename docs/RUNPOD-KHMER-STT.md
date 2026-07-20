@@ -461,6 +461,22 @@ print(asr("/workspace/clips/0001.wav")["text"])
 ```
 Also transcribe a few **real, noisy** clips — that's your true accuracy.
 
+### Measure CER/WER on a fresh pod ([`scripts/eval_stt.py`](../scripts/eval_stt.py))
+
+Self-contained — pulls the model + test set from HF, so it needs no local files
+(runs on any fresh RunPod/Colab/Kaggle GPU):
+
+```bash
+apt-get update && apt-get install -y libsndfile1 ffmpeg
+pip install -q -U transformers "datasets<4" evaluate jiwer librosa soundfile accelerate
+python scripts/eval_stt.py --n 300 --baseline           # your model + stock whisper-base, on FLEURS km
+python scripts/eval_stt.py --dataset sengtha/iany-khmer-voice --config "" --split train   # real-app audio
+```
+
+It prints **CER(raw)**, **CER(no-space)** (the honest Khmer figure — spaces stripped),
+WER, and example REF/HYP pairs. `--baseline` also scores stock `openai/whisper-base`
+so you see exactly what the fine-tune bought.
+
 ---
 
 ## 5. Convert to each platform (once trained)
