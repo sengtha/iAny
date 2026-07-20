@@ -473,6 +473,15 @@ python scripts/eval_stt.py --n 300 --baseline           # your model + stock whi
 python scripts/eval_stt.py --dataset sengtha/iany-khmer-voice --config "" --split train   # real-app audio
 ```
 
+**CPU-only / offline pod** — point at your **local** model + prepared dataset (no
+downloads, reuses the pre-extracted `input_features`, so it's the fastest thing to run
+on CPU; keep `--n` small since whisper-base is slow without a GPU):
+
+```bash
+python scripts/eval_stt.py --model /workspace/whisper-base-khmer \
+    --dataset /workspace/ds_v2 --split test --n 30
+```
+
 It prints **CER(raw)**, **CER(no-space)** (the honest Khmer figure — spaces stripped),
 WER, and example REF/HYP pairs. `--baseline` also scores stock `openai/whisper-base`
 so you see exactly what the fine-tune bought.
