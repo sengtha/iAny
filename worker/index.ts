@@ -39,7 +39,8 @@ const ALLOWED_PREFIXES = [
   // Shared on-device models.
   'sengtha/khmer-tts-female-v2/', // Khmer TTS voice (Radio)
   'sengtha/khmer-ocr/', // Khmer OCR — detector + recognizer
-  'sengtha/whisper-tiny-khmer/', // Khmer STT (whisper.rn GGML + ct2/onnx)
+  'sengtha/whisper-tiny-khmer/', // Khmer STT v1 (whisper-tiny; superseded)
+  'sengtha/whisper-base-khmer/', // Khmer STT (whisper-base fine-tune — PWA ONNX + mobile GGML)
   'sengtha/mediapipe-hand/', // MediaPipe hand_landmarker.task (KSL /sign collector)
   'sengtha/mediapipe-embed/', // MediaPipe Image Embedder (Trace "better matching")
   'sengtha/mediapipe-detector/', // MediaPipe Object Detector (EfficientDet, /traffic)

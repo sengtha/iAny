@@ -2,7 +2,7 @@ import { VoiceRecorder } from '../lib/wavRecorder'
 
 /**
  * PWA Khmer voice input: record from the mic, then transcribe with the
- * whisper-tiny-khmer ONNX model in a worker (see khmerStt.worker.ts). Speak →
+ * whisper-base-khmer ONNX model in a worker (see khmerStt.worker.ts). Speak →
  * text → the existing RAG ask() flow. Desktop/tablet only (the UI gates the
  * mic to fine-pointer devices; in-browser Whisper is too slow on a phone).
  */
@@ -181,7 +181,9 @@ class KhmerStt {
       for (const name of await caches.keys()) {
         const c = await caches.open(name)
         for (const req of await c.keys()) {
-          if (req.url.includes('whisper-tiny-khmer')) await c.delete(req)
+          // Match any whisper-*-khmer model so upgrading (tiny → base) also
+          // clears the superseded weights, not just the current one.
+          if (/whisper-\w+-khmer/.test(req.url)) await c.delete(req)
         }
       }
     }

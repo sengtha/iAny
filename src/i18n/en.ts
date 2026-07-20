@@ -70,7 +70,7 @@ export const en = {
   settingsVoiceNote: 'Reads Radio news aloud · ~115 MB',
   settingsSttLabel: 'Voice input',
   settingsStt: 'Khmer voice input',
-  settingsSttNote: 'Speech-to-text for Chat · ~150 MB',
+  settingsSttNote: 'Speech-to-text for Chat · ~290 MB',
   settingsSignLabel: 'Sign Language',
   settingsSign: 'Khmer Sign hand tracker',
   settingsSignNote: 'Pre-download so the Sign page works offline · ~8 MB',

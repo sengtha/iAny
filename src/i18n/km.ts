@@ -72,7 +72,7 @@ export const km: Translation = {
   settingsVoiceNote: 'អានព័ត៌មានវិទ្យុឮៗ · ~115 MB',
   settingsSttLabel: 'បញ្ចូលដោយសំឡេង',
   settingsStt: 'បញ្ចូលសំឡេងខ្មែរ',
-  settingsSttNote: 'បំប្លែងសំឡេងជាអក្សរសម្រាប់សន្ទនា · ~150 MB',
+  settingsSttNote: 'បំប្លែងសំឡេងជាអក្សរសម្រាប់សន្ទនា · ~290 MB',
   settingsSignLabel: 'ភាសាសញ្ញា',
   settingsSign: 'កម្មវិធីតាមដានដៃ ភាសាសញ្ញាខ្មែរ',
   settingsSignNote: 'ទាញយកជាមុន ដើម្បីឲ្យទំព័រភាសាសញ្ញាដំណើរការក្រៅបណ្ដាញ · ~8 MB',

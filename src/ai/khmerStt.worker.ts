@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 /**
- * Khmer STT worker (PWA) — runs whisper-tiny-khmer (ONNX) via transformers.js
+ * Khmer STT worker (PWA) — runs whisper-base-khmer (ONNX) via transformers.js
  * on WASM, off the UI thread. Receives 16 kHz mono float samples and returns
  * the transcribed Khmer text. Weights download once through the model mirror
  * and are cached by the browser Cache API, so it works offline afterward.

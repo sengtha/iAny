@@ -368,7 +368,7 @@ function VoiceCard() {
 }
 
 /** Khmer voice input (STT, ONNX via transformers.js/WASM) — download once for
- *  offline speech-to-text in Chat. Desktop/tablet only (~150 MB). */
+ *  offline speech-to-text in Chat. Desktop/tablet only (~290 MB). */
 function SttCard() {
   const { t } = useI18n()
   const [state, setState] = useState<SttState>({ phase: 'idle', level: 0 })
