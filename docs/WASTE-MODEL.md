@@ -91,24 +91,50 @@ back to emoji/Khmer names.
 
 ---
 
-## 3. Environment (Colab free tier is enough)
+## 3. Rent a GPU on RunPod
 
-MediaPipe Model Maker trains a MobileNetV3 classifier in minutes on a free Colab T4
-(the classifier is tiny). RunPod works too if you prefer (see the STT guide's §1).
+Same flow as the STT guide. The **classifier** is tiny — a cheap card (or even CPU)
+trains it in minutes; the **detector** (§9) wants a GPU.
+
+1. runpod.io → sign in → add a few $ credit.
+2. **Pods → Deploy → GPU Cloud.** Pick **RTX A4000 / RTX 4090** (~$0.2–0.7/hr).
+3. **Template: choose a TensorFlow image** (e.g. *RunPod TensorFlow* or
+   `tensorflow/tensorflow:2.15.0-gpu`), **not** the PyTorch one — Model Maker is a
+   TensorFlow project, and a matching CUDA/cuDNN saves the version fight. If you only
+   have a PyTorch pod, that's fine too: `pip install "tensorflow[and-cuda]"` ships its
+   own CUDA libs, and the classifier runs happily on CPU regardless.
+4. **Volume ~60 GB** at `/workspace`. Open the **web terminal** (or SSH).
+
+### Setup on the pod
 
 ```bash
+# MediaPipe/OpenCV need these system libs — the classic "libGL.so.1" crash otherwise
+apt-get update && apt-get install -y libgl1 libglib2.0-0 git
+
+cd /workspace
 python -m venv venv && source venv/bin/activate     # Python 3.10 or 3.11
 pip install --upgrade pip
-pip install "mediapipe-model-maker"                   # pulls TF + the maker
-pip install kaggle                                    # for dataset download
+pip install "mediapipe-model-maker" kaggle huggingface_hub
 ```
 
-Kaggle download (put your `kaggle.json` token in `~/.kaggle/`):
+Sanity-check the GPU is visible to TF (optional — CPU is fine for the classifier):
+
+```bash
+python -c "import tensorflow as tf; print('GPUs:', tf.config.list_physical_devices('GPU'))"
+```
+
+### Get the data
+
+Put your Kaggle token at `~/.kaggle/kaggle.json` (`chmod 600` it), then:
 
 ```bash
 kaggle datasets download -d arkadiyhacks/drinking-waste-classification -p data/ --unzip
 git clone https://github.com/garythung/trashnet data/trashnet   # images in data/trashnet/data
+# TACO (optional, for the detector): git clone https://github.com/pedropro/TACO && python TACO/download.py
 ```
+
+> **Tip:** everything (venv, data, exported model) must live under `/workspace` — it's
+> the only path that survives a pod restart.
 
 ---
 
@@ -195,8 +221,16 @@ in D1 (`waste_samples`). Export them into the same folder-per-class layout:
 
 ## 8. Deploy into iAny (swap out the beta guess)
 
-Say you export and upload to **`sengtha/iany-waste-v1`** on Hugging Face
-(`model.tflite` at the repo root). Three small changes:
+### Upload the model to Hugging Face (from the pod)
+
+```bash
+huggingface-cli login          # paste an HF token with write access
+huggingface-cli upload sengtha/iany-waste-v1 exported/model.tflite model.tflite --repo-type=model
+```
+
+Add a short **model card** (`README.md`) crediting the datasets (TrashNet — MIT;
+TACO / Open Images — CC BY 4.0) and stating the model's license. Now three small
+code changes in the app:
 
 **a) Allowlist the model** in [`worker/index.ts`](../worker/index.ts) — add the
 prefix to `ALLOWED_PREFIXES`:
