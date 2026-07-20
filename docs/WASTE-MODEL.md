@@ -138,6 +138,58 @@ git clone https://github.com/garythung/trashnet data/trashnet   # images in data
 
 ---
 
+## 3B. Train on Kaggle instead (free GPU, datasets pre-hosted)
+
+Kaggle is a great fit here: the classifier trains in minutes on the free GPU, and the
+datasets are **already on Kaggle**, so you *attach* them (no download).
+
+**1. New Notebook → right sidebar:**
+- **Accelerator: GPU T4 x2**, **Internet: On** (phone-verified account required).
+- **Add Data** (🔎) → search & attach:
+  - `arkadiyhacks/drinking-waste-classification` → mounts at
+    `/kaggle/input/drinking-waste-classification` (PET bottle / glass / **can** / HDPE, with boxes).
+  - search **`trashnet`** (e.g. `feyzazkefe/trashnet`) → `/kaggle/input/trashnet` (6 material classes).
+  Inputs are **read-only**; you build the training folders under `/kaggle/working` (writable, ~20 GB).
+
+**2. Install Model Maker** (first cell):
+```python
+!pip install -q mediapipe-model-maker
+```
+> Kaggle ships its own TensorFlow, and Model Maker pins a specific TF version — so this
+> install often **downgrades TF and asks you to restart**. If the next cell errors with a
+> TF/keras message, do **Run → Restart & clear cell outputs**, then continue (don't re-run
+> the install). GPU is auto-detected, no CUDA setup needed.
+
+**3. Prep + train** — the code is **identical to §4 + §5**, only the input paths change to
+`/kaggle/input/...` and the output dir to `/kaggle/working`:
+```python
+# in your prep.py: point LABEL_MAP's source folders at, e.g.
+#   /kaggle/input/drinking-waste-classification/...   /kaggle/input/trashnet/...
+# and write balanced folders into /kaggle/working/waste_ds/<iany_type>/
+# then §5 with export_dir="/kaggle/working/exported"
+```
+
+**4. Get the model out** — two ways:
+- **Download:** after it runs, `/kaggle/working/exported/model.tflite` appears in the
+  right-side **Output** pane → download it. (Do **Save Version** to persist outputs.)
+- **Push straight to HF** (recommended) — store your token once via **Add-ons → Secrets**
+  as `HF_TOKEN`, then:
+  ```python
+  from kaggle_secrets import UserSecretsClient
+  from huggingface_hub import HfApi
+  tok = UserSecretsClient().get_secret("HF_TOKEN")
+  HfApi().upload_file(path_or_fileobj="/kaggle/working/exported/model.tflite",
+                      path_in_repo="model.tflite", repo_id="sengtha/iany-waste-v1",
+                      repo_type="model", token=tok)
+  ```
+
+**Kaggle limits:** GPU sessions cap at **12 h** and **~30 h/week** — irrelevant here
+(the classifier trains in minutes). The detector (§9) is heavier but still fits.
+
+Then continue at **§6 (evaluate)** and **§8 (deploy into iAny)** exactly as written.
+
+---
+
 ## 4. Prep the data (folder-per-class for the classifier)
 
 Model Maker's image classifier wants **one folder per label**:
