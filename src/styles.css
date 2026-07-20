@@ -1529,6 +1529,45 @@ progress {
 .traffic-status.band-light b { color: #4ade80; }
 .traffic-status.band-moderate b { color: #fbbf24; }
 .traffic-status.band-heavy b { color: #f87171; }
+.traffic-status.band-flow b { color: #38bdf8; }
+/* mode toggle: In frame ⟷ Count passing */
+.traffic-modes {
+  display: flex;
+  gap: 8px;
+  margin: 4px 0 2px;
+}
+.traffic-modes button {
+  flex: 1;
+  padding: 9px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--bg-softer);
+  background: var(--bg-soft);
+  color: var(--fg-muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.traffic-modes button.active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--fg);
+}
+/* counting-line slider + reset row */
+.traffic-line-ctl {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0;
+}
+.traffic-line-ctl label {
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+  white-space: nowrap;
+}
+.traffic-line-ctl input[type='range'] {
+  flex: 1;
+  accent-color: #f43f5e;
+}
 .traffic-counts {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
