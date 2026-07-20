@@ -44,7 +44,8 @@ const ALLOWED_PREFIXES = [
   'sengtha/mediapipe-hand/', // MediaPipe hand_landmarker.task (KSL /sign collector)
   'sengtha/mediapipe-embed/', // MediaPipe Image Embedder (Trace "better matching")
   'sengtha/mediapipe-detector/', // MediaPipe Object Detector (EfficientDet, /traffic)
-  'sengtha/mediapipe-classifier/', // MediaPipe Image Classifier (EfficientNet-Lite, live /waste guess)
+  'sengtha/mediapipe-classifier/', // MediaPipe Image Classifier (EfficientNet-Lite, superseded)
+  'sengtha/iany-waste-v1/', // iAny waste classifier (MobileNetV2 ONNX — live /waste)
 ]
 // OCR language data, served through the same mirror. Khmer uses the
 // high-accuracy models; English's fast model is accurate enough.

@@ -116,16 +116,16 @@ export default defineConfig({
             },
           },
           {
-            // MediaPipe vision .tflite models (Trace embedder, /traffic detector,
-            // live /waste classifier). Cache on first fetch so the live features
-            // work offline afterward, like the hand model.
+            // On-device vision models: MediaPipe .tflite (Trace embedder, /traffic
+            // detector) + the /waste classifier .onnx. Cache on first fetch so the
+            // live features work offline afterward, like the hand model.
             urlPattern: ({ url }) =>
-              /\/models\/sengtha\/mediapipe-(embed|detector|classifier)\//.test(url.pathname) ||
+              /\/models\/sengtha\/(mediapipe-(embed|detector|classifier)|iany-waste)/.test(url.pathname) ||
               url.pathname.endsWith('.tflite'),
             handler: 'CacheFirst',
             options: {
               cacheName: 'runtime-vision-models',
-              expiration: { maxEntries: 6 },
+              expiration: { maxEntries: 8 },
               cacheableResponse: { statuses: [0, 200] },
               rangeRequests: true,
             },

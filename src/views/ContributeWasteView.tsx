@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useI18n } from '../i18n'
 import { WASTE_TYPES, WASTE_BY_ID } from '../assets/wasteLabels'
-import { createImageClassifier, type ImageClassifierAdapter } from '../lib/imageClassifier'
+import { createWasteClassifier } from '../lib/wasteOnnx'
 import { guessWasteType } from '../lib/wasteGuess'
-import { LiveCapture, type LiveGuess } from './LiveCapture'
+import { LiveCapture, type LiveClassifier, type LiveGuess } from './LiveCapture'
 import {
   deviceId,
   EMPTY_WASTE_PROFILE,
@@ -36,17 +36,18 @@ import type { GeoPoint } from '../lib/geo'
  */
 type Phase = 'idle' | 'live' | 'label' | 'uploading'
 
-// One shared live classifier (lazy: the model only downloads when live mode opens).
-// Pretrained EfficientNet-Lite (ImageNet) in VIDEO mode — a rough beta guess until
-// the /waste-trained model exists (see src/lib/wasteGuess.ts).
-let sharedClassifier: ImageClassifierAdapter | null = null
-function liveClassifier(): ImageClassifierAdapter {
+// The real /waste model — MobileNetV2 trained from open datasets (docs/WASTE-MODEL.md),
+// run via onnxruntime-web. Labels are our material type ids, in this fixed order.
+// Lazy: the model only downloads when live mode opens.
+const WASTE_MODEL_LABELS = [
+  'can', 'glass', 'organic', 'other', 'paper', 'plastic_bottle', 'plastic_other',
+]
+let sharedClassifier: LiveClassifier | null = null
+function liveClassifier(): LiveClassifier {
   if (!sharedClassifier) {
-    sharedClassifier = createImageClassifier({
-      wasmPath: `${location.origin}/mediapipe`,
-      modelUrl: `${location.origin}/models/sengtha/mediapipe-classifier/resolve/main/efficientnet_lite0.tflite`,
-      runningMode: 'VIDEO',
-      maxResults: 5,
+    sharedClassifier = createWasteClassifier({
+      modelUrl: `${location.origin}/models/sengtha/iany-waste-v1/resolve/main/model.onnx`,
+      labels: WASTE_MODEL_LABELS,
     })
   }
   return sharedClassifier

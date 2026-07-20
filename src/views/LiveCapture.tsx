@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { useI18n } from '../i18n'
-import type { Classification, ImageClassifierAdapter } from '../lib/imageClassifier'
+import type { Classification } from '../lib/imageClassifier'
+
+/** A live camera classifier: load once, then classify video frames (async). */
+export interface LiveClassifier {
+  prepare(onProgress?: (fraction: number) => void): Promise<void>
+  classifyFrame(video: HTMLVideoElement): Promise<Classification[]>
+}
 
 /**
  * 📷 Reusable "live camera + on-device guess" capture. Streams the back camera,
@@ -23,7 +29,7 @@ export function LiveCapture({
   onCancel,
   maxDim = 1280,
 }: {
-  classifier: ImageClassifierAdapter
+  classifier: LiveClassifier
   /** Map ranked classifier output → a domain type + confidence (or null). */
   guess: (results: Classification[]) => LiveGuess | null
   /** How to render a type id (emoji + localized text) for the overlay chip. */
@@ -45,6 +51,7 @@ export function LiveCapture({
   const streamRef = useRef<MediaStream | null>(null)
   const rafRef = useRef(0)
   const lastInfer = useRef(0)
+  const inflight = useRef(false)
   const liveRef = useRef<LiveGuess | null>(null)
 
   useEffect(() => {
@@ -94,12 +101,20 @@ export function LiveCapture({
       const ctx = canvas.getContext('2d')!
       ctx.drawImage(video, 0, 0, w, h)
       const now = performance.now()
-      if (now - lastInfer.current > 180) {
+      if (!inflight.current && now - lastInfer.current > 250) {
         lastInfer.current = now
-        const res = classifier.classifyVideo(video, Math.round(now), 5)
-        const g = guess(res)
-        liveRef.current = g
-        setLive(g)
+        inflight.current = true
+        classifier
+          .classifyFrame(video)
+          .then((res) => {
+            const g = guess(res)
+            liveRef.current = g
+            setLive(g)
+          })
+          .catch(() => {})
+          .finally(() => {
+            inflight.current = false
+          })
       }
     }
     rafRef.current = requestAnimationFrame(loop)
