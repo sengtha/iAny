@@ -89,6 +89,7 @@ export default defineConfig({
           /^\/traffic(\/|\.html|$)/,
           /^\/street(\/|\.html|$)/,
           /^\/label(\/|\.html|$)/,
+          /^\/waste-scan(\/|\.html|$)/,
         ],
         runtimeCaching: [
           {
@@ -178,6 +179,7 @@ export default defineConfig({
         traffic: path.resolve(root, 'traffic.html'),
         street: path.resolve(root, 'street.html'),
         label: path.resolve(root, 'label.html'),
+        wasteScan: path.resolve(root, 'waste-scan.html'),
       },
     },
   },

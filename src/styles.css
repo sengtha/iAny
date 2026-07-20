@@ -1672,6 +1672,50 @@ progress {
   backdrop-filter: blur(6px);
 }
 
+/* /waste-scan — live material detector (experiment) */
+.wscan-video {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.wscan-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0;
+}
+.wscan-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+.wscan-bar-name {
+  flex: 0 0 42%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wscan-bar-track {
+  flex: 1;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bg-softer);
+  overflow: hidden;
+}
+.wscan-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width 0.2s ease;
+}
+.wscan-bar small {
+  flex: 0 0 34px;
+  text-align: right;
+  color: var(--fg-muted);
+}
+
 /* /label — read the ច.ប.ផ registration code off a product */
 .label-reading {
   display: flex;

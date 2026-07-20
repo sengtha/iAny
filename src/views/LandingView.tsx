@@ -191,6 +191,8 @@ export function LandingView() {
             desc={L('Building a Cambodia-aware vehicle AI — tuk-tuk, remork and cyclo, the classes generic detectors miss. Photograph + tag one vehicle.', 'កំពុងបង្កើត AI ស្គាល់យានយន្តខ្មែរ — តុកតុក រ៉ឺម៉ក ស៊ីក្លូ ដែល AI ទូទៅមិនស្គាល់។ ថត + ដាក់ស្លាកយានយន្តមួយ។')} link="/street" linkLabel={L('Open /street', 'បើក /street')} />
           <Feature icon="🏷️" title={L('Label reader', 'អានស្លាក ច.ប.ផ')} badge={L('Experiment', 'ពិសោធន៍')}
             desc={L('Photograph a product label to read its ច.ប.ផ registration code + barcode together — on-device Khmer OCR, offline, nothing uploaded.', 'ថតស្លាកផលិតផល ដើម្បីអានលេខ ច.ប.ផ និងបាកូដ ជាមួយគ្នា — OCR ខ្មែរលើឧបករណ៍ ក្រៅបណ្ដាញ គ្មានការអាប់ឡូត។')} link="/label" linkLabel={L('Try /label', 'សាកល្បង /label')} />
+          <Feature icon="♻️" title={L('Waste scan', 'ស្កេនសំរាម')} badge={L('Experiment', 'ពិសោធន៍')}
+            desc={L('Point your camera at an item to identify its material — plastic bottle, can, glass, paper — live and on-device, offline.', 'ចង្អុលកាមេរ៉ាទៅវត្ថុ ដើម្បីស្គាល់ប្រភេទសម្ភារៈ — ដបផ្លាស្ទិច កំប៉ុង កែវ ក្រដាស — ផ្ទាល់ លើឧបករណ៍ ក្រៅបណ្ដាញ។')} link="/waste-scan" linkLabel={L('Try /waste-scan', 'សាកល្បង /waste-scan')} />
         </div>
       </section>
 
@@ -281,6 +283,7 @@ export function LandingView() {
           <a href="/traffic">/traffic</a>
           <a href="/street">/street</a>
           <a href="/label">/label</a>
+          <a href="/waste-scan">/waste-scan</a>
           <a href="/braille">/braille</a>
           <a href="/trace">/trace · {L('experiment', 'ពិសោធន៍')}</a>
         </div>
