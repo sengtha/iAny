@@ -51,12 +51,22 @@ export function createTrafficDetector(opts: { wasmPath: string; modelUrl: string
         onProgress?.(0.05)
         const fileset = await FilesetResolver.forVisionTasks(opts.wasmPath)
         const buf = await fetchWithProgress(opts.modelUrl, (f) => onProgress?.(0.05 + 0.9 * f))
-        const d = await ObjectDetector.createFromOptions(fileset, {
-          baseOptions: { modelAssetBuffer: new Uint8Array(buf), delegate: 'GPU' },
-          runningMode: 'VIDEO',
-          scoreThreshold: 0.4,
-          maxResults: 40,
-        })
+        const bytes = new Uint8Array(buf)
+        const make = (delegate: 'GPU' | 'CPU') =>
+          ObjectDetector.createFromOptions(fileset, {
+            baseOptions: { modelAssetBuffer: bytes, delegate },
+            runningMode: 'VIDEO',
+            scoreThreshold: 0.4,
+            maxResults: 40,
+          })
+        // Prefer GPU (smooth live video); fall back to CPU where the GPU
+        // delegate is unavailable (some phones / browsers) so it still works.
+        let d: ObjectDetector
+        try {
+          d = await make('GPU')
+        } catch {
+          d = await make('CPU')
+        }
         detector = d
         onProgress?.(1)
         return d
@@ -74,7 +84,13 @@ export function createTrafficDetector(opts: { wasmPath: string; modelUrl: string
     },
     detect(video, timestampMs) {
       if (!detector) return []
-      const res = detector.detectForVideo(video, timestampMs)
+      let res
+      try {
+        res = detector.detectForVideo(video, timestampMs)
+      } catch {
+        // A bad frame / non-monotonic timestamp must not kill the render loop.
+        return []
+      }
       const out: Detection[] = []
       for (const det of res.detections ?? []) {
         const cat = det.categories?.[0]

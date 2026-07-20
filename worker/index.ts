@@ -62,10 +62,12 @@ const MEDIAPIPE_HAND_URL =
 // "better matching" model for Trace. Mirrored from Google's model storage.
 const MEDIAPIPE_EMBED_URL =
   'https://storage.googleapis.com/mediapipe-models/image_embedder/mobilenet_v3_small/float32/1/mobilenet_v3_small.tflite'
-// MediaPipe Object Detector (EfficientDet-Lite0 int8, ~4.6 MB, Apache-2.0) — the
-// live vehicle/people detector for /traffic. Mirrored from Google's model storage.
+// MediaPipe Object Detector (EfficientDet-Lite0 float32, ~13.8 MB, Apache-2.0) —
+// the live vehicle/people detector for /traffic. float32 (not int8) because the
+// GPU delegate needs a float model — int8 loads but silently detects nothing.
+// Mirrored from Google's model storage.
 const MEDIAPIPE_DETECTOR_URL =
-  'https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/int8/1/efficientdet_lite0.tflite'
+  'https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float32/1/efficientdet_lite0.tflite'
 // MediaPipe Image Classifier (EfficientNet-Lite0 int8, ~5.4 MB, Apache-2.0) — the
 // pretrained ImageNet classifier that powers the live /waste "guess" until a
 // purpose-trained waste model exists. Mirrored from Google's model storage.

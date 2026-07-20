@@ -13,7 +13,9 @@ import './styles.css'
  */
 const detector = createTrafficDetector({
   wasmPath: `${location.origin}/mediapipe`,
-  modelUrl: `${location.origin}/models/sengtha/mediapipe-detector/resolve/main/efficientdet_lite0.tflite`,
+  // _f32 filename = a fresh mirror/R2 key, so the switch from the int8 model
+  // (which the GPU delegate couldn't detect with) fetches the float32 bytes.
+  modelUrl: `${location.origin}/models/sengtha/mediapipe-detector/resolve/main/efficientdet_lite0_f32.tflite`,
 })
 
 function TrafficApp() {

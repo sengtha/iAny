@@ -44,6 +44,8 @@ export function createImageClassifier(opts: {
   maxResults?: number
   /** IMAGE (default) for still photos, VIDEO for a live camera overlay. */
   runningMode?: 'IMAGE' | 'VIDEO'
+  /** 'CPU' (default, correct for int8 models) or 'GPU' (needs a float model). */
+  delegate?: 'GPU' | 'CPU'
 }): ImageClassifierAdapter {
   let classifier: ImageClassifier | null = null
   let loading: Promise<ImageClassifier> | null = null
@@ -58,11 +60,26 @@ export function createImageClassifier(opts: {
         onProgress?.(0.05)
         const fileset = await FilesetResolver.forVisionTasks(opts.wasmPath)
         const buf = await fetchWithProgress(opts.modelUrl, (f) => onProgress?.(0.05 + 0.9 * f))
-        const c = await ImageClassifier.createFromOptions(fileset, {
-          baseOptions: { modelAssetBuffer: new Uint8Array(buf), delegate: 'GPU' },
-          runningMode: mode,
-          maxResults: opts.maxResults ?? 3,
-        })
+        const bytes = new Uint8Array(buf)
+        const make = (delegate: 'GPU' | 'CPU') =>
+          ImageClassifier.createFromOptions(fileset, {
+            baseOptions: { modelAssetBuffer: bytes, delegate },
+            runningMode: mode,
+            maxResults: opts.maxResults ?? 3,
+          })
+        // Default to CPU: we ship an int8 model, and the GPU delegate needs a
+        // float model (int8 + GPU loads but classifies nothing). GPU is opt-in
+        // via `delegate`, with a CPU fallback if it's unavailable.
+        let c: ImageClassifier
+        if (opts.delegate === 'GPU') {
+          try {
+            c = await make('GPU')
+          } catch {
+            c = await make('CPU')
+          }
+        } else {
+          c = await make('CPU')
+        }
         classifier = c
         onProgress?.(1)
         return c
