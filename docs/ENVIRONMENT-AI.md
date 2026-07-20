@@ -65,7 +65,10 @@ Each is the same collect → train → deploy loop; only the dataset changes.
   guess currently runs MediaPipe's pretrained EfficientNet-Lite (ImageNet) mapped
   to our material types ([`src/lib/wasteGuess.ts`](../src/lib/wasteGuess.ts)) — a
   rough **beta** hint until the `/waste`-trained model exists; swapping in the real
-  model is a one-line URL change. The reusable live view is
+  model is a one-line URL change. **Training recipe:**
+  [docs/WASTE-MODEL.md](./WASTE-MODEL.md) — bootstrap on open datasets (Drinking
+  Waste / TrashNet / TACO) → fine-tune on the collected `/waste` photos → export
+  `.tflite` → deploy. The reusable live view is
   [`src/views/LiveCapture.tsx`](../src/views/LiveCapture.tsx), so `/street` and the
   other collectors can adopt the same "point → guess → capture" UX.
 - **🌿 Species / nature ID** — *collector built* ([`/species`](https://iany.app/species)):

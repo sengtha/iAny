@@ -8,7 +8,8 @@ import type { Classification } from './imageClassifier'
  * EfficientNet-Lite (ImageNet, Apache-2.0) and we translate its 1000-class labels
  * into our 8 material types by keyword. It's a rough BETA guess, shown as a
  * suggestion the user confirms — never an authoritative result. When the trained
- * model lands, swap the model URL and delete this map. See docs/ENVIRONMENT-AI.md.
+ * model lands, swap the model URL and collapse this to a passthrough — full recipe
+ * + deploy steps in docs/WASTE-MODEL.md. See also docs/ENVIRONMENT-AI.md.
  */
 
 // Each waste type → substrings that appear in relevant ImageNet labels.
