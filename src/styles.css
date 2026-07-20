@@ -1497,6 +1497,67 @@ progress {
   border: 1px solid var(--bg-softer);
   background: var(--bg-soft);
 }
+/* /traffic — live camera vehicle counter */
+.traffic-stage {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  background: #000;
+  border: 1px solid var(--bg-softer);
+  margin: 8px 0;
+}
+.traffic-video {
+  display: none; /* the canvas mirrors the video + draws boxes */
+}
+.traffic-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.traffic-status {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  backdrop-filter: blur(6px);
+  background: rgba(8, 16, 31, 0.62);
+  color: #fff;
+}
+.traffic-status.band-light b { color: #4ade80; }
+.traffic-status.band-moderate b { color: #fbbf24; }
+.traffic-status.band-heavy b { color: #f87171; }
+.traffic-counts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+  gap: 8px;
+  margin: 10px 0;
+}
+.traffic-count {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 10px 6px;
+  background: var(--bg-soft);
+  border: 1px solid var(--bg-softer);
+  border-radius: 12px;
+}
+.traffic-count-emoji {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+.traffic-count b {
+  font-size: 1.3rem;
+  line-height: 1.1;
+}
+.traffic-count small {
+  font-size: 0.72rem;
+  color: var(--fg-muted);
+}
+
 /* /crop — crop + condition label chips */
 .crop-chips {
   display: flex;

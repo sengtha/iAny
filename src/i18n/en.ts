@@ -362,6 +362,21 @@ export const en = {
   reportNotePlaceholder: 'a short description (no personal info)',
   reportHint: 'Tip: add the location so the report can be mapped. Never photograph people.',
 
+  // Live traffic counter (/traffic)
+  trafficStart: 'Start camera',
+  trafficStop: 'Stop',
+  trafficLoading: 'Loading model',
+  trafficCameraFailed: 'Could not open the camera. Allow camera access and try again.',
+  traffic_person: 'people',
+  traffic_motorbike: 'motorbikes',
+  traffic_car: 'cars',
+  traffic_bus: 'buses',
+  traffic_truck: 'trucks',
+  traffic_bicycle: 'bicycles',
+  trafficTuktukNote:
+    'Counts what’s in the frame now. Tuk-tuks / remork aren’t a standard class yet — they’re counted as car or motorbike. A Cambodia-specific model is future work.',
+  trafficPrivacy: 'Runs fully on your device — no video leaves the phone, nothing is uploaded.',
+
   // Khmer Braille converter (/braille)
   brTitle: 'Khmer Braille',
   brLead:

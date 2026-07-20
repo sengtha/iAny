@@ -184,6 +184,8 @@ export function LandingView() {
           <Feature icon="📣" title={L('Community reports', 'របាយការណ៍សហគមន៍')}
             badge={L('Collecting data', 'កំពុងប្រមូលទិន្នន័យ')} badgeTone="collecting"
             desc={L('Photograph + map local issues (rubbish, flooding, potholes) — a geotagged open dataset + an offline report sorter.', 'ថត + ធ្វើផែនទីបញ្ហាក្នុងតំបន់ (សំរាម ទឹកជំនន់ ផ្លូវខូច) — ទិន្នន័យបើកចំហមានទីតាំង + ឧបករណ៍ចាត់ថ្នាក់ក្រៅបណ្ដាញ។')} link="/report" linkLabel={L('Open /report', 'បើក /report')} />
+          <Feature icon="🚦" title={L('Traffic counter', 'ឧបករណ៍រាប់ចរាចរណ៍')} badge={L('Experiment', 'ពិសោធន៍')}
+            desc={L('Point your camera at traffic to count vehicles + people and read congestion — live, on-device, offline.', 'ចង្អុលកាមេរ៉ាទៅចរាចរណ៍ ដើម្បីរាប់យានយន្ត + មនុស្ស និងស្ថានភាពកកកុញ — ផ្ទាល់ លើឧបករណ៍ ក្រៅបណ្ដាញ។')} link="/traffic" linkLabel={L('Try /traffic', 'សាកល្បង /traffic')} />
         </div>
       </section>
 
@@ -270,6 +272,7 @@ export function LandingView() {
           <a href="/waste">/waste</a>
           <a href="/species">/species</a>
           <a href="/report">/report</a>
+          <a href="/traffic">/traffic</a>
           <a href="/braille">/braille</a>
           <a href="/trace">/trace · {L('experiment', 'ពិសោធន៍')}</a>
         </div>

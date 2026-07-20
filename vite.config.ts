@@ -86,6 +86,7 @@ export default defineConfig({
           /^\/waste(\/|\.html|$)/,
           /^\/species(\/|\.html|$)/,
           /^\/report(\/|\.html|$)/,
+          /^\/traffic(\/|\.html|$)/,
         ],
         runtimeCaching: [
           {
@@ -157,6 +158,7 @@ export default defineConfig({
         waste: path.resolve(root, 'waste.html'),
         species: path.resolve(root, 'species.html'),
         report: path.resolve(root, 'report.html'),
+        traffic: path.resolve(root, 'traffic.html'),
       },
     },
   },

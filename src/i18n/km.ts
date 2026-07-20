@@ -364,6 +364,21 @@ export const km: Translation = {
   reportNotePlaceholder: 'ការពិពណ៌នាខ្លី (គ្មានព័ត៌មានផ្ទាល់ខ្លួន)',
   reportHint: 'គន្លឹះ៖ បន្ថែមទីតាំង ដើម្បីធ្វើផែនទីរបាយការណ៍។ កុំថតមនុស្ស។',
 
+  // Live traffic counter (/traffic)
+  trafficStart: 'បើកកាមេរ៉ា',
+  trafficStop: 'ឈប់',
+  trafficLoading: 'កំពុងផ្ទុកម៉ូឌែល',
+  trafficCameraFailed: 'មិនអាចបើកកាមេរ៉ា។ សូមអនុញ្ញាតកាមេរ៉ា ហើយសាកម្ដងទៀត។',
+  traffic_person: 'មនុស្ស',
+  traffic_motorbike: 'ម៉ូតូ',
+  traffic_car: 'ឡាន',
+  traffic_bus: 'ឡានក្រុង',
+  traffic_truck: 'ឡានដឹក',
+  traffic_bicycle: 'កង់',
+  trafficTuktukNote:
+    'រាប់អ្វីដែលនៅក្នុងស៊ុមឥឡូវ។ តុកតុក / រ៉ឺម៉ក មិនទាន់ជាថ្នាក់ស្តង់ដារ — ត្រូវរាប់ជាឡាន ឬម៉ូតូ។ ម៉ូឌែលសម្រាប់កម្ពុជា ជាការងារអនាគត។',
+  trafficPrivacy: 'ដំណើរការលើឧបករណ៍ទាំងស្រុង — វីដេអូមិនចេញពីទូរស័ព្ទ គ្មានការអាប់ឡូត។',
+
   // បម្លែងអក្សរផុសខ្មែរ (/braille)
   brTitle: 'អក្សរផុសខ្មែរ',
   brLead:

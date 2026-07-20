@@ -42,6 +42,7 @@ const ALLOWED_PREFIXES = [
   'sengtha/whisper-tiny-khmer/', // Khmer STT (whisper.rn GGML + ct2/onnx)
   'sengtha/mediapipe-hand/', // MediaPipe hand_landmarker.task (KSL /sign collector)
   'sengtha/mediapipe-embed/', // MediaPipe Image Embedder (Trace "better matching")
+  'sengtha/mediapipe-detector/', // MediaPipe Object Detector (EfficientDet, /traffic)
 ]
 // OCR language data, served through the same mirror. Khmer uses the
 // high-accuracy models; English's fast model is accurate enough.
@@ -60,6 +61,10 @@ const MEDIAPIPE_HAND_URL =
 // "better matching" model for Trace. Mirrored from Google's model storage.
 const MEDIAPIPE_EMBED_URL =
   'https://storage.googleapis.com/mediapipe-models/image_embedder/mobilenet_v3_small/float32/1/mobilenet_v3_small.tflite'
+// MediaPipe Object Detector (EfficientDet-Lite0 int8, ~4.6 MB, Apache-2.0) — the
+// live vehicle/people detector for /traffic. Mirrored from Google's model storage.
+const MEDIAPIPE_DETECTOR_URL =
+  'https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/int8/1/efficientdet_lite0.tflite'
 
 function upstreamUrl(key: string, hfPath: string): string {
   if (key.startsWith('tessdata2/')) {
@@ -71,6 +76,9 @@ function upstreamUrl(key: string, hfPath: string): string {
   }
   if (key.startsWith('sengtha/mediapipe-embed/')) {
     return MEDIAPIPE_EMBED_URL
+  }
+  if (key.startsWith('sengtha/mediapipe-detector/')) {
+    return MEDIAPIPE_DETECTOR_URL
   }
   return `${HF}/${hfPath}`
 }
