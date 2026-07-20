@@ -41,6 +41,7 @@ const ALLOWED_PREFIXES = [
   'sengtha/khmer-ocr/', // Khmer OCR — detector + recognizer
   'sengtha/whisper-tiny-khmer/', // Khmer STT (whisper.rn GGML + ct2/onnx)
   'sengtha/mediapipe-hand/', // MediaPipe hand_landmarker.task (KSL /sign collector)
+  'sengtha/mediapipe-embed/', // MediaPipe Image Embedder (Trace "better matching")
 ]
 // OCR language data, served through the same mirror. Khmer uses the
 // high-accuracy models; English's fast model is accurate enough.
@@ -55,6 +56,10 @@ function isAllowedKey(key: string): boolean {
 // on first fetch like every other model.
 const MEDIAPIPE_HAND_URL =
   'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task'
+// MediaPipe Image Embedder (MobileNetV3-small, ~4 MB, Apache-2.0) — the optional
+// "better matching" model for Trace. Mirrored from Google's model storage.
+const MEDIAPIPE_EMBED_URL =
+  'https://storage.googleapis.com/mediapipe-models/image_embedder/mobilenet_v3_small/float32/1/mobilenet_v3_small.tflite'
 
 function upstreamUrl(key: string, hfPath: string): string {
   if (key.startsWith('tessdata2/')) {
@@ -63,6 +68,9 @@ function upstreamUrl(key: string, hfPath: string): string {
   }
   if (key.startsWith('sengtha/mediapipe-hand/')) {
     return MEDIAPIPE_HAND_URL
+  }
+  if (key.startsWith('sengtha/mediapipe-embed/')) {
+    return MEDIAPIPE_EMBED_URL
   }
   return `${HF}/${hfPath}`
 }

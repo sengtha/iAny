@@ -35,10 +35,13 @@ trace/
   core/trace.ts        Zero-dependency engine: signatures, trust score, chains,
                        compliance report, registry client. No React, no iAny.
   web/
-    TraceView.tsx      The full UI (Create / Verify / Journey / provenance page).
-    TraceApp.tsx       Self-contained shell (header + EN/ខ្មែរ toggle).
-    adapters.ts        Optional OCR/STT capability interfaces (see below).
-    context.ts         React context that carries those capabilities.
+    TraceView.tsx        The full UI (Create / Verify / Journey / provenance page).
+    TraceApp.tsx         Self-contained shell (header + EN/ខ្មែរ toggle).
+    adapters.ts          Optional OCR / STT / Matcher capability interfaces (below).
+    context.ts           React context that carries those capabilities.
+    mediapipeMatcher.ts  Optional "better matching" via MediaPipe Image Embedder
+                         (lazy-loaded; a host that doesn't want the dependency just
+                         doesn't import this file).
   worker/
     handlers.ts        Optional registry backend (Cloudflare D1 + R2). Self-
                        contained: `serveTrace(url, request, env)`.
@@ -66,8 +69,13 @@ createRoot(el).render(<TraceApp ocr={ocr} /* stt={...} */ />)
 ```
 
 iAny's host is [`../src/trace.tsx`](../src/trace.tsx): it injects iAny's
-on-device Khmer OCR + STT. A standalone build can inject a WASM OCR, a cloud
-API, or nothing at all.
+on-device Khmer OCR + STT, plus an optional **`MatcherAdapter`** — a MediaPipe
+Image Embedder (`web/mediapipeMatcher.ts`) that powers an opt-in "better matching"
+toggle (a learned, lighting/angle-robust appearance embedding). It's lazy: nothing
+downloads until the user turns it on, and the zero-download classical match stays
+the default, so a capsule is always verifiable with or without the model. A
+standalone build can inject a WASM OCR, a cloud API, a different embedder, or
+nothing at all.
 
 > **Styling note (standalone finishing step).** The UI currently reuses iAny's
 > stylesheet (`voice-*`, `contribute`, `ocr-drop` classes from

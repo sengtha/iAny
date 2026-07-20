@@ -53,7 +53,8 @@ beyond a tiny thumbnail leave the device.
   "thumb": "data:image/jpeg;base64,…",  // ~160px preview, for side-by-side view
   "phash": "a1b2c3d4e5f6a7b8",          // 64-bit DCT perceptual hash, 16 hex
   "vec":   [ /* L2-normalized floats */ ], // colour-grid + gradient-orientation
-  "color": [ /* 64 floats, sums to 1 */ ]  // 4×4×4 RGB histogram
+  "color": [ /* 64 floats, sums to 1 */ ], // 4×4×4 RGB histogram
+  "embed": [ /* optional L2-normalized floats */ ] // learned embedding (opt-in)
 }
 ```
 
@@ -62,10 +63,14 @@ Working resolution is 32×32. `phash` is the top-left 8×8 low-frequency DCT blo
 grid with a gradient-orientation (texture/shape) histogram, L2-normalized so it
 compares by cosine. `color` is a separate 64-bin normalized RGB histogram.
 
-`photoSignature()` is the single designated extension point: a learned image
-embedding (e.g. MobileCLIP/DINO via onnxruntime-web) can replace the classical
-descriptor **without changing the capsule shape or the scoring** — only the
-numbers in `vec` change.
+**`embed` (optional, learned)** — an L2-normalized embedding from a learned model
+(the reference web layer injects a **MediaPipe Image Embedder**, MobileNetV3,
+~4 MB, via a `MatcherAdapter`). It's opt-in ("better matching") because it needs a
+model download, unlike the instant, zero-download classical path. **Additive and
+backward-compatible:** the appearance score uses `embed` **only when both** the
+origin and the fresh photo carry it (§5); otherwise it's ignored and matching
+falls back to `vec` + `phash`, so any capsule stays verifiable by anyone — model or
+not. Because `embed` is inside the signature, it's covered by the capsule `id`.
 
 ## 3. The id — keyless content addressing
 
@@ -101,7 +106,7 @@ one score in **0–100**:
 
 | Signal | Key | Weight | Compared by |
 |---|---|---|---|
-| Product appearance | `visual` | 0.50 | cosine(`vec`) + Hamming(`phash`) |
+| Product appearance | `visual` | 0.50 | cosine(`vec`) + Hamming(`phash`); if both sides have `embed`, cosine(`embed`) dominates |
 | Colour / material | `color` | 0.25 | histogram similarity |
 | Box / label text | `text` | 0.25 | fuzzy match **rate** of the two OCR reads |
 

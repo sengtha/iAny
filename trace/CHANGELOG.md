@@ -6,6 +6,18 @@ version (`v`) as its compatibility anchor; see [`SPEC.md`](./SPEC.md).
 
 ## [Unreleased]
 
+### Added
+- **Optional "better matching" via a learned embedding.** New `MatcherAdapter`
+  (`web/adapters.ts`) + a MediaPipe Image Embedder implementation
+  (`web/mediapipeMatcher.ts`, MobileNetV3-small, ~4 MB, Apache-2.0). When switched
+  on, each photo gets an L2-normalized learned embedding (`PhotoSig.embed`) for a
+  sharper, more lighting/angle-robust appearance match. Opt-in and lazy (the ~125
+  KB MediaPipe runtime + model load only on toggle); the zero-download classical
+  descriptor stays the default. Backward-compatible: `embed` is scored only when
+  **both** sides carry it, else matching falls back to `vec` + `phash`, so any
+  capsule stays verifiable with or without the model. The capsule format is
+  unchanged apart from the additive optional `embed` field (still pinned by `id`).
+
 ### Changed
 - **Extracted into a self-contained `trace/` folder** (engine / web / worker +
   docs + license) so Trace can be run, embedded, or split out (`git subtree

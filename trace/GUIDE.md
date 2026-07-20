@@ -177,11 +177,16 @@ Khmer OCR label scan; witness/GPS/story context; optional registry (trusted time
   download, instant** — keeps the works-on-any-cheap-phone-offline property.
 - **Guided multi-angle capture** (Front / Back-label / Close-up prompts) to cut
   lighting/angle noise and make a match harder to fake.
-- *Optional next:* a **learned on-device embedding** (MobileCLIP / DINO via
-  onnxruntime-web) can drop into the `photoSignature()` swap-in for an even bigger
-  jump — deferred by default because it adds a ~10–80 MB model download; the
-  classical descriptor keeps Trace instant and download-free. A **grade/quality
-  classifier** can be added as an extra scored signal the same way.
+- **Optional "better matching" — a learned embedding** ✅ A **MediaPipe Image
+  Embedder** (MobileNetV3-small, ~4 MB, Apache-2.0) can be turned on to attach an
+  L2-normalized learned embedding (`PhotoSig.embed`) to each photo, giving a
+  sharper, more lighting/angle-robust appearance match. It's **opt-in and lazy**
+  (nothing downloads until you toggle it) so the classical descriptor keeps Trace
+  instant and download-free by default, and it's **backward-compatible** — scored
+  only when both the origin and fresh photo carry it, else it falls back to the
+  classical match, so any capsule stays verifiable with or without the model.
+  *Optional next:* a **grade/quality classifier** can be added as an extra scored
+  signal the same way.
 
 **v3 (now) — credibility & reach.** ✅
 - **Consumer provenance page** (`/trace?p=<id>`): publish a capsule as a

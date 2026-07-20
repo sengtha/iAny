@@ -13,7 +13,7 @@ const COMPANY_NAME = 'E-KHMER Technology Co., Ltd'
  * capabilities to the tree. A host (iAny, or any deployment) renders this and
  * optionally injects capability adapters.
  */
-export function TraceApp({ ocr, stt }: TraceCaps) {
+export function TraceApp({ ocr, stt, matcher }: TraceCaps) {
   const [lang, setLang] = useState<'en' | 'km'>(() => {
     try { return (localStorage.getItem('trace.lang') as 'en' | 'km') || 'en' } catch { return 'en' }
   })
@@ -22,7 +22,7 @@ export function TraceApp({ ocr, stt }: TraceCaps) {
   const L = (en: string, khmer: string) => (km ? khmer : en)
 
   return (
-    <TraceCtx.Provider value={{ ocr, stt }}>
+    <TraceCtx.Provider value={{ ocr, stt, matcher }}>
       <div className="voice-shell">
         <header className="voice-topbar">
           <div className="voice-brand">

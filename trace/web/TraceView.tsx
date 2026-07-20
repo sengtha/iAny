@@ -109,6 +109,59 @@ export function TraceView({ lang }: { lang: 'en' | 'km' }) {
 
 type LFn = (en: string, khmer: string) => string
 
+/* ------------------------------------------ learned "better matching" opt-in */
+
+interface MatcherState {
+  available: boolean
+  on: boolean
+  phase: 'off' | 'loading' | 'ready'
+  progress: number
+  toggle: () => void
+  embed: (blob: Blob) => Promise<number[] | null>
+}
+
+/** Wraps the optional MatcherAdapter: lazy-load on first toggle, then attach a
+ *  learned embedding to each photo. No adapter → `available:false` (button hidden). */
+function useMatcher(): MatcherState {
+  const { matcher } = useTraceCaps()
+  const [on, setOn] = useState(false)
+  const [phase, setPhase] = useState<'off' | 'loading' | 'ready'>('off')
+  const [progress, setProgress] = useState(0)
+  const toggle = () => {
+    if (!matcher) return
+    if (on) { setOn(false); return }
+    if (phase === 'ready') { setOn(true); return }
+    setPhase('loading'); setProgress(0)
+    void matcher.prepare((f) => setProgress(f))
+      .then(() => { setPhase('ready'); setOn(true) })
+      .catch(() => setPhase('off'))
+  }
+  const embed = (blob: Blob) => (on && matcher ? matcher.embed(blob) : Promise.resolve(null))
+  return { available: !!matcher, on, phase, progress, toggle, embed }
+}
+
+function MatcherToggle({ m, L }: { m: MatcherState; L: LFn }) {
+  const { matcher } = useTraceCaps()
+  if (!m.available || !matcher) return null
+  const size = matcher.sizeMb ? ` · ${matcher.sizeMb} MB` : ''
+  const label =
+    m.phase === 'loading'
+      ? `${L('Loading matcher', 'កំពុងផ្ទុកម៉ូឌែល')}… ${Math.round(m.progress * 100)}%`
+      : m.on
+        ? `✓ ${L('Better matching on', 'ការផ្គូផ្គងកាន់តែល្អ (បើក)')}`
+        : `✨ ${L('Better matching', 'ការផ្គូផ្គងកាន់តែល្អ')} (${L('small download', 'ទាញយកតូច')}${size})`
+  return (
+    <button
+      type="button"
+      className={`voice-ghost trace-scan ${m.on ? 'trace-matcher-on' : ''}`}
+      disabled={m.phase === 'loading'}
+      onClick={m.toggle}
+    >
+      {label}
+    </button>
+  )
+}
+
 /* ------------------------------------------------------------------ create */
 
 function Create({ L }: { L: LFn }) {
@@ -127,11 +180,18 @@ function Create({ L }: { L: LFn }) {
   const [prev, setPrev] = useState<{ id: string; step: number } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const prevRef = useRef<HTMLInputElement>(null)
+  const m = useMatcher()
 
   async function addPhotos(files: FileList) {
     setBusy(true)
-    const sigs = await Promise.all([...files].map((f) => photoSignature(f)))
-    setPhotos((p) => [...p, ...sigs.map((sig) => ({ sig }))])
+    const sigs = await Promise.all(
+      [...files].map(async (f) => {
+        const sig = await photoSignature(f)
+        const emb = await m.embed(f)
+        return { sig: emb ? { ...sig, embed: emb } : sig }
+      }),
+    )
+    setPhotos((p) => [...p, ...sigs])
     setBusy(false)
   }
 
@@ -268,6 +328,7 @@ function Create({ L }: { L: LFn }) {
         {L('Tip: a few angles — especially a close-up of texture — make the match stronger and harder to fake.',
            'គន្លឹះ៖ ថតពីរបីមុំ — ជាពិសេសរូបជិតនៃវាយនភាព — ធ្វើឲ្យការផ្គូផ្គងកាន់តែរឹងមាំ និងពិបាកក្លែងបន្លំ។')}
       </small>
+      <MatcherToggle m={m} L={L} />
 
       {/* Step 2 — optional details, hidden until asked for. */}
       <details className="trace-more">
@@ -365,6 +426,7 @@ function Verify({ L, preload }: { L: LFn; preload?: TraceCapsule }) {
   const [registry, setRegistry] = useState<RegistryInfo | null>(null)
   const capRef = useRef<HTMLInputElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const m = useMatcher()
 
   async function loadCapsule(file: File) {
     setResult(null); setPhotos([]); setBoxText('')
@@ -380,10 +442,20 @@ function Verify({ L, preload }: { L: LFn; preload?: TraceCapsule }) {
 
   async function addPhotos(files: FileList) {
     setBusy(true)
-    const sigs = await Promise.all([...files].map((f) => photoSignature(f)))
+    const sigs = await Promise.all(
+      [...files].map(async (f) => {
+        const sig = await photoSignature(f)
+        const emb = await m.embed(f)
+        return emb ? { ...sig, embed: emb } : sig
+      }),
+    )
     setPhotos((p) => [...p, ...sigs])
     setBusy(false)
   }
+
+  // If the origin proof itself used better matching, prompt the verifier to turn
+  // it on so both sides carry embeddings (otherwise it falls back to classical).
+  const originHasEmbed = !!capsule?.match.photos.some((p) => p.embed?.length)
 
   function verify() {
     if (!capsule) return
@@ -432,6 +504,11 @@ function Verify({ L, preload }: { L: LFn; preload?: TraceCapsule }) {
         {photos.map((p, i) => <img key={i} src={p.thumb} alt="" />)}
         <button className="trace-add" onClick={() => fileRef.current?.click()}>＋</button>
       </div>
+      {originHasEmbed && !m.on && (
+        <small className="hint">✨ {L('This proof used better matching — turn it on for the most accurate result.',
+          'ភស្តុតាងនេះប្រើការផ្គូផ្គងកាន់តែល្អ — សូមបើកវាដើម្បីលទ្ធផលត្រឹមត្រូវបំផុត។')}</small>
+      )}
+      <MatcherToggle m={m} L={L} />
       <label className="voice-field">
         <span>🏷️ {L('Text on the box now', 'អក្សរនៅលើប្រអប់ឥឡូវ')}</span>
         <textarea lang="km" rows={2} value={boxText} onChange={(e) => setBoxText(e.target.value)} />

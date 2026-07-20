@@ -1,10 +1,11 @@
 import { createContext, useContext } from 'react'
-import type { OcrAdapter, SttAdapter } from './adapters'
+import type { MatcherAdapter, OcrAdapter, SttAdapter } from './adapters'
 
-/** Host-provided capabilities, read by the OCR/voice buttons. */
+/** Host-provided capabilities, read by the OCR/voice/matcher buttons. */
 export interface TraceCaps {
   ocr?: OcrAdapter
   stt?: SttAdapter
+  matcher?: MatcherAdapter
 }
 
 export const TraceCtx = createContext<TraceCaps>({})

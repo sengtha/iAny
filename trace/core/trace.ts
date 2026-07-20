@@ -30,6 +30,12 @@ export interface PhotoSig {
   vec: number[]
   /** 64-bin (4×4×4) normalized RGB colour histogram — the separate colour signal. */
   color: number[]
+  /** Optional L2-normalized LEARNED embedding (e.g. MediaPipe Image Embedder),
+   *  attached by a host that provides a MatcherAdapter. When BOTH the origin and
+   *  the fresh photo carry it, the appearance match uses it (sharper, more
+   *  lighting/angle-robust); otherwise it's ignored and the classical `vec`+`phash`
+   *  are used — so a capsule stays verifiable by anyone, model or not. */
+  embed?: number[]
 }
 
 export interface TraceCapsule {
@@ -274,10 +280,11 @@ async function thumbnail(blob: Blob, max = 160): Promise<string> {
 /**
  * Turn a product photo into its signature (thumb + descriptors).
  *
- * ⭐ This is the single swap-in point: to use a learned on-device image
- * embedding (MobileCLIP / DINO via onnxruntime-web) instead of / alongside the
- * classical descriptor, compute it here and add it to `vec` — the capsule shape
- * and the scoring below stay the same.
+ * Always computes the zero-dependency classical descriptor (works on any phone,
+ * offline, instantly). To ADD a learned embedding for a sharper match, a host
+ * injects a `MatcherAdapter` (see web/adapters.ts) and merges its result into the
+ * returned sig's optional `embed` field — the capsule shape and the scoring stay
+ * the same, and a verifier without the model still matches on the classical part.
  */
 export async function photoSignature(blob: Blob): Promise<PhotoSig> {
   const bmp = await createImageBitmap(blob)
@@ -321,7 +328,13 @@ function bestPhotoMatch(fresh: PhotoSig, origins: PhotoSig[]): { v: number; c: n
   for (const o of origins) {
     const cos = cosine(fresh.vec, o.vec)
     const ham = hammingSimilarity(fresh.phash, o.phash)
-    const v = 0.65 * cos + 0.35 * ham
+    let v = 0.65 * cos + 0.35 * ham
+    // If BOTH sides carry a learned embedding, let it dominate the appearance
+    // score — it's more robust to lighting/angle than the classical descriptor.
+    // Missing on either side → pure-classical (keeps offline/no-model verify working).
+    if (fresh.embed && fresh.embed.length && o.embed && o.embed.length) {
+      v = 0.6 * cosine(fresh.embed, o.embed) + 0.4 * v
+    }
     const c = histSimilarity(fresh.color, o.color)
     const sum = v + c
     if (sum > best.sum) best = { v, c, sum }

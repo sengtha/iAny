@@ -1997,6 +1997,12 @@ progress {
 @keyframes trace-rec-pulse {
   50% { opacity: 0.55; }
 }
+/* "Better matching" toggle — active (learned embedder on). */
+.trace-scan.trace-matcher-on {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-weak);
+}
 
 /* Trace v4 — journey / event chain */
 .trace-events {
