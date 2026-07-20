@@ -1,0 +1,42 @@
+{
+  "observation": {
+    "v": 1,
+    "kind": "observation",
+    "device": "BGChLwM7Ypj_R0I-MPsEt_375vvDj3aWKUOex6wt-MAyfil3oKPEI4sadvt9KHY00I8N1U06op-kyGbGJdzbxrw",
+    "plot": "home-garden-01",
+    "species": "mango",
+    "count": 1,
+    "measure": {
+      "method": "dbh_height",
+      "dbh_cm": 20,
+      "height_m": 8
+    },
+    "biomassKg": 93.73,
+    "co2Kg": 161.52,
+    "gps": {
+      "lat": 11.556789,
+      "lng": 104.928123,
+      "acc": 8
+    },
+    "observedAt": "2026-07-14T08:30:00.000Z",
+    "photoHash": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+    "prev": "d60470910b133ba6dd5ea89ab27aea36ab0f07c798fdd425652f793dd1ec2720",
+    "note": "",
+    "id": "b1e50a21609730a026e945fceb24b583ef78bc7752bbc24b478128ba94f162c1",
+    "sig": "vNtVNCj8IG9F1HiOxobTtOFx38b-kQId4s5Eq0xftKP7ddGGE_MuGqbEtYYDGp0tQ9e8-mJXcoODPAvebM1Htw"
+  },
+  "attestations": [
+    {
+      "v": 1,
+      "kind": "attestation",
+      "ref": "b1e50a21609730a026e945fceb24b583ef78bc7752bbc24b478128ba94f162c1",
+      "device": "BNUXdPY6auioiAN80oYfUbWMeqCeecYP6_aWl6Vx7kI9co9BgXeW1r210j4gqOruYAFkT2VVvIcOrDxuPVJMiUA",
+      "verdict": "confirm",
+      "note": "Visited — a healthy mango, ~8 m.",
+      "at": "2026-07-16T10:00:00.000Z",
+      "id": "44baaecfa014628a7a73091ee6b147a4d7728fc6f82bfd5370749d817155d600",
+      "sig": "OXCacXWRSwPzrRrT1r9hJpRAVOev4R0YsJ8QaZ2mZpVOl0-Jvb5YPrwInEj5EN3IajNAUeQ1GJcijRqX-RL4yA"
+    }
+  ],
+  "trust": 63
+}

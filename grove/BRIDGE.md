@@ -13,6 +13,11 @@ signed records anyone can, and it can **verify every one for itself**.
 > 2014), never a certified carbon credit. The virtual world should render it as
 > "estimated CO₂ captured", not a tradable asset. See [SPEC.md](./SPEC.md) §7.
 
+> **Build against real data now.** [`fixtures/`](./fixtures) has genuinely
+> device-signed sample records that verify with the reference verifier — an
+> export bundle plus one example of every node response below. Develop your
+> ingest + verify path against them before the node is live.
+
 ---
 
 ## 1. Two ways to connect
