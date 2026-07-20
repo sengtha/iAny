@@ -1597,6 +1597,79 @@ progress {
   color: var(--fg-muted);
 }
 
+/* Live camera "point → guess → capture" (shared LiveCapture) */
+.live-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.live-entry-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 18px 12px;
+  border-radius: 16px;
+  border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--fg);
+  cursor: pointer;
+}
+.live-entry-btn .live-entry-ic {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+.live-entry-btn b {
+  font-size: 1rem;
+}
+.live-entry-btn small {
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+}
+.live-guess {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(8, 16, 31, 0.68);
+  backdrop-filter: blur(6px);
+  color: #fff;
+  font-size: 0.95rem;
+}
+.live-guess span[aria-hidden] {
+  font-size: 1.3rem;
+  line-height: 1;
+}
+.live-guess b {
+  color: #4ade80;
+}
+.live-guess small {
+  margin-left: auto;
+  color: #cbd5e1;
+  font-size: 0.8rem;
+}
+.live-guess-none {
+  color: #cbd5e1;
+  justify-content: center;
+}
+.live-guess-tag {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: rgba(8, 16, 31, 0.62);
+  color: #fbbf24;
+  backdrop-filter: blur(6px);
+}
+
 /* /crop — crop + condition label chips */
 .crop-chips {
   display: flex;

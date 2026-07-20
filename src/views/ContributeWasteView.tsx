@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useI18n } from '../i18n'
-import { WASTE_TYPES } from '../assets/wasteLabels'
+import { WASTE_TYPES, WASTE_BY_ID } from '../assets/wasteLabels'
+import { createImageClassifier, type ImageClassifierAdapter } from '../lib/imageClassifier'
+import { guessWasteType } from '../lib/wasteGuess'
+import { LiveCapture, type LiveGuess } from './LiveCapture'
 import {
   deviceId,
   EMPTY_WASTE_PROFILE,
@@ -31,7 +34,23 @@ import type { GeoPoint } from '../lib/geo'
  * recyclables — recycling education + knowing what has resale value. Easy to
  * bootstrap (TrashNet / TACO). See docs/ENVIRONMENT-AI.md.
  */
-type Phase = 'idle' | 'label' | 'uploading'
+type Phase = 'idle' | 'live' | 'label' | 'uploading'
+
+// One shared live classifier (lazy: the model only downloads when live mode opens).
+// Pretrained EfficientNet-Lite (ImageNet) in VIDEO mode — a rough beta guess until
+// the /waste-trained model exists (see src/lib/wasteGuess.ts).
+let sharedClassifier: ImageClassifierAdapter | null = null
+function liveClassifier(): ImageClassifierAdapter {
+  if (!sharedClassifier) {
+    sharedClassifier = createImageClassifier({
+      wasmPath: `${location.origin}/mediapipe`,
+      modelUrl: `${location.origin}/models/sengtha/mediapipe-classifier/resolve/main/efficientnet_lite0.tflite`,
+      runningMode: 'VIDEO',
+      maxResults: 5,
+    })
+  }
+  return sharedClassifier
+}
 
 const OCR_WARN_KEY = {
   blurry: 'ocrWarnBlurry',
@@ -194,6 +213,27 @@ function Collector({
     setPhase('label')
   }
 
+  // From live mode: the frame is already downscaled; pre-select the guessed type.
+  async function onLiveCapture(blob: Blob, w: number, h: number, g: LiveGuess | null) {
+    setError('')
+    if (previewUrl) URL.revokeObjectURL(previewUrl)
+    setImage(blob)
+    setDims({ w, h })
+    setPreviewUrl(URL.createObjectURL(blob))
+    if (g && WASTE_BY_ID[g.typeId]) setType(g.typeId)
+    try {
+      const q = await analyzeImage(blob)
+      setQuality(q)
+      setWarnings(assessOcr(q).warnings)
+      setIsDup(!!nearDuplicate(q.phash, loadSubmittedHashes()))
+    } catch {
+      setQuality(null)
+      setWarnings([])
+      setIsDup(false)
+    }
+    setPhase('label')
+  }
+
   function reset() {
     if (previewUrl) URL.revokeObjectURL(previewUrl)
     setImage(null)
@@ -246,11 +286,29 @@ function Collector({
         }}
       />
 
-      {!image ? (
-        <div className="ocr-drop" onClick={() => fileRef.current?.click()}>
-          <div className="ocr-drop-icon">♻️</div>
-          <div className="ocr-drop-title">{t('wasteTake')}</div>
-          <div className="ocr-drop-sub">{t('wasteTakeSub')}</div>
+      {phase === 'live' ? (
+        <LiveCapture
+          classifier={liveClassifier()}
+          guess={guessWasteType}
+          typeLabel={(id) => {
+            const w = WASTE_BY_ID[id]
+            return { emoji: w?.emoji ?? '♻️', text: w ? (km ? w.km : w.en) : id }
+          }}
+          onCancel={() => setPhase('idle')}
+          onCapture={onLiveCapture}
+        />
+      ) : !image ? (
+        <div className="live-entry">
+          <button type="button" className="live-entry-btn primary" onClick={() => setPhase('live')}>
+            <span className="live-entry-ic" aria-hidden>📷</span>
+            <b>{t('wasteLiveTitle')}</b>
+            <small>{t('wasteLiveSub')}</small>
+          </button>
+          <div className="ocr-drop" onClick={() => fileRef.current?.click()}>
+            <div className="ocr-drop-icon">🖼️</div>
+            <div className="ocr-drop-title">{t('wasteTake')}</div>
+            <div className="ocr-drop-sub">{t('wasteTakeSub')}</div>
+          </div>
         </div>
       ) : (
         <>

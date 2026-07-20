@@ -59,7 +59,15 @@ Each is the same collect → train → deploy loop; only the dataset changes.
   open dataset → offline classifier for recycling education, correct sorting, and
   knowing what a waste-buyer will take. Easy to bootstrap (TrashNet / TACO), no
   safety failure mode. **Litter mapping built** — an optional GPS point turns a
-  waste photo into a map point.
+  waste photo into a map point. **Live camera mode built** — point the phone at an
+  item to see a material *guess* on the frame in real time, then tap to capture +
+  contribute (the guess pre-fills the label, which you confirm or correct). The
+  guess currently runs MediaPipe's pretrained EfficientNet-Lite (ImageNet) mapped
+  to our material types ([`src/lib/wasteGuess.ts`](../src/lib/wasteGuess.ts)) — a
+  rough **beta** hint until the `/waste`-trained model exists; swapping in the real
+  model is a one-line URL change. The reusable live view is
+  [`src/views/LiveCapture.tsx`](../src/views/LiveCapture.tsx), so `/street` and the
+  other collectors can adopt the same "point → guess → capture" UX.
 - **🌿 Species / nature ID** — *collector built* ([`/species`](https://iany.app/species)):
   plants, birds, insects, fish for biodiversity monitoring (iNaturalist-style), and
   **mosquitoes** for dengue/malaria **disease-vector surveillance** (bridges

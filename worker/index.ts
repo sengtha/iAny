@@ -43,6 +43,7 @@ const ALLOWED_PREFIXES = [
   'sengtha/mediapipe-hand/', // MediaPipe hand_landmarker.task (KSL /sign collector)
   'sengtha/mediapipe-embed/', // MediaPipe Image Embedder (Trace "better matching")
   'sengtha/mediapipe-detector/', // MediaPipe Object Detector (EfficientDet, /traffic)
+  'sengtha/mediapipe-classifier/', // MediaPipe Image Classifier (EfficientNet-Lite, live /waste guess)
 ]
 // OCR language data, served through the same mirror. Khmer uses the
 // high-accuracy models; English's fast model is accurate enough.
@@ -65,6 +66,11 @@ const MEDIAPIPE_EMBED_URL =
 // live vehicle/people detector for /traffic. Mirrored from Google's model storage.
 const MEDIAPIPE_DETECTOR_URL =
   'https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/int8/1/efficientdet_lite0.tflite'
+// MediaPipe Image Classifier (EfficientNet-Lite0 int8, ~5.4 MB, Apache-2.0) — the
+// pretrained ImageNet classifier that powers the live /waste "guess" until a
+// purpose-trained waste model exists. Mirrored from Google's model storage.
+const MEDIAPIPE_CLASSIFIER_URL =
+  'https://storage.googleapis.com/mediapipe-models/image_classifier/efficientnet_lite0/int8/1/efficientnet_lite0.tflite'
 
 function upstreamUrl(key: string, hfPath: string): string {
   if (key.startsWith('tessdata2/')) {
@@ -79,6 +85,9 @@ function upstreamUrl(key: string, hfPath: string): string {
   }
   if (key.startsWith('sengtha/mediapipe-detector/')) {
     return MEDIAPIPE_DETECTOR_URL
+  }
+  if (key.startsWith('sengtha/mediapipe-classifier/')) {
+    return MEDIAPIPE_CLASSIFIER_URL
   }
   return `${HF}/${hfPath}`
 }

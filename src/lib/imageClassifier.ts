@@ -29,15 +29,25 @@ export interface ImageClassifierAdapter {
   prepare(onProgress?: (fraction: number) => void): Promise<void>
   /** Top-`k` predictions for a photo, highest score first (empty if it failed). */
   classify(blob: Blob, k?: number): Promise<Classification[]>
+  /**
+   * Top-`k` predictions for a live video frame (only in `runningMode: 'VIDEO'`).
+   * Synchronous + fast so it can run every animation frame for a live overlay.
+   * `timestampMs` must strictly increase. Returns [] before the model is ready.
+   */
+  classifyVideo(video: HTMLVideoElement, timestampMs: number, k?: number): Classification[]
+  close(): void
 }
 
 export function createImageClassifier(opts: {
   wasmPath: string
   modelUrl: string
   maxResults?: number
+  /** IMAGE (default) for still photos, VIDEO for a live camera overlay. */
+  runningMode?: 'IMAGE' | 'VIDEO'
 }): ImageClassifierAdapter {
   let classifier: ImageClassifier | null = null
   let loading: Promise<ImageClassifier> | null = null
+  const mode = opts.runningMode ?? 'IMAGE'
 
   async function ensure(onProgress?: (f: number) => void): Promise<ImageClassifier> {
     if (classifier) return classifier
@@ -50,6 +60,7 @@ export function createImageClassifier(opts: {
         const buf = await fetchWithProgress(opts.modelUrl, (f) => onProgress?.(0.05 + 0.9 * f))
         const c = await ImageClassifier.createFromOptions(fileset, {
           baseOptions: { modelAssetBuffer: new Uint8Array(buf), delegate: 'GPU' },
+          runningMode: mode,
           maxResults: opts.maxResults ?? 3,
         })
         classifier = c
@@ -63,6 +74,11 @@ export function createImageClassifier(opts: {
     return loading
   }
 
+  const toResults = (cats: { categoryName?: string; displayName?: string; index: number; score: number }[], k?: number): Classification[] =>
+    cats
+      .slice(0, k ?? cats.length)
+      .map((cat) => ({ label: cat.categoryName || cat.displayName || String(cat.index), score: cat.score }))
+
   return {
     async prepare(onProgress) {
       await ensure(onProgress)
@@ -71,15 +87,30 @@ export function createImageClassifier(opts: {
       try {
         const c = await ensure()
         const bmp = await createImageBitmap(blob)
-        const res = c.classify(bmp)
+        const res = mode === 'VIDEO' ? c.classifyForVideo(bmp, performance.now()) : c.classify(bmp)
         bmp.close()
-        const cats = res.classifications?.[0]?.categories ?? []
-        return cats
-          .slice(0, k ?? cats.length)
-          .map((cat) => ({ label: cat.categoryName || cat.displayName || String(cat.index), score: cat.score }))
+        return toResults(res.classifications?.[0]?.categories ?? [], k)
       } catch {
         return []
       }
+    },
+    classifyVideo(video, timestampMs, k) {
+      if (!classifier || mode !== 'VIDEO') return []
+      try {
+        const res = classifier.classifyForVideo(video, timestampMs)
+        return toResults(res.classifications?.[0]?.categories ?? [], k)
+      } catch {
+        return []
+      }
+    },
+    close() {
+      try {
+        classifier?.close()
+      } catch {
+        /* ignore */
+      }
+      classifier = null
+      loading = null
     },
   }
 }

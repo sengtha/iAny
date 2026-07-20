@@ -318,6 +318,8 @@ export const en = {
   wasteConsent:
     'I agree these photos may be published in an open dataset and used to train free, open AI models.',
   wasteTip: 'No personal info is collected — only the item photo and the material you pick.',
+  wasteLiveTitle: 'Point camera (live guess)',
+  wasteLiveSub: 'see the material live, then tap to capture + contribute',
   wasteTake: 'Take / choose a photo of one item',
   wasteTakeSub: 'one item, filling the frame, on a plain background if you can',
   wasteWhichType: 'What material is it?',

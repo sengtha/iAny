@@ -115,6 +115,21 @@ export default defineConfig({
             },
           },
           {
+            // MediaPipe vision .tflite models (Trace embedder, /traffic detector,
+            // live /waste classifier). Cache on first fetch so the live features
+            // work offline afterward, like the hand model.
+            urlPattern: ({ url }) =>
+              /\/models\/sengtha\/mediapipe-(embed|detector|classifier)\//.test(url.pathname) ||
+              url.pathname.endsWith('.tflite'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'runtime-vision-models',
+              expiration: { maxEntries: 6 },
+              cacheableResponse: { statuses: [0, 200] },
+              rangeRequests: true,
+            },
+          },
+          {
             // Radio loop music (.mp3) and the pdf.js worker (.mjs) are bundled
             // but not precached — cache them the first time they're used, so
             // installs stay lean but the features work offline afterward.
