@@ -12,7 +12,7 @@ See docs/RUNPOD-KHMER-STT.md.
 
 Setup (online / fresh pod):
     apt-get update && apt-get install -y libsndfile1 ffmpeg
-    pip install -q -U transformers "datasets<4" evaluate jiwer librosa soundfile accelerate
+    pip install -q -U transformers "datasets<4" jiwer librosa soundfile accelerate
 
 Examples:
     # GPU, HF benchmark + baseline:
@@ -33,7 +33,7 @@ import os
 import re
 
 import torch
-import evaluate
+import jiwer
 from datasets import load_dataset, load_from_disk, Audio, DatasetDict
 from transformers import WhisperProcessor, WhisperForConditionalGeneration
 
@@ -98,10 +98,16 @@ def transcribe(model, proc, ds, batch, dev, dtype):
     return hyps
 
 
-def report(tag, refs, hyps, cer_m, wer_m):
-    craw = 100 * cer_m.compute(predictions=hyps, references=refs)
-    cnrm = 100 * cer_m.compute(predictions=[norm(x) for x in hyps], references=[norm(x) for x in refs])
-    wraw = 100 * wer_m.compute(predictions=hyps, references=refs)
+def _metric(fn, rs, hs):
+    """jiwer CER/WER, skipping pairs with an empty reference (jiwer errors on those)."""
+    pairs = [(a, b) for a, b in zip(rs, hs) if a and a.strip()]
+    return 100 * fn([a for a, _ in pairs], [b for _, b in pairs]) if pairs else float("nan")
+
+
+def report(tag, refs, hyps):
+    craw = _metric(jiwer.cer, refs, hyps)
+    cnrm = _metric(jiwer.cer, [norm(x) for x in refs], [norm(x) for x in hyps])
+    wraw = _metric(jiwer.wer, refs, hyps)
     print(f"\n[{tag}]  N={len(refs)}   CER(raw)={craw:.1f}   CER(no-space)={cnrm:.1f}   WER={wraw:.1f}")
 
 
@@ -136,12 +142,11 @@ def main():
     if "input_features" not in ds.column_names and "audio" in ds.column_names:
         ds = ds.cast_column("audio", Audio(sampling_rate=16000))
 
-    cer_m, wer_m = evaluate.load("cer"), evaluate.load("wer")
     proc, model, dtype = load_model(args.model, dev)
 
     refs = references(ds, proc, args.ref_col)
     hyps = transcribe(model, proc, ds, args.batch, dev, dtype)
-    report(args.model, refs, hyps, cer_m, wer_m)
+    report(args.model, refs, hyps)
 
     print("\n--- examples (✓ = exact after space-normalization) ---")
     for r, h in list(zip(refs, hyps))[: args.examples]:
@@ -152,7 +157,7 @@ def main():
         print("\nScoring stock openai/whisper-base (zero-shot)…")
         bproc, bmodel, bdtype = load_model("openai/whisper-base", dev)
         bhyps = transcribe(bmodel, bproc, ds, args.batch, dev, bdtype)
-        report("openai/whisper-base", references(ds, bproc, args.ref_col), bhyps, cer_m, wer_m)
+        report("openai/whisper-base", references(ds, bproc, args.ref_col), bhyps)
 
 
 if __name__ == "__main__":

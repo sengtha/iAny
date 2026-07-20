@@ -59,7 +59,7 @@ re-run §2 to fold in the newer clips.
 Install deps (terminal):
 
 ```bash
-pip install -U "transformers>=4.44" "datasets>=2.18,<4" accelerate evaluate jiwer librosa soundfile tensorboard huggingface_hub
+pip install -U "transformers>=4.44" "datasets>=2.18,<4" accelerate jiwer librosa soundfile tensorboard huggingface_hub
 # Your /voice dataset is thousands of tiny files; HF's Xet backend rate-limits
 # (429) on those. Remove it so downloads use the plain LFS CDN (see §2):
 pip uninstall -y hf_xet
@@ -468,7 +468,7 @@ Self-contained — pulls the model + test set from HF, so it needs no local file
 
 ```bash
 apt-get update && apt-get install -y libsndfile1 ffmpeg
-pip install -q -U transformers "datasets<4" evaluate jiwer librosa soundfile accelerate
+pip install -q -U transformers "datasets<4" jiwer librosa soundfile accelerate
 python scripts/eval_stt.py --n 300 --baseline           # your model + stock whisper-base, on FLEURS km
 python scripts/eval_stt.py --dataset sengtha/iany-khmer-voice --config "" --split train   # real-app audio
 ```
