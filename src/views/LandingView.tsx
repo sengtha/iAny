@@ -189,6 +189,8 @@ export function LandingView() {
           <Feature icon="🛺" title={L('Street vehicles', 'យានយន្តតាមផ្លូវ')}
             badge={L('Collecting data', 'កំពុងប្រមូលទិន្នន័យ')} badgeTone="collecting"
             desc={L('Building a Cambodia-aware vehicle AI — tuk-tuk, remork and cyclo, the classes generic detectors miss. Photograph + tag one vehicle.', 'កំពុងបង្កើត AI ស្គាល់យានយន្តខ្មែរ — តុកតុក រ៉ឺម៉ក ស៊ីក្លូ ដែល AI ទូទៅមិនស្គាល់។ ថត + ដាក់ស្លាកយានយន្តមួយ។')} link="/street" linkLabel={L('Open /street', 'បើក /street')} />
+          <Feature icon="🏷️" title={L('Label reader', 'អានស្លាក ច.ប.ផ')} badge={L('Experiment', 'ពិសោធន៍')}
+            desc={L('Photograph a product label to read its ច.ប.ផ registration code — on-device Khmer OCR, offline, nothing uploaded.', 'ថតស្លាកផលិតផល ដើម្បីអានលេខ ច.ប.ផ — OCR ខ្មែរលើឧបករណ៍ ក្រៅបណ្ដាញ គ្មានការអាប់ឡូត។')} link="/label" linkLabel={L('Try /label', 'សាកល្បង /label')} />
         </div>
       </section>
 
@@ -278,6 +280,7 @@ export function LandingView() {
           <a href="/report">/report</a>
           <a href="/traffic">/traffic</a>
           <a href="/street">/street</a>
+          <a href="/label">/label</a>
           <a href="/braille">/braille</a>
           <a href="/trace">/trace · {L('experiment', 'ពិសោធន៍')}</a>
         </div>

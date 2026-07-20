@@ -88,6 +88,7 @@ export default defineConfig({
           /^\/report(\/|\.html|$)/,
           /^\/traffic(\/|\.html|$)/,
           /^\/street(\/|\.html|$)/,
+          /^\/label(\/|\.html|$)/,
         ],
         runtimeCaching: [
           {
@@ -176,6 +177,7 @@ export default defineConfig({
         report: path.resolve(root, 'report.html'),
         traffic: path.resolve(root, 'traffic.html'),
         street: path.resolve(root, 'street.html'),
+        label: path.resolve(root, 'label.html'),
       },
     },
   },
