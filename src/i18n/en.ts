@@ -237,6 +237,29 @@ export const en = {
   ocrQualityRetake: '— a sharper, well-lit photo trains a better model.',
   ocrDupWarn: 'You already submitted a very similar photo — take a different one, or skip.',
 
+  // Contribute crop photos (/crop)
+  cropTitle: 'Contribute crop photos',
+  cropLead:
+    'Photograph a crop and tag its health. Each photo helps build a free, offline AI that spots crop diseases early — helping farmers with no lab or internet.',
+  cropStatSamples: 'photos',
+  cropOpenData: 'Photos are released as an open, free dataset for anyone to use.',
+  cropOpenModel: 'The crop-health model built from it is released free for everyone.',
+  cropConsent:
+    'I agree these photos may be published in an open dataset and used to train free, open AI models.',
+  cropTip: 'No personal info is collected — only the crop photo and your labels.',
+  cropStart: 'Start contributing',
+  cropUploadFailed: 'Could not save. Check your connection and try again.',
+  cropDoneCount: 'added',
+  cropTake: 'Take / choose a crop photo',
+  cropTakeSub: 'get close to the leaf, fruit, or affected part',
+  cropWhichCrop: 'Which crop?',
+  cropCondition: 'How does it look?',
+  cropNote: 'Note (optional)',
+  cropNotePlaceholder: 'disease name if you know it, or anything useful',
+  cropRetake: 'Retake',
+  cropSubmit: 'Add photo',
+  cropHint: 'Tip: fill the frame with the plant part, avoid glare, one plant per photo.',
+
   // Khmer Braille converter (/braille)
   brTitle: 'Khmer Braille',
   brLead:

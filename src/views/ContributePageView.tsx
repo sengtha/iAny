@@ -93,6 +93,9 @@ export function ContributePageView() {
           <Card icon="🤟" title={L('Contribute sign language', 'ចូលរួមភាសាសញ្ញា')}
             desc={L('Sign Khmer words to the camera — only hand landmarks are stored, never video.', 'ធ្វើសញ្ញាពាក្យខ្មែរទៅកាមេរ៉ា — រក្សាទុកតែចំណុចដៃ មិនមែនវីដេអូ។')}
             link="/sign" linkLabel={L('Open /sign', 'បើក /sign')} />
+          <Card icon="🌱" title={L('Contribute crop photos', 'ចូលរួមរូបថតដំណាំ')}
+            desc={L('Photograph crops and tag their health — builds an offline crop-disease AI for farmers.', 'ថតរូបដំណាំ ហើយដាក់ស្លាកសុខភាព — បង្កើត AI ជំងឺដំណាំក្រៅបណ្ដាញសម្រាប់កសិករ។')}
+            link="/crop" linkLabel={L('Open /crop', 'បើក /crop')} />
           <Card icon="🌐" title={L('Translate & improve Khmer', 'បកប្រែ & កែលម្អខ្មែរ')}
             desc={L('Improve the Khmer wording, prompts, and app text. Great first contribution.', 'កែលម្អពាក្យខ្មែរ ប្រយោគ និងអត្ថបទកម្មវិធី។ ការចូលរួមដំបូងដ៏ល្អ។')}
             link={`${GITHUB_URL}/issues`} linkLabel={L('Good first issues', 'កិច្ចការសម្រាប់អ្នកចាប់ផ្ដើម')} external />

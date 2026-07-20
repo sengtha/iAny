@@ -96,6 +96,30 @@ CREATE TABLE IF NOT EXISTS sign_samples (
 CREATE INDEX IF NOT EXISTS idx_sign_created ON sign_samples (created_at);
 CREATE INDEX IF NOT EXISTS idx_sign_label ON sign_samples (label);
 
+-- Crowd-sourced crop photos (the /crop page). Each row is one (image, crop,
+-- condition) sample for training an open, offline crop-health classifier
+-- (MobileNetV3 — see docs/VISION-MOBILENET.md). The image lives in R2 at r2_key
+-- (foldered crop/<crop>/<condition>/… so the prefix is already a labelled image
+-- dataset); `crop` + `condition` are server-allowlisted label ids. `device` is an
+-- anonymous per-device id; credit_name is opt-in for the released credits.
+CREATE TABLE IF NOT EXISTS crop_samples (
+  id          TEXT PRIMARY KEY,
+  r2_key      TEXT NOT NULL,          -- R2 object key: crop/<crop>/<condition>/<day>-<id>.jpg
+  device      TEXT NOT NULL,          -- anonymous per-device id, e.g. c-3f9a2c71
+  crop        TEXT NOT NULL,          -- crop id (rice, cassava, …)
+  condition   TEXT NOT NULL,          -- healthy / disease / pest / deficiency / unsure
+  note        TEXT,                   -- optional free-text (e.g. disease name if known)
+  credit_name TEXT,                   -- opt-in public credit (dataset contributors)
+  region      TEXT,                   -- optional province/dialect
+  width       INTEGER,
+  height      INTEGER,
+  bytes       INTEGER,
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_crop_created ON crop_samples (created_at);
+CREATE INDEX IF NOT EXISTS idx_crop_crop ON crop_samples (crop);
+CREATE INDEX IF NOT EXISTS idx_crop_condition ON crop_samples (condition);
+
 -- iAny Trace — optional online registry for proof-of-origin capsules (/trace).
 -- Offline verification works without this; the registry only adds a TRUSTED
 -- first-seen timestamp and double-use transparency (verify_count). `id` is a

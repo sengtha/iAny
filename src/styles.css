@@ -1497,6 +1497,27 @@ progress {
   border: 1px solid var(--bg-softer);
   background: var(--bg-soft);
 }
+/* /crop — crop + condition label chips */
+.crop-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+.crop-chips button {
+  background: var(--bg-soft);
+  border: 1px solid var(--bg-softer);
+  border-radius: 999px;
+  padding: 8px 13px;
+  font-size: 0.88rem;
+  min-height: 0;
+}
+.crop-chips button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-fg);
+}
+
 /* Non-blocking quality / duplicate hints under the /scan preview. */
 .ocr-warn {
   margin: 8px 0 0;

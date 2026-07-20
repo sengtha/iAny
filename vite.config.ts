@@ -79,6 +79,7 @@ export default defineConfig({
           /^\/braille(\/|\.html|$)/,
           /^\/sign(\/|\.html|$)/,
           /^\/trace(\/|\.html|$)/,
+          /^\/crop(\/|\.html|$)/,
         ],
         runtimeCaching: [
           {
@@ -143,6 +144,7 @@ export default defineConfig({
         braille: path.resolve(root, 'braille.html'),
         sign: path.resolve(root, 'sign.html'),
         trace: path.resolve(root, 'trace.html'),
+        crop: path.resolve(root, 'crop.html'),
       },
     },
   },

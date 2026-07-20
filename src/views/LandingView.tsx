@@ -167,6 +167,9 @@ export function LandingView() {
             desc={L('Help train a better open Khmer speech model.', 'ជួយបង្រៀនម៉ូឌែលសំឡេងខ្មែរបើកចំហ ឲ្យប្រសើរ។')} link="/voice" linkLabel={L('Open /voice', 'បើក /voice')} />
           <Feature icon="🔖" title={L('Trace', 'Trace')} badge={L('Experiment', 'ពិសោធន៍')}
             desc={L('Offline proof of origin for honest makers — a phone-only trust score built on iAny’s on-device OCR & STT.', 'ភស្តុតាងប្រភពដើមក្រៅបណ្ដាញ សម្រាប់អ្នកផលិតស្មោះត្រង់ — ពិន្ទុទំនុកចិត្តដោយប្រើតែទូរស័ព្ទ ផ្អែកលើ OCR និង STT លើឧបករណ៍របស់ iAny។')} link="/trace" linkLabel={L('Try /trace', 'សាកល្បង /trace')} />
+          <Feature icon="🌱" title={L('Crop health', 'សុខភាពដំណាំ')}
+            badge={L('Collecting data', 'កំពុងប្រមូលទិន្នន័យ')} badgeTone="collecting"
+            desc={L('Building an open, offline crop-disease AI for farmers — spot problems early with just a phone, no lab or internet.', 'កំពុងបង្កើត AI ជំងឺដំណាំបើកចំហ ក្រៅបណ្ដាញ សម្រាប់កសិករ — រកឃើញបញ្ហាឆាប់ ដោយប្រើតែទូរស័ព្ទ។')} link="/crop" linkLabel={L('Open /crop', 'បើក /crop')} />
         </div>
       </section>
 
@@ -192,6 +195,7 @@ export function LandingView() {
             <a className="lp-chip" href="/voice">🎤 {L('Voice', 'សំឡេង')}</a>
             <a className="lp-chip" href="/scan">📷 {L('Scan', 'ស្កេន')}</a>
             <a className="lp-chip" href="/sign">🤟 {L('Sign', 'សញ្ញា')}</a>
+            <a className="lp-chip" href="/crop">🌱 {L('Crop', 'ដំណាំ')}</a>
             <a className="lp-chip" href="/braille">⠿ {L('Braille', 'អក្សរផុស')}</a>
             <a className="lp-chip" href="/contribute">
               {L('All ways to help', 'គ្រប់មធ្យោបាយជួយ')} →
@@ -241,6 +245,7 @@ export function LandingView() {
           <a href="/voice">/voice</a>
           <a href="/scan">/scan</a>
           <a href="/sign">/sign</a>
+          <a href="/crop">/crop</a>
           <a href="/braille">/braille</a>
           <a href="/trace">/trace · {L('experiment', 'ពិសោធន៍')}</a>
         </div>

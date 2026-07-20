@@ -8,7 +8,7 @@ training iterations and work-in-progress — on the profile:
 
 Part of iAny's mission is to **release the best Khmer models open source, with the
 community and for the community.** The community data collectors (`/voice`,
-`/scan`, `/sign`) feed the next versions.
+`/scan`, `/sign`, `/crop`) feed the next versions.
 
 ## Models used in iAny
 
@@ -37,8 +37,9 @@ with opt-in contributor credit:
   — Khmer read speech (audio + transcript) from [`/voice`](https://iany.app/voice),
   for training open Khmer STT. **Live now** and growing as people contribute; it's
   folded into the whisper-base fine-tune (see `docs/RUNPOD-KHMER-STT.md`).
-- 📷 `/scan` (Khmer OCR) and 🤟 `/sign` (Khmer Sign Language landmarks) — collecting
-  now, to be released the same way.
+- 📷 `/scan` (Khmer OCR), 🤟 `/sign` (Khmer Sign Language landmarks), and 🌱 `/crop`
+  (crop-health photos → an offline crop-disease classifier, see
+  `docs/VISION-MOBILENET.md`) — collecting now, to be released the same way.
 
 ### External data used
 
@@ -53,3 +54,4 @@ Every recording, photo, and sign contributed makes the next model better:
 - 🎤 **[iany.app/voice](https://iany.app/voice)** — read Khmer aloud (STT)
 - 📷 **[iany.app/scan](https://iany.app/scan)** — photograph + correct Khmer text (OCR)
 - 🤟 **[iany.app/sign](https://iany.app/sign)** — sign Khmer words (Sign Language)
+- 🌱 **[iany.app/crop](https://iany.app/crop)** — photograph crops + tag health (crop-disease AI)
