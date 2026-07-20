@@ -1225,10 +1225,11 @@ async function waterPostSample(request: Request, env: Env): Promise<Response> {
   }
   await env.DB.prepare(
     `INSERT INTO water_samples
-       (id, r2_key, device, test, level, source, note, credit_name, region, width, height, bytes, created_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       (id, r2_key, device, test, level, source, kit, reading, note, credit_name, region, width, height, bytes, created_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
   ).bind(
-    id, r2Key, device, test, level, source || null, trim('note', 120), trim('creditName', 60),
+    id, r2Key, device, test, level, source || null, trim('kit', 60), trim('reading', 40),
+    trim('note', 120), trim('creditName', 60),
     trim('region', 40), num('width'), num('height'), size, now.toISOString(),
   ).run()
   return json({ id })

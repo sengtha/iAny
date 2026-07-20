@@ -51,6 +51,8 @@ export interface WaterUpload {
   test: string // test-type id (see waterLabels.ts)
   level: string // safety band: safe / caution / unsafe / unclear
   source?: string // water-source id
+  kit?: string // kit / brand — different kits have different colour charts
+  reading?: string // the value read off the kit's chart (e.g. "10 ppb", "pH 6.5")
   note?: string
   width?: number
   height?: number
@@ -66,6 +68,8 @@ export async function uploadSample(sample: WaterUpload, profile: WaterProfile): 
   form.set('device', deviceId())
   form.set('consent', profile.consent ? '1' : '0')
   if (sample.source) form.set('source', sample.source)
+  if (sample.kit?.trim()) form.set('kit', sample.kit.trim())
+  if (sample.reading?.trim()) form.set('reading', sample.reading.trim())
   if (sample.note?.trim()) form.set('note', sample.note.trim())
   if (sample.width) form.set('width', String(sample.width))
   if (sample.height) form.set('height', String(sample.height))

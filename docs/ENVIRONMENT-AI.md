@@ -42,6 +42,13 @@ the field. So:
 question is *safe / treat-it / don't-drink*. Bands make the dataset consistent and
 the output useful. Arsenic especially is a **fail-safe** case: err toward "unsafe."
 
+**How the reader actually works —** [docs/WATER-READING.md](./WATER-READING.md).
+Water is **colorimetry, not classification**: there's no dataset to train a classifier
+on, and you don't need one — the kit's printed chart is the ground truth. The build is
+a classical CV pipeline (localize → white-balance → chart-match → band); `/water`
+collects a **calibration** set (now incl. the *kit* + the exact *chart reading*), not
+training labels. Shoot the strip **beside its colour chart** for reliable colour.
+
 ### Water-safety education
 Water knowledge lives on the [`/health`](https://iany.app/health) education surface
 (safe water, arsenic awareness, treatment: boil / filter / chlorine / SODIS) —

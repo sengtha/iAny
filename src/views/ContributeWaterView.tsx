@@ -160,6 +160,8 @@ function Collector({
   const [test, setTest] = useState('')
   const [level, setLevel] = useState('')
   const [source, setSource] = useState('')
+  const [kit, setKit] = useState('')
+  const [reading, setReading] = useState('')
   const [note, setNote] = useState('')
   const [count, setCount] = useState(0)
   const [error, setError] = useState('')
@@ -199,6 +201,8 @@ function Collector({
     setImage(null)
     setPreviewUrl('')
     setDims(null)
+    setKit('')
+    setReading('')
     setNote('')
     setQuality(null)
     setWarnings([])
@@ -212,7 +216,11 @@ function Collector({
     setPhase('uploading')
     try {
       await uploadSample(
-        { image, test, level, source: source || undefined, note: note.trim() || undefined, width: dims?.w, height: dims?.h },
+        {
+          image, test, level, source: source || undefined,
+          kit: kit.trim() || undefined, reading: reading.trim() || undefined,
+          note: note.trim() || undefined, width: dims?.w, height: dims?.h,
+        },
         profile,
       )
       if (quality) rememberHash(quality.phash)
@@ -292,6 +300,30 @@ function Collector({
                 </button>
               ))}
             </div>
+          </label>
+
+          <label className="voice-field">
+            <span>{t('waterKit')}</span>
+            <input
+              type="text"
+              value={kit}
+              maxLength={60}
+              placeholder={t('waterKitPlaceholder')}
+              onChange={(e) => setKit(e.target.value)}
+            />
+            <small>{t('waterKitHint')}</small>
+          </label>
+
+          <label className="voice-field">
+            <span>{t('waterReading')}</span>
+            <input
+              type="text"
+              value={reading}
+              maxLength={40}
+              placeholder={t('waterReadingPlaceholder')}
+              onChange={(e) => setReading(e.target.value)}
+            />
+            <small>{t('waterReadingHint')}</small>
           </label>
 
           <label className="voice-field">

@@ -157,6 +157,8 @@ CREATE TABLE IF NOT EXISTS water_samples (
   test        TEXT NOT NULL,          -- arsenic / bacteria / ph / chlorine / nitrate / iron / other
   level       TEXT NOT NULL,          -- safe / caution / unsafe / unclear  (classifier target)
   source      TEXT,                   -- tubewell / dugwell / pond / rain / piped / bottled / other
+  kit         TEXT,                   -- kit / brand (different kits = different colour charts)
+  reading     TEXT,                   -- value read off the kit's chart, e.g. "10 ppb" / "pH 6.5"
   note        TEXT,
   credit_name TEXT,                   -- opt-in public credit (dataset contributors)
   region      TEXT,
@@ -168,6 +170,8 @@ CREATE TABLE IF NOT EXISTS water_samples (
 CREATE INDEX IF NOT EXISTS idx_water_created ON water_samples (created_at);
 CREATE INDEX IF NOT EXISTS idx_water_test ON water_samples (test);
 CREATE INDEX IF NOT EXISTS idx_water_level ON water_samples (level);
+-- Migration for an existing DB (safe once): ALTER TABLE water_samples ADD COLUMN kit TEXT;
+--   ALTER TABLE water_samples ADD COLUMN reading TEXT;
 
 -- Crowd-sourced waste/recyclable item photos (the /waste page). Each row is one
 -- (image, material type) sample for training an offline waste-sorting classifier
