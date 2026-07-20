@@ -119,6 +119,9 @@ export default {
     if (url.pathname.startsWith('/api/health-test/')) {
       return serveHealthTest(url, request, env)
     }
+    if (url.pathname.startsWith('/api/water/')) {
+      return serveWater(url, request, env)
+    }
     if (url.pathname.startsWith('/download/')) {
       return serveApk(request, env)
     }
@@ -1103,6 +1106,106 @@ async function htestPostSample(request: Request, env: Env): Promise<Response> {
 async function htestStats(env: Env): Promise<Response> {
   const row = await env.DB.prepare(
     `SELECT COUNT(*) AS samples, COUNT(DISTINCT device) AS devices FROM health_test_samples`,
+  ).first<{ samples: number; devices: number }>()
+  return new Response(
+    JSON.stringify({ samples: row?.samples ?? 0, devices: row?.devices ?? 0 }),
+    { headers: { ...JSON_HEADERS, 'cache-control': 'public, max-age=30' } },
+  )
+}
+
+/* ------------------------------------------------------------------ *
+ * /water — crowd-sourced water-quality test-strip photos for an        *
+ * OFFLINE reader that maps a strip → safety band (safe/caution/unsafe) *
+ * — guidance, not a certified measurement (see docs/ENVIRONMENT-AI.md).*
+ * Strip photo → R2; test + level (+ source) → D1.                      *
+ * ------------------------------------------------------------------ */
+
+const WATER_MAX_BYTES = 8 * 1024 * 1024
+const WATER_DEVICE_RE = /^w-[0-9a-z]{6,16}$/
+// Keep in sync with src/assets/waterLabels.ts (server-side allowlist).
+const WATER_TESTS = new Set(['arsenic', 'bacteria', 'ph', 'chlorine', 'nitrate', 'iron', 'other'])
+const WATER_LEVELS = new Set(['safe', 'caution', 'unsafe', 'unclear'])
+const WATER_SOURCES = new Set(['tubewell', 'dugwell', 'pond', 'rain', 'piped', 'bottled', 'other'])
+
+async function serveWater(url: URL, request: Request, env: Env): Promise<Response> {
+  const path = url.pathname.slice('/api/water/'.length)
+  if (request.method === 'OPTIONS') {
+    return new Response(null, {
+      headers: { ...JSON_HEADERS, 'access-control-allow-methods': 'GET,POST,OPTIONS',
+        'access-control-allow-headers': 'content-type' },
+    })
+  }
+  try {
+    if (path === 'sample' && request.method === 'POST') return await waterPostSample(request, env)
+    if (path === 'stats' && request.method === 'GET') return await waterStats(env)
+    return json({ error: 'not found' }, 404)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    const hint = /no such table|water_samples/i.test(msg)
+      ? 'water storage not initialised — run the D1 schema migration (worker/schema.sql)'
+      : 'server error'
+    return json({ error: hint, detail: msg }, 500)
+  }
+}
+
+// Public: accept one (strip image, test, level) sample. multipart/form-data.
+async function waterPostSample(request: Request, env: Env): Promise<Response> {
+  let form: FormData
+  try {
+    form = await request.formData()
+  } catch {
+    return json({ error: 'expected multipart form' }, 400)
+  }
+  const entry = form.get('image') as unknown
+  const test = String(form.get('test') ?? '').trim()
+  const level = String(form.get('level') ?? '').trim()
+  const source = String(form.get('source') ?? '').trim()
+  const device = String(form.get('device') ?? '').trim()
+  const consent = String(form.get('consent') ?? '') === '1'
+
+  if (!entry || typeof entry === 'string') return json({ error: 'image required' }, 400)
+  const image = entry as Blob
+  if (!consent) return json({ error: 'consent required' }, 403)
+  if (!WATER_TESTS.has(test)) return json({ error: 'bad test' }, 400)
+  if (!WATER_LEVELS.has(level)) return json({ error: 'bad level' }, 400)
+  if (source && !WATER_SOURCES.has(source)) return json({ error: 'bad source' }, 400)
+  if (!WATER_DEVICE_RE.test(device)) return json({ error: 'bad device id' }, 400)
+  const size = image.size
+  if (!size || size > WATER_MAX_BYTES) return json({ error: 'image too large or empty' }, 413)
+
+  const id = crypto.randomUUID()
+  const now = new Date()
+  const day = now.toISOString().slice(0, 10).replace(/-/g, '')
+  const type = image.type === 'image/png' ? 'png' : 'jpg'
+  // Foldered by test/level so the R2 prefix is already a labelled dataset.
+  const r2Key = `water/${test}/${level}/${day}-${id}.${type}`
+  await env.MODELS.put(r2Key, await image.arrayBuffer(), {
+    httpMetadata: { contentType: image.type || 'image/jpeg' },
+    customMetadata: { device, test, level },
+  })
+
+  const trim = (k: string, max: number): string | null => {
+    const v = String(form.get(k) ?? '').trim()
+    return v ? v.slice(0, max) : null
+  }
+  const num = (k: string): number | null => {
+    const v = Number(form.get(k) ?? 0)
+    return Number.isFinite(v) && v > 0 ? Math.round(v) : null
+  }
+  await env.DB.prepare(
+    `INSERT INTO water_samples
+       (id, r2_key, device, test, level, source, note, credit_name, region, width, height, bytes, created_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+  ).bind(
+    id, r2Key, device, test, level, source || null, trim('note', 120), trim('creditName', 60),
+    trim('region', 40), num('width'), num('height'), size, now.toISOString(),
+  ).run()
+  return json({ id })
+}
+
+async function waterStats(env: Env): Promise<Response> {
+  const row = await env.DB.prepare(
+    `SELECT COUNT(*) AS samples, COUNT(DISTINCT device) AS devices FROM water_samples`,
   ).first<{ samples: number; devices: number }>()
   return new Response(
     JSON.stringify({ samples: row?.samples ?? 0, devices: row?.devices ?? 0 }),

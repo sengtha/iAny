@@ -82,6 +82,7 @@ export default defineConfig({
           /^\/crop(\/|\.html|$)/,
           /^\/health(\/|\.html|$)/,
           /^\/health-test(\/|\.html|$)/,
+          /^\/water(\/|\.html|$)/,
         ],
         runtimeCaching: [
           {
@@ -149,6 +150,7 @@ export default defineConfig({
         crop: path.resolve(root, 'crop.html'),
         health: path.resolve(root, 'health.html'),
         healthTest: path.resolve(root, 'health-test.html'),
+        water: path.resolve(root, 'water.html'),
       },
     },
   },

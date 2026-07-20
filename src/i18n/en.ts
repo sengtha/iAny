@@ -289,6 +289,26 @@ export const en = {
   htestNotePlaceholder: 'kit brand, or anything useful (no personal info)',
   htestHint: 'Tip: good light, no glare, fill the frame with the result window.',
 
+  // Contribute water-test photos (/water)
+  waterTitle: 'Contribute water-test photos',
+  waterLead:
+    'Photograph a used water-quality test strip and tag the reading. Helps build a free, offline AI that reads the strip — so a family can check if water is safe, no lab needed. Water safety matters in rural areas (especially arsenic).',
+  waterDisclaimer:
+    'This helps train a tool that READS a test strip — guidance, not a certified measurement. The test kit is the device. When unsure, treat the water or find a safer source.',
+  waterPrivacy: 'Photograph the STRIP ONLY — no personal information.',
+  waterStatSamples: 'test photos',
+  waterOpenModel: 'The water-reading model built from it is released free for everyone.',
+  waterConsent:
+    'I agree these strip photos may be published in an open dataset and used to train free, open AI models.',
+  waterTip: 'No personal info is collected — only the strip photo and the labels you pick.',
+  waterTake: 'Take / choose a strip photo',
+  waterTakeSub: 'fill the frame with the colour pads; the strip only',
+  waterWhichTest: 'Which test?',
+  waterLevel: 'Reading (from the kit chart)',
+  waterSource: 'Water source (optional)',
+  waterNotePlaceholder: 'kit brand, exact value, or notes (no personal info)',
+  waterHint: 'Tip: read the strip at the time the kit says; good light, no glare, no shadow.',
+
   // Khmer Braille converter (/braille)
   brTitle: 'Khmer Braille',
   brLead:

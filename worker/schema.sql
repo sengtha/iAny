@@ -144,6 +144,31 @@ CREATE INDEX IF NOT EXISTS idx_htest_created ON health_test_samples (created_at)
 CREATE INDEX IF NOT EXISTS idx_htest_test ON health_test_samples (test);
 CREATE INDEX IF NOT EXISTS idx_htest_result ON health_test_samples (result);
 
+-- Crowd-sourced water-quality test-strip photos (the /water page). Each row is one
+-- (strip image, test type, safety band) sample for training an offline reader that
+-- maps a strip → safe / caution / unsafe — guidance, not a certified measurement
+-- (see docs/ENVIRONMENT-AI.md). Water safety (esp. arsenic) is a rural-health issue.
+-- Image in R2 at r2_key (foldered water/<test>/<level>/); device is anonymous;
+-- credit_name is opt-in.
+CREATE TABLE IF NOT EXISTS water_samples (
+  id          TEXT PRIMARY KEY,
+  r2_key      TEXT NOT NULL,          -- R2 key: water/<test>/<level>/<day>-<id>.jpg
+  device      TEXT NOT NULL,          -- anonymous per-device id, e.g. w-3f9a2c71
+  test        TEXT NOT NULL,          -- arsenic / bacteria / ph / chlorine / nitrate / iron / other
+  level       TEXT NOT NULL,          -- safe / caution / unsafe / unclear  (classifier target)
+  source      TEXT,                   -- tubewell / dugwell / pond / rain / piped / bottled / other
+  note        TEXT,
+  credit_name TEXT,                   -- opt-in public credit (dataset contributors)
+  region      TEXT,
+  width       INTEGER,
+  height      INTEGER,
+  bytes       INTEGER,
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_water_created ON water_samples (created_at);
+CREATE INDEX IF NOT EXISTS idx_water_test ON water_samples (test);
+CREATE INDEX IF NOT EXISTS idx_water_level ON water_samples (level);
+
 -- iAny Trace — optional online registry for proof-of-origin capsules (/trace).
 -- Offline verification works without this; the registry only adds a TRUSTED
 -- first-seen timestamp and double-use transparency (verify_count). `id` is a

@@ -139,6 +139,27 @@ export const HEALTH_TOPICS: HealthTopic[] = [
     source: 'WHO',
   },
   {
+    id: 'arsenic',
+    emoji: '☠️',
+    titleEn: 'Arsenic in well water',
+    titleKm: 'អាសេនិចក្នុងទឹកអណ្ដូង',
+    bodyEn: [
+      'Some tube wells (especially in the Mekong basin) have natural arsenic — you cannot see, taste, or smell it.',
+      'Long-term drinking can cause skin changes and serious illness.',
+      'Boiling does NOT remove arsenic. Use a tested-safe source, a proper arsenic filter, or rainwater.',
+      'Have wells tested (a test strip or a lab) — the /water tool helps read a strip.',
+    ],
+    bodyKm: [
+      'អណ្ដូងបំពង់ខ្លះ (ជាពិសេសក្នុងអាងទន្លេមេគង្គ) មានអាសេនិចធម្មជាតិ — មើលមិនឃើញ គ្មានរស់ គ្មានក្លិន។',
+      'ការផឹករយៈពេលវែងបណ្ដាលឲ្យប្រែស្បែក និងជំងឺធ្ងន់ធ្ងរ។',
+      'ការស្ងោរ មិនយកអាសេនិចចេញ។ ប្រើប្រភពដែលបានតេស្តថាមានសុវត្ថិភាព តម្រងអាសេនិច ឬទឹកភ្លៀង។',
+      'តេស្តអណ្ដូង (បន្ទះតេស្ត ឬមន្ទីរពិសោធន៍) — ឧបករណ៍ /water ជួយអានបន្ទះ។',
+    ],
+    seekEn: 'See a health worker if you have unexplained skin patches/thickening. Test your well if it has never been checked.',
+    seekKm: 'ជួបបុគ្គលិកសុខាភិបាល បើមានប្រឡាក់/ក្រាស់ស្បែកមិនដឹងមូលហេតុ។ តេស្តអណ្ដូង បើមិនធ្លាប់ពិនិត្យ។',
+    source: 'WHO',
+  },
+  {
     id: 'antenatal',
     emoji: '🤰',
     titleEn: 'Pregnancy care',
