@@ -66,7 +66,15 @@ export class VoiceRecorder {
     const AC =
       window.AudioContext ||
       (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
-    this.ctx = new AC()
+    // Ask the browser to capture at 16 kHz directly — it uses a proper
+    // (anti-aliased) resampler, which Whisper likes far more than our naive
+    // linear downsample of 48 kHz audio (that aliases HF noise into the speech
+    // band). If the browser ignores the hint, stop() still downsamples as before.
+    try {
+      this.ctx = new AC({ sampleRate: TARGET_SR })
+    } catch {
+      this.ctx = new AC()
+    }
     // Autoplay policies can leave the context suspended until a gesture; the
     // Record tap is that gesture, so resume explicitly.
     if (this.ctx.state === 'suspended') await this.ctx.resume()
