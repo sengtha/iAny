@@ -16,10 +16,12 @@ community and for the community.** The community data collectors (`/voice`,
 |---|---|---|---|---|
 | [sengtha/iany-khmer-tiny-v1-ONNX](https://huggingface.co/sengtha/iany-khmer-tiny-v1-ONNX) | Khmer answering LLM (~270M, the small default) | ONNX | PWA (Transformers.js) | Gemma 270M (Gemma Terms) |
 | [sengtha/Qwen3-0.6B-khm-ft3-Q8_0-GGUF](https://huggingface.co/sengtha/Qwen3-0.6B-khm-ft3-Q8_0-GGUF) | Khmer answering LLM | GGUF (Q4/Q8) | Mobile (llama.rn) | Qwen3-0.6B (Apache-2.0) |
-| [sengtha/whisper-tiny-khmer](https://huggingface.co/sengtha/whisper-tiny-khmer) | Khmer speech-to-text (STT) | GGML + CT2 + ONNX | App + mobile (whisper.rn) | Whisper tiny (MIT) |
+| [sengtha/whisper-base-khmer](https://huggingface.co/sengtha/whisper-base-khmer) | Khmer speech-to-text (STT) — ~19% CER (in-domain), ~23% on FLEURS | ONNX + GGML + CT2 | App (Transformers.js) + mobile (whisper.rn) | Whisper **base** (MIT) · fine-tuned on DDD + `/voice` |
 | [sengtha/khmer-tts-female-v2](https://huggingface.co/sengtha/khmer-tts-female-v2) | Khmer text-to-speech (female voice) | ONNX (VITS) | App (Radio + TTS) | VITS · DDD-Cambodia (CC-BY-SA-4.0) |
-| [sengtha/khmer-ocr](https://huggingface.co/sengtha/khmer-ocr) | Khmer OCR — detector + recognizer | ONNX | App + mobile | seanghay/KhmerOCR (MIT) |
+| [sengtha/khmer-ocr](https://huggingface.co/sengtha/khmer-ocr) | Khmer OCR — detector + recognizer | ONNX | App + mobile · `/scan`, `/label`, `/braille` | seanghay/KhmerOCR (MIT) |
+| [sengtha/iany-waste-v1](https://huggingface.co/sengtha/iany-waste-v1) | Waste-material classifier (7 types: can / glass / paper / plastic / organic / …) | ONNX | App — live [`/waste-scan`](https://iany.app/waste-scan) + `/waste` capture | MobileNetV2 · trained from open waste datasets (see `docs/WASTE-MODEL.md`) |
 | MediaPipe Hand Landmarker | Hand tracking for the `/sign` collector | `.task` | `/sign` | Google (Apache-2.0) — mirrored from Google's model storage, no HF repo needed |
+| MediaPipe Object Detector (EfficientDet-Lite0) | Live vehicle + people detection | `.tflite` | `/traffic` | Google COCO (Apache-2.0) — mirrored, no HF repo needed |
 
 > **Licensing:** each Hugging Face repo card is the authoritative source for that
 > model's license. The lineage column shows what the model is derived from.
@@ -37,9 +39,14 @@ with opt-in contributor credit:
   — Khmer read speech (audio + transcript) from [`/voice`](https://iany.app/voice),
   for training open Khmer STT. **Live now** and growing as people contribute; it's
   folded into the whisper-base fine-tune (see `docs/RUNPOD-KHMER-STT.md`).
-- 📷 `/scan` (Khmer OCR), 🤟 `/sign` (Khmer Sign Language landmarks), and 🌱 `/crop`
-  (crop-health photos → an offline crop-disease classifier, see
-  `docs/VISION-MOBILENET.md`) — collecting now, to be released the same way.
+- 📷 `/scan` (Khmer OCR), 🤟 `/sign` (Khmer Sign Language landmarks), 🌱 `/crop`
+  (crop-health), 🧪 `/health-test`, 💧 `/water`, ♻️ `/waste`, 🌿 `/species`,
+  📣 `/report`, and 🛺 `/street` (Cambodia vehicles) — collecting now, to be
+  released the same way. See `docs/VISION-MOBILENET.md`, `docs/ENVIRONMENT-AI.md`,
+  `docs/SMARTCITY-AI.md`, `docs/WASTE-MODEL.md`, `docs/WATER-READING.md`.
+- ♻️ The first vision model from this loop is live: **`sengtha/iany-waste-v1`**
+  powers [`/waste-scan`](https://iany.app/waste-scan). It improves as `/waste`
+  photos are folded in and retrained.
 
 ### External data used
 

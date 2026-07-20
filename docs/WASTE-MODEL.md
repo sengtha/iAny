@@ -222,7 +222,13 @@ class is plenty for a first model.
 
 ---
 
-## 5. Train the classifier (MobileNetV3 → `.tflite`)
+## 5. Train the classifier (MobileNetV2 → export)
+
+> ⚠️ **`mediapipe-model-maker` does NOT install on current Kaggle/Colab (Python
+> 3.12)** — the wheel build fails. The `.tflite` metadata tool (`tflite-support`) is
+> dead there too. **What actually works** (and what shipped): train a plain **Keras
+> MobileNetV2** on Kaggle's built-in TensorFlow, then export **ONNX** (§8). The
+> Model-Maker snippet below is kept only for reference / older environments.
 
 ```python
 from mediapipe_model_maker import image_classifier
@@ -279,54 +285,61 @@ in D1 (`waste_samples`). Export them into the same folder-per-class layout:
 
 ---
 
-## 8. Deploy into iAny (swap out the beta guess)
+## 8. Ship it — export to **ONNX** and deploy (this is what shipped for v1)
 
-### Upload the model to Hugging Face (from the pod)
+> **Why not `.tflite`?** The MediaPipe path (`mediapipe-model-maker` to *train*,
+> `tflite-support` to add metadata) is a **dead end on current Kaggle/Colab
+> (Python 3.12)** — both packages fail to install (no wheels). So iAny trains a
+> plain **Keras MobileNetV2** (§5, using Kaggle's built-in TensorFlow) and ships it
+> as **ONNX**, run by **onnxruntime-web** — the same runtime the OCR/STT already
+> use, so no new dependency. This is the route `sengtha/iany-waste-v1` took.
 
+### Export the Keras model → ONNX (on the pod / Kaggle)
+
+Keras 3 breaks `tf2onnx.convert.from_keras`, so go via a SavedModel:
+
+```python
+model.export("/kaggle/working/sm")                 # Keras 3 SavedModel
+print("LABEL ORDER:", labels)                      # note this — it's the output order
+```
 ```bash
-huggingface-cli login          # paste an HF token with write access
-huggingface-cli upload sengtha/iany-waste-v1 exported/model.tflite model.tflite --repo-type=model
+!python -m tf2onnx.convert --saved-model /kaggle/working/sm \
+    --output iany-waste.onnx --opset 13
 ```
 
-Add a short **model card** (`README.md`) crediting the datasets (TrashNet — MIT;
-TACO / Open Images — CC BY 4.0) and stating the model's license. Now three small
-code changes in the app:
+### Upload to Hugging Face (Python API — the CLI is deprecated)
 
-**a) Allowlist the model** in [`worker/index.ts`](../worker/index.ts) — add the
-prefix to `ALLOWED_PREFIXES`:
-
-```ts
-'sengtha/iany-waste-v1/', // iAny waste classifier (real model, replaces the ImageNet beta)
+```python
+from huggingface_hub import HfApi
+api = HfApi(); api.create_repo("sengtha/iany-waste-v1", repo_type="model", exist_ok=True, token=TOK)
+open("labels.txt","w").write("\n".join(labels))
+for f, name in [("iany-waste.onnx","model.onnx"), ("labels.txt","labels.txt")]:
+    api.upload_file(path_or_fileobj=f, path_in_repo=name, repo_id="sengtha/iany-waste-v1",
+                    repo_type="model", token=TOK)
 ```
+Add a **model card** crediting the datasets (TrashNet — MIT; TACO / Open Images —
+CC BY 4.0) and stating the license.
 
-It then resolves through the default HF path automatically
-(`/models/sengtha/iany-waste-v1/resolve/main/model.tflite` →
-`https://huggingface.co/sengtha/iany-waste-v1/resolve/main/model.tflite`) and is
-cached in R2 + the service worker like every other model.
+### How it's wired in the app (already done for v1)
 
-**b) Point the live view at it** in
-[`src/views/ContributeWasteView.tsx`](../src/views/ContributeWasteView.tsx) — change
-`liveClassifier()`'s `modelUrl` to the new path (keep the default **CPU** delegate,
-which matches the int8 export).
+- **Runtime:** [`src/lib/wasteOnnx.ts`](../src/lib/wasteOnnx.ts) — lazy onnxruntime-web
+  classifier; centre-crops the frame, normalizes `[0,255]→[-1,1]` (MobileNetV2), forces
+  `numThreads = 1` so it loads without cross-origin isolation.
+- **Labels** (the `LABEL ORDER` above) live in
+  [`ContributeWasteView.tsx`](../src/views/ContributeWasteView.tsx) as `WASTE_MODEL_LABELS`;
+  [`wasteGuess.ts`](../src/lib/wasteGuess.ts) is a top-prediction passthrough (the model's
+  labels **are** our type ids).
+- **Mirror:** `'sengtha/iany-waste-v1/'` is allow-listed in
+  [`worker/index.ts`](../worker/index.ts); the SW caches the `.onnx` for offline use.
+- **Surfaces:** the live experiment [`/waste-scan`](https://iany.app/waste-scan) and the
+  live guess inside the `/waste` collector.
 
-**c) Replace the ImageNet keyword map with a direct label map.** The new model
-already outputs our 8 ids, so [`src/lib/wasteGuess.ts`](../src/lib/wasteGuess.ts)
-collapses to a passthrough:
+### To update the model (retrain loop)
 
-```ts
-// The model's categoryName IS our type id — no keyword mapping needed.
-export function guessWasteType(results: Classification[], minConf = 0.35): WasteGuess | null {
-  const top = results[0]
-  return top && top.score >= minConf ? { typeId: top.label, conf: top.score } : null
-}
-```
-
-Bump `minConf` (a real model is calibrated; the ImageNet hack needed a low floor).
-Everything else — the overlay, capture, confirm-and-contribute flow — is unchanged.
-Delete the `.tflite` SW cache entry's stale name if you renamed the file.
-
-That's it: point the phone at a bottle → **real** on-device material label →
-tap to confirm + contribute. Same for `/street` once its model exists.
+Re-run §5–§7 with more data, re-export ONNX, and **upload to the same repo**
+(`sengtha/iany-waste-v1`, same `model.onnx`). The app picks it up automatically — no
+code change. If the **label set/order changes**, update `WASTE_MODEL_LABELS` +
+`labels.txt` to match. Same pattern will apply to `/street` once its model exists.
 
 ---
 

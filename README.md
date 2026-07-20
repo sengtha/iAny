@@ -84,9 +84,10 @@ above; the full catalog (purpose, format, license lineage) is in
 | Model | Purpose |
 |---|---|
 | [iany-khmer-tiny-v1-ONNX](https://huggingface.co/sengtha/iany-khmer-tiny-v1-ONNX) · [Qwen3-0.6B-khm-ft3-…-GGUF](https://huggingface.co/sengtha/Qwen3-0.6B-khm-ft3-Q8_0-GGUF) | Khmer answering LLM (PWA / mobile) |
-| [whisper-tiny-khmer](https://huggingface.co/sengtha/whisper-tiny-khmer) | Khmer speech-to-text (STT) |
+| [whisper-base-khmer](https://huggingface.co/sengtha/whisper-base-khmer) | Khmer speech-to-text (STT) — ONNX (PWA) + GGML (mobile) |
 | [khmer-tts-female-v2](https://huggingface.co/sengtha/khmer-tts-female-v2) | Khmer text-to-speech (TTS) |
 | [khmer-ocr](https://huggingface.co/sengtha/khmer-ocr) | Khmer OCR (detector + recognizer) |
+| [iany-waste-v1](https://huggingface.co/sengtha/iany-waste-v1) | Waste-material classifier (ONNX) — live `/waste-scan` |
 
 **Open datasets** (released from community contributions, CC-BY-SA-4.0):
 

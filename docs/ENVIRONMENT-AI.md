@@ -66,16 +66,16 @@ Each is the same collect → train → deploy loop; only the dataset changes.
   open dataset → offline classifier for recycling education, correct sorting, and
   knowing what a waste-buyer will take. Easy to bootstrap (TrashNet / TACO), no
   safety failure mode. **Litter mapping built** — an optional GPS point turns a
-  waste photo into a map point. **Live camera mode built** — point the phone at an
-  item to see a material *guess* on the frame in real time, then tap to capture +
-  contribute (the guess pre-fills the label, which you confirm or correct). The
-  guess currently runs MediaPipe's pretrained EfficientNet-Lite (ImageNet) mapped
-  to our material types ([`src/lib/wasteGuess.ts`](../src/lib/wasteGuess.ts)) — a
-  rough **beta** hint until the `/waste`-trained model exists; swapping in the real
-  model is a one-line URL change. **Training recipe:**
+  waste photo into a map point. **Model trained + deployed (v1):**
+  **[`sengtha/iany-waste-v1`](https://huggingface.co/sengtha/iany-waste-v1)** — a
+  MobileNetV2 classifier (7 material types) trained from open datasets, exported to
+  ONNX and run on-device via onnxruntime-web ([`src/lib/wasteOnnx.ts`](../src/lib/wasteOnnx.ts)).
+  It powers the live experiment **[`/waste-scan`](https://iany.app/waste-scan)**
+  (point → material label, anyone can try) and the live guess inside the `/waste`
+  collector (pre-fills the label to confirm + contribute). **Training recipe:**
   [docs/WASTE-MODEL.md](./WASTE-MODEL.md) — bootstrap on open datasets (Drinking
   Waste / TrashNet / TACO) → fine-tune on the collected `/waste` photos → export
-  `.tflite` → deploy. The reusable live view is
+  ONNX → deploy. The reusable live view is
   [`src/views/LiveCapture.tsx`](../src/views/LiveCapture.tsx), so `/street` and the
   other collectors can adopt the same "point → guess → capture" UX.
 - **🌿 Species / nature ID** — *collector built* ([`/species`](https://iany.app/species)):
