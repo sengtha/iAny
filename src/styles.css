@@ -1716,6 +1716,48 @@ progress {
   color: var(--fg-muted);
 }
 
+/* /garden — signed garden-carbon observations (Grove) */
+.garden-summary {
+  display: flex;
+  gap: 10px;
+  margin: 8px 0;
+}
+.garden-summary > div {
+  flex: 1;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--bg-soft);
+  border: 1px solid var(--bg-softer);
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--fg-muted);
+}
+.garden-summary b { color: var(--fg); font-size: 1.2rem; }
+.garden-measure { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; }
+.garden-measure input { width: 100%; }
+.garden-est {
+  margin: 10px 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, #22c55e 14%, transparent);
+  border: 1px solid #22c55e;
+  font-size: 1rem;
+}
+.garden-est b { font-size: 1.25rem; }
+.garden-list { margin-top: 16px; }
+.garden-list-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.garden-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--bg-softer);
+  font-size: 0.88rem;
+}
+.garden-row-sp { flex: 1; }
+.garden-row-co2 { color: #22c55e; font-variant-numeric: tabular-nums; }
+.garden-row-id { color: var(--fg-muted); font-size: 0.78rem; font-family: ui-monospace, monospace; }
+
 /* /label — read the ច.ប.ផ registration code off a product */
 .label-reading {
   display: flex;

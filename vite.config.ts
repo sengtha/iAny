@@ -90,6 +90,7 @@ export default defineConfig({
           /^\/street(\/|\.html|$)/,
           /^\/label(\/|\.html|$)/,
           /^\/waste-scan(\/|\.html|$)/,
+          /^\/garden(\/|\.html|$)/,
         ],
         runtimeCaching: [
           {
@@ -180,6 +181,7 @@ export default defineConfig({
         street: path.resolve(root, 'street.html'),
         label: path.resolve(root, 'label.html'),
         wasteScan: path.resolve(root, 'waste-scan.html'),
+        garden: path.resolve(root, 'garden.html'),
       },
     },
   },
