@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { useI18n } from '../i18n'
-import { WASTE_TYPES } from '../assets/wasteLabels'
+import { ISSUE_TYPES } from '../assets/reportLabels'
 import {
   deviceId,
-  EMPTY_WASTE_PROFILE,
-  fetchWasteStats,
-  loadWasteProfile,
-  saveWasteProfile,
+  EMPTY_REPORT_PROFILE,
+  fetchReportStats,
+  loadReportProfile,
+  saveReportProfile,
   uploadSample,
-  type WasteProfile,
-  type WasteStats,
-} from '../lib/wasteContribute'
+  type ReportProfile,
+  type ReportStats,
+} from '../lib/reportContribute'
 import {
   analyzeImage,
   assessOcr,
@@ -23,14 +23,7 @@ import {
 import { GeoField } from './GeoField'
 import type { GeoPoint } from '../lib/geo'
 
-/**
- * ♻️ Contribute waste photos (/waste).
- *
- * Photograph a waste item and tag its material (plastic bottle, can, glass, …).
- * Builds an open dataset for an OFFLINE classifier that helps people sort
- * recyclables — recycling education + knowing what has resale value. Easy to
- * bootstrap (TrashNet / TACO). See docs/ENVIRONMENT-AI.md.
- */
+/** 📣 Report a community issue (/report) — geotagged civic/environment reports. */
 type Phase = 'idle' | 'label' | 'uploading'
 
 const OCR_WARN_KEY = {
@@ -40,13 +33,13 @@ const OCR_WARN_KEY = {
   lowContrast: 'ocrWarnLowContrast',
 } as const
 
-export function ContributeWasteView() {
-  const [profile, setProfile] = useState<WasteProfile>(loadWasteProfile)
+export function ContributeReportView() {
+  const [profile, setProfile] = useState<ReportProfile>(loadReportProfile)
   const [started, setStarted] = useState(false)
-  const [stats, setStats] = useState<WasteStats | null>(null)
+  const [stats, setStats] = useState<ReportStats | null>(null)
 
   useEffect(() => {
-    void fetchWasteStats().then(setStats)
+    void fetchReportStats().then(setStats)
   }, [])
 
   if (!started || !profile.consent) {
@@ -55,7 +48,7 @@ export function ContributeWasteView() {
         profile={profile}
         stats={stats}
         onStart={(p) => {
-          saveWasteProfile(p)
+          saveReportProfile(p)
           setProfile(p)
           setStarted(true)
         }}
@@ -72,21 +65,22 @@ function ConsentGate({
   stats,
   onStart,
 }: {
-  profile: WasteProfile
-  stats: WasteStats | null
-  onStart: (p: WasteProfile) => void
+  profile: ReportProfile
+  stats: ReportStats | null
+  onStart: (p: ReportProfile) => void
 }) {
   const { t } = useI18n()
-  const [draft, setDraft] = useState<WasteProfile>({ ...EMPTY_WASTE_PROFILE, ...profile })
+  const [draft, setDraft] = useState<ReportProfile>({ ...EMPTY_REPORT_PROFILE, ...profile })
 
   return (
     <div className="contribute">
-      <h2 className="contribute-title">♻️ {t('wasteTitle')}</h2>
-      <p className="contribute-lead">{t('wasteLead')}</p>
+      <h2 className="contribute-title">📣 {t('reportTitle')}</h2>
+      <p className="contribute-lead">{t('reportLead')}</p>
+      <p className="health-disclaimer">📸 {t('reportPrivacy')}</p>
 
       {stats && stats.samples > 0 ? (
         <div className="voice-stats">
-          <b>{stats.samples.toLocaleString()}</b> {t('wasteStatSamples')} ·{' '}
+          <b>{stats.samples.toLocaleString()}</b> {t('reportStatSamples')} ·{' '}
           <b>{stats.devices.toLocaleString()}</b> {t('ocrStatContributors')}
         </div>
       ) : null}
@@ -94,7 +88,7 @@ function ConsentGate({
       <div className="voice-openbox">
         <div className="voice-openrow">🗂️ {t('cropOpenData')}</div>
         <div className="voice-openrow">🏅 {t('voiceOpenCredit')}</div>
-        <div className="voice-openrow">🆓 {t('wasteOpenModel')}</div>
+        <div className="voice-openrow">🆓 {t('reportOpenModel')}</div>
       </div>
 
       <fieldset className="voice-fields">
@@ -127,9 +121,9 @@ function ConsentGate({
           checked={draft.consent}
           onChange={(e) => setDraft({ ...draft, consent: e.target.checked })}
         />
-        <span>{t('wasteConsent')}</span>
+        <span>{t('reportConsent')}</span>
       </label>
-      <p className="voice-minor-note">{t('wasteTip')}</p>
+      <p className="voice-minor-note">{t('reportTip')}</p>
 
       <button className="voice-primary" disabled={!draft.consent} onClick={() => onStart(draft)}>
         {t('cropStart')}
@@ -148,9 +142,9 @@ function Collector({
   stats,
   onStats,
 }: {
-  profile: WasteProfile
-  stats: WasteStats | null
-  onStats: (s: WasteStats | null) => void
+  profile: ReportProfile
+  stats: ReportStats | null
+  onStats: (s: ReportStats | null) => void
 }) {
   const { t, lang } = useI18n()
   const km = lang === 'km'
@@ -248,9 +242,9 @@ function Collector({
 
       {!image ? (
         <div className="ocr-drop" onClick={() => fileRef.current?.click()}>
-          <div className="ocr-drop-icon">♻️</div>
-          <div className="ocr-drop-title">{t('wasteTake')}</div>
-          <div className="ocr-drop-sub">{t('wasteTakeSub')}</div>
+          <div className="ocr-drop-icon">📣</div>
+          <div className="ocr-drop-title">{t('reportTake')}</div>
+          <div className="ocr-drop-sub">{t('reportTakeSub')}</div>
         </div>
       ) : (
         <>
@@ -263,9 +257,9 @@ function Collector({
           ) : null}
 
           <label className="voice-field">
-            <span>{t('wasteWhichType')}</span>
+            <span>{t('reportWhichType')}</span>
             <div className="crop-chips">
-              {WASTE_TYPES.map((c) => (
+              {ISSUE_TYPES.map((c) => (
                 <button key={c.id} type="button" className={type === c.id ? 'active' : ''} onClick={() => setType(c.id)}>
                   {c.emoji} {km ? c.km : c.en}
                 </button>
@@ -273,19 +267,18 @@ function Collector({
             </div>
           </label>
 
+          <GeoField gps={gps} onChange={setGps} />
+
           <label className="voice-field">
             <span>{t('cropNote')}</span>
             <input
               type="text"
               value={note}
               maxLength={120}
-              placeholder={t('wasteNotePlaceholder')}
+              placeholder={t('reportNotePlaceholder')}
               onChange={(e) => setNote(e.target.value)}
             />
           </label>
-
-          <small className="hint">{t('wasteWhereHint')}</small>
-          <GeoField gps={gps} onChange={setGps} />
 
           {error ? <p className="voice-error">{error}</p> : null}
           <div className="voice-controls">
@@ -303,7 +296,7 @@ function Collector({
         </>
       )}
 
-      <p className="voice-tip">{t('wasteHint')}</p>
+      <p className="voice-tip">{t('reportHint')}</p>
     </div>
   )
 }

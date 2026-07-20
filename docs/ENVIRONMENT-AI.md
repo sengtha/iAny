@@ -58,13 +58,17 @@ Each is the same collect → train → deploy loop; only the dataset changes.
   photograph an item, tag its material (plastic bottle, can, glass, paper, …) →
   open dataset → offline classifier for recycling education, correct sorting, and
   knowing what a waste-buyer will take. Easy to bootstrap (TrashNet / TACO), no
-  safety failure mode. *Next:* add geotagging for litter mapping.
-- **🐟 Species ID** — plants, birds, insects, fish for biodiversity monitoring
-  (iNaturalist-style), and **mosquito-species ID** for dengue/malaria vector
-  surveillance (bridges environment ↔ health).
-- **🏙️ Citizen infrastructure reports** — pothole / broken light / illegal dumping
-  → categorized + geotagged for the community or municipality (ties to Trace's
-  content-addressed, GPS-stamped capsule idea).
+  safety failure mode. **Litter mapping built** — an optional GPS point turns a
+  waste photo into a map point.
+- **🌿 Species / nature ID** — *collector built* ([`/species`](https://iany.app/species)):
+  plants, birds, insects, fish for biodiversity monitoring (iNaturalist-style), and
+  **mosquitoes** for dengue/malaria **disease-vector surveillance** (bridges
+  environment ↔ health). Broad group = classifier target; free-text species name +
+  optional sighting GPS enrich it.
+- **📣 Citizen infrastructure reports** — *collector built* ([`/report`](https://iany.app/report)):
+  rubbish / flooding / pothole / broken light / … → categorized + **geotagged** for
+  the community or municipality (ties to Trace's content-addressed, GPS-stamped
+  capsule idea). Photograph the issue, never people.
 - **🌫️ Air / water clarity proxies** — turbidity or haze estimates from photos
   (rough, guidance only).
 

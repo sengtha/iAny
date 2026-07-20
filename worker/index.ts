@@ -125,6 +125,12 @@ export default {
     if (url.pathname.startsWith('/api/waste/')) {
       return serveWaste(url, request, env)
     }
+    if (url.pathname.startsWith('/api/species/')) {
+      return serveSpecies(url, request, env)
+    }
+    if (url.pathname.startsWith('/api/report/')) {
+      return serveReport(url, request, env)
+    }
     if (url.pathname.startsWith('/download/')) {
       return serveApk(request, env)
     }
@@ -1289,15 +1295,28 @@ async function wastePostSample(request: Request, env: Env): Promise<Response> {
     const v = Number(form.get(k) ?? 0)
     return Number.isFinite(v) && v > 0 ? Math.round(v) : null
   }
+  const geo = parseGeo(form)
   await env.DB.prepare(
     `INSERT INTO waste_samples
-       (id, r2_key, device, type, note, credit_name, region, width, height, bytes, created_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+       (id, r2_key, device, type, note, credit_name, region, lat, lng, acc, width, height, bytes, created_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
   ).bind(
     id, r2Key, device, type, trim('note', 120), trim('creditName', 60),
-    trim('region', 40), num('width'), num('height'), size, now.toISOString(),
+    trim('region', 40), geo.lat, geo.lng, geo.acc, num('width'), num('height'), size, now.toISOString(),
   ).run()
   return json({ id })
+}
+
+// Parse an optional GPS point (lat/lng/acc) from a form; returns nulls if absent
+// or out of range. Shared by the mapping collectors (litter / species / reports).
+function parseGeo(form: FormData): { lat: number | null; lng: number | null; acc: number | null } {
+  const lat = Number(form.get('lat'))
+  const lng = Number(form.get('lng'))
+  const acc = Number(form.get('acc'))
+  const ok = Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180
+  return ok
+    ? { lat: +lat.toFixed(5), lng: +lng.toFixed(5), acc: Number.isFinite(acc) && acc > 0 ? Math.round(acc) : null }
+    : { lat: null, lng: null, acc: null }
 }
 
 async function wasteStats(env: Env): Promise<Response> {
@@ -1307,6 +1326,192 @@ async function wasteStats(env: Env): Promise<Response> {
   ).first<{ samples: number; devices: number; types: number }>()
   return new Response(
     JSON.stringify({ samples: row?.samples ?? 0, devices: row?.devices ?? 0, types: row?.types ?? 0 }),
+    { headers: { ...JSON_HEADERS, 'cache-control': 'public, max-age=30' } },
+  )
+}
+
+/* ------------------------------------------------------------------ *
+ * /species — crowd-sourced biodiversity + mosquito photos for an       *
+ * OFFLINE nature-ID classifier (group target; free-text species name + *
+ * optional GPS sighting as metadata). See docs/ENVIRONMENT-AI.md.      *
+ * ------------------------------------------------------------------ */
+
+const SPECIES_MAX_BYTES = 8 * 1024 * 1024
+const SPECIES_DEVICE_RE = /^n-[0-9a-z]{6,16}$/
+const SPECIES_GROUPS = new Set([
+  'plant', 'bird', 'insect', 'mosquito', 'fish', 'reptile', 'mammal', 'fungus', 'other',
+])
+
+async function serveSpecies(url: URL, request: Request, env: Env): Promise<Response> {
+  const path = url.pathname.slice('/api/species/'.length)
+  if (request.method === 'OPTIONS') {
+    return new Response(null, {
+      headers: { ...JSON_HEADERS, 'access-control-allow-methods': 'GET,POST,OPTIONS',
+        'access-control-allow-headers': 'content-type' },
+    })
+  }
+  try {
+    if (path === 'sample' && request.method === 'POST') return await speciesPostSample(request, env)
+    if (path === 'stats' && request.method === 'GET') return await speciesStats(env)
+    return json({ error: 'not found' }, 404)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    const hint = /no such table|species_samples/i.test(msg)
+      ? 'species storage not initialised — run the D1 schema migration (worker/schema.sql)'
+      : 'server error'
+    return json({ error: hint, detail: msg }, 500)
+  }
+}
+
+async function speciesPostSample(request: Request, env: Env): Promise<Response> {
+  let form: FormData
+  try {
+    form = await request.formData()
+  } catch {
+    return json({ error: 'expected multipart form' }, 400)
+  }
+  const entry = form.get('image') as unknown
+  const group = String(form.get('group') ?? '').trim()
+  const device = String(form.get('device') ?? '').trim()
+  const consent = String(form.get('consent') ?? '') === '1'
+
+  if (!entry || typeof entry === 'string') return json({ error: 'image required' }, 400)
+  const image = entry as Blob
+  if (!consent) return json({ error: 'consent required' }, 403)
+  if (!SPECIES_GROUPS.has(group)) return json({ error: 'bad group' }, 400)
+  if (!SPECIES_DEVICE_RE.test(device)) return json({ error: 'bad device id' }, 400)
+  const size = image.size
+  if (!size || size > SPECIES_MAX_BYTES) return json({ error: 'image too large or empty' }, 413)
+
+  const id = crypto.randomUUID()
+  const now = new Date()
+  const day = now.toISOString().slice(0, 10).replace(/-/g, '')
+  const t = image.type === 'image/png' ? 'png' : 'jpg'
+  const r2Key = `species/${group}/${day}-${id}.${t}`
+  await env.MODELS.put(r2Key, await image.arrayBuffer(), {
+    httpMetadata: { contentType: image.type || 'image/jpeg' },
+    customMetadata: { device, group },
+  })
+
+  const trim = (k: string, max: number): string | null => {
+    const v = String(form.get(k) ?? '').trim()
+    return v ? v.slice(0, max) : null
+  }
+  const num = (k: string): number | null => {
+    const v = Number(form.get(k) ?? 0)
+    return Number.isFinite(v) && v > 0 ? Math.round(v) : null
+  }
+  const geo = parseGeo(form)
+  await env.DB.prepare(
+    `INSERT INTO species_samples
+       (id, r2_key, device, grp, species, credit_name, region, lat, lng, acc, width, height, bytes, created_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+  ).bind(
+    id, r2Key, device, group, trim('species', 80), trim('creditName', 60), trim('region', 40),
+    geo.lat, geo.lng, geo.acc, num('width'), num('height'), size, now.toISOString(),
+  ).run()
+  return json({ id })
+}
+
+async function speciesStats(env: Env): Promise<Response> {
+  const row = await env.DB.prepare(
+    `SELECT COUNT(*) AS samples, COUNT(DISTINCT device) AS devices FROM species_samples`,
+  ).first<{ samples: number; devices: number }>()
+  return new Response(
+    JSON.stringify({ samples: row?.samples ?? 0, devices: row?.devices ?? 0 }),
+    { headers: { ...JSON_HEADERS, 'cache-control': 'public, max-age=30' } },
+  )
+}
+
+/* ------------------------------------------------------------------ *
+ * /report — geotagged citizen infrastructure / environment reports    *
+ * for an OFFLINE report-sorting classifier + a community map dataset.  *
+ * Privacy: photograph the ISSUE, not people. See docs/ENVIRONMENT-AI.md*
+ * ------------------------------------------------------------------ */
+
+const REPORT_MAX_BYTES = 8 * 1024 * 1024
+const REPORT_DEVICE_RE = /^i-[0-9a-z]{6,16}$/
+const REPORT_TYPES = new Set([
+  'rubbish', 'flooding', 'drainage', 'water_leak', 'pothole', 'streetlight', 'fallen_tree', 'other',
+])
+
+async function serveReport(url: URL, request: Request, env: Env): Promise<Response> {
+  const path = url.pathname.slice('/api/report/'.length)
+  if (request.method === 'OPTIONS') {
+    return new Response(null, {
+      headers: { ...JSON_HEADERS, 'access-control-allow-methods': 'GET,POST,OPTIONS',
+        'access-control-allow-headers': 'content-type' },
+    })
+  }
+  try {
+    if (path === 'sample' && request.method === 'POST') return await reportPostSample(request, env)
+    if (path === 'stats' && request.method === 'GET') return await reportStats(env)
+    return json({ error: 'not found' }, 404)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    const hint = /no such table|report_samples/i.test(msg)
+      ? 'report storage not initialised — run the D1 schema migration (worker/schema.sql)'
+      : 'server error'
+    return json({ error: hint, detail: msg }, 500)
+  }
+}
+
+async function reportPostSample(request: Request, env: Env): Promise<Response> {
+  let form: FormData
+  try {
+    form = await request.formData()
+  } catch {
+    return json({ error: 'expected multipart form' }, 400)
+  }
+  const entry = form.get('image') as unknown
+  const type = String(form.get('type') ?? '').trim()
+  const device = String(form.get('device') ?? '').trim()
+  const consent = String(form.get('consent') ?? '') === '1'
+
+  if (!entry || typeof entry === 'string') return json({ error: 'image required' }, 400)
+  const image = entry as Blob
+  if (!consent) return json({ error: 'consent required' }, 403)
+  if (!REPORT_TYPES.has(type)) return json({ error: 'bad type' }, 400)
+  if (!REPORT_DEVICE_RE.test(device)) return json({ error: 'bad device id' }, 400)
+  const size = image.size
+  if (!size || size > REPORT_MAX_BYTES) return json({ error: 'image too large or empty' }, 413)
+
+  const id = crypto.randomUUID()
+  const now = new Date()
+  const day = now.toISOString().slice(0, 10).replace(/-/g, '')
+  const t = image.type === 'image/png' ? 'png' : 'jpg'
+  const r2Key = `report/${type}/${day}-${id}.${t}`
+  await env.MODELS.put(r2Key, await image.arrayBuffer(), {
+    httpMetadata: { contentType: image.type || 'image/jpeg' },
+    customMetadata: { device, type },
+  })
+
+  const trim = (k: string, max: number): string | null => {
+    const v = String(form.get(k) ?? '').trim()
+    return v ? v.slice(0, max) : null
+  }
+  const num = (k: string): number | null => {
+    const v = Number(form.get(k) ?? 0)
+    return Number.isFinite(v) && v > 0 ? Math.round(v) : null
+  }
+  const geo = parseGeo(form)
+  await env.DB.prepare(
+    `INSERT INTO report_samples
+       (id, r2_key, device, type, note, credit_name, region, lat, lng, acc, width, height, bytes, created_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+  ).bind(
+    id, r2Key, device, type, trim('note', 120), trim('creditName', 60), trim('region', 40),
+    geo.lat, geo.lng, geo.acc, num('width'), num('height'), size, now.toISOString(),
+  ).run()
+  return json({ id })
+}
+
+async function reportStats(env: Env): Promise<Response> {
+  const row = await env.DB.prepare(
+    `SELECT COUNT(*) AS samples, COUNT(DISTINCT device) AS devices FROM report_samples`,
+  ).first<{ samples: number; devices: number }>()
+  return new Response(
+    JSON.stringify({ samples: row?.samples ?? 0, devices: row?.devices ?? 0 }),
     { headers: { ...JSON_HEADERS, 'cache-control': 'public, max-age=30' } },
   )
 }

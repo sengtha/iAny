@@ -181,6 +181,9 @@ CREATE TABLE IF NOT EXISTS waste_samples (
   note        TEXT,
   credit_name TEXT,                   -- opt-in public credit (dataset contributors)
   region      TEXT,
+  lat         REAL,                   -- optional GPS (litter mapping)
+  lng         REAL,
+  acc         INTEGER,                -- GPS accuracy radius (metres)
   width       INTEGER,
   height      INTEGER,
   bytes       INTEGER,
@@ -188,6 +191,53 @@ CREATE TABLE IF NOT EXISTS waste_samples (
 );
 CREATE INDEX IF NOT EXISTS idx_waste_created ON waste_samples (created_at);
 CREATE INDEX IF NOT EXISTS idx_waste_type ON waste_samples (type);
+-- Migration for an existing DB (safe once): ALTER TABLE waste_samples ADD COLUMN lat REAL;
+--   ALTER TABLE waste_samples ADD COLUMN lng REAL; ALTER TABLE waste_samples ADD COLUMN acc INTEGER;
+
+-- Crowd-sourced nature photos (the /species page) — biodiversity + mosquito
+-- (disease-vector) surveillance. `grp` (group) is the classifier target; `species`
+-- is a free-text name (metadata); lat/lng is an optional sighting point. See
+-- docs/ENVIRONMENT-AI.md. (`grp` not `group` — GROUP is a SQL keyword.)
+CREATE TABLE IF NOT EXISTS species_samples (
+  id          TEXT PRIMARY KEY,
+  r2_key      TEXT NOT NULL,          -- R2 key: species/<group>/<day>-<id>.jpg
+  device      TEXT NOT NULL,          -- anonymous per-device id, e.g. n-3f9a2c71
+  grp         TEXT NOT NULL,          -- plant / bird / insect / mosquito / …  (classifier target)
+  species     TEXT,                   -- free-text species name (optional)
+  credit_name TEXT,
+  region      TEXT,
+  lat         REAL,                   -- optional GPS (sighting map)
+  lng         REAL,
+  acc         INTEGER,
+  width       INTEGER,
+  height      INTEGER,
+  bytes       INTEGER,
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_species_created ON species_samples (created_at);
+CREATE INDEX IF NOT EXISTS idx_species_grp ON species_samples (grp);
+
+-- Crowd-sourced citizen infrastructure / environment reports (the /report page).
+-- `type` is the classifier target; lat/lng makes a report actionable/mappable.
+-- Privacy: the issue photo, not people. See docs/ENVIRONMENT-AI.md.
+CREATE TABLE IF NOT EXISTS report_samples (
+  id          TEXT PRIMARY KEY,
+  r2_key      TEXT NOT NULL,          -- R2 key: report/<type>/<day>-<id>.jpg
+  device      TEXT NOT NULL,          -- anonymous per-device id, e.g. i-3f9a2c71
+  type        TEXT NOT NULL,          -- rubbish / flooding / pothole / streetlight / …
+  note        TEXT,
+  credit_name TEXT,
+  region      TEXT,
+  lat         REAL,                   -- optional GPS (report map)
+  lng         REAL,
+  acc         INTEGER,
+  width       INTEGER,
+  height      INTEGER,
+  bytes       INTEGER,
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_report_created ON report_samples (created_at);
+CREATE INDEX IF NOT EXISTS idx_report_type ON report_samples (type);
 
 -- iAny Trace — optional online registry for proof-of-origin capsules (/trace).
 -- Offline verification works without this; the registry only adds a TRUSTED

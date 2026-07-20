@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { useI18n } from '../i18n'
-import { WASTE_TYPES } from '../assets/wasteLabels'
+import { GROUPS } from '../assets/speciesLabels'
 import {
   deviceId,
-  EMPTY_WASTE_PROFILE,
-  fetchWasteStats,
-  loadWasteProfile,
-  saveWasteProfile,
+  EMPTY_SPECIES_PROFILE,
+  fetchSpeciesStats,
+  loadSpeciesProfile,
+  saveSpeciesProfile,
   uploadSample,
-  type WasteProfile,
-  type WasteStats,
-} from '../lib/wasteContribute'
+  type SpeciesProfile,
+  type SpeciesStats,
+} from '../lib/speciesContribute'
 import {
   analyzeImage,
   assessOcr,
@@ -23,14 +23,7 @@ import {
 import { GeoField } from './GeoField'
 import type { GeoPoint } from '../lib/geo'
 
-/**
- * ♻️ Contribute waste photos (/waste).
- *
- * Photograph a waste item and tag its material (plastic bottle, can, glass, …).
- * Builds an open dataset for an OFFLINE classifier that helps people sort
- * recyclables — recycling education + knowing what has resale value. Easy to
- * bootstrap (TrashNet / TACO). See docs/ENVIRONMENT-AI.md.
- */
+/** 🌿 Contribute nature photos (/species) — biodiversity + mosquito surveillance. */
 type Phase = 'idle' | 'label' | 'uploading'
 
 const OCR_WARN_KEY = {
@@ -40,13 +33,13 @@ const OCR_WARN_KEY = {
   lowContrast: 'ocrWarnLowContrast',
 } as const
 
-export function ContributeWasteView() {
-  const [profile, setProfile] = useState<WasteProfile>(loadWasteProfile)
+export function ContributeSpeciesView() {
+  const [profile, setProfile] = useState<SpeciesProfile>(loadSpeciesProfile)
   const [started, setStarted] = useState(false)
-  const [stats, setStats] = useState<WasteStats | null>(null)
+  const [stats, setStats] = useState<SpeciesStats | null>(null)
 
   useEffect(() => {
-    void fetchWasteStats().then(setStats)
+    void fetchSpeciesStats().then(setStats)
   }, [])
 
   if (!started || !profile.consent) {
@@ -55,7 +48,7 @@ export function ContributeWasteView() {
         profile={profile}
         stats={stats}
         onStart={(p) => {
-          saveWasteProfile(p)
+          saveSpeciesProfile(p)
           setProfile(p)
           setStarted(true)
         }}
@@ -72,21 +65,21 @@ function ConsentGate({
   stats,
   onStart,
 }: {
-  profile: WasteProfile
-  stats: WasteStats | null
-  onStart: (p: WasteProfile) => void
+  profile: SpeciesProfile
+  stats: SpeciesStats | null
+  onStart: (p: SpeciesProfile) => void
 }) {
   const { t } = useI18n()
-  const [draft, setDraft] = useState<WasteProfile>({ ...EMPTY_WASTE_PROFILE, ...profile })
+  const [draft, setDraft] = useState<SpeciesProfile>({ ...EMPTY_SPECIES_PROFILE, ...profile })
 
   return (
     <div className="contribute">
-      <h2 className="contribute-title">♻️ {t('wasteTitle')}</h2>
-      <p className="contribute-lead">{t('wasteLead')}</p>
+      <h2 className="contribute-title">🌿 {t('speciesTitle')}</h2>
+      <p className="contribute-lead">{t('speciesLead')}</p>
 
       {stats && stats.samples > 0 ? (
         <div className="voice-stats">
-          <b>{stats.samples.toLocaleString()}</b> {t('wasteStatSamples')} ·{' '}
+          <b>{stats.samples.toLocaleString()}</b> {t('speciesStatSamples')} ·{' '}
           <b>{stats.devices.toLocaleString()}</b> {t('ocrStatContributors')}
         </div>
       ) : null}
@@ -94,7 +87,7 @@ function ConsentGate({
       <div className="voice-openbox">
         <div className="voice-openrow">🗂️ {t('cropOpenData')}</div>
         <div className="voice-openrow">🏅 {t('voiceOpenCredit')}</div>
-        <div className="voice-openrow">🆓 {t('wasteOpenModel')}</div>
+        <div className="voice-openrow">🆓 {t('speciesOpenModel')}</div>
       </div>
 
       <fieldset className="voice-fields">
@@ -127,9 +120,9 @@ function ConsentGate({
           checked={draft.consent}
           onChange={(e) => setDraft({ ...draft, consent: e.target.checked })}
         />
-        <span>{t('wasteConsent')}</span>
+        <span>{t('speciesConsent')}</span>
       </label>
-      <p className="voice-minor-note">{t('wasteTip')}</p>
+      <p className="voice-minor-note">{t('speciesTip')}</p>
 
       <button className="voice-primary" disabled={!draft.consent} onClick={() => onStart(draft)}>
         {t('cropStart')}
@@ -148,9 +141,9 @@ function Collector({
   stats,
   onStats,
 }: {
-  profile: WasteProfile
-  stats: WasteStats | null
-  onStats: (s: WasteStats | null) => void
+  profile: SpeciesProfile
+  stats: SpeciesStats | null
+  onStats: (s: SpeciesStats | null) => void
 }) {
   const { t, lang } = useI18n()
   const km = lang === 'km'
@@ -158,9 +151,9 @@ function Collector({
   const [image, setImage] = useState<Blob | null>(null)
   const [previewUrl, setPreviewUrl] = useState('')
   const [dims, setDims] = useState<{ w: number; h: number } | null>(null)
-  const [type, setType] = useState('')
+  const [group, setGroup] = useState('')
+  const [species, setSpecies] = useState('')
   const [gps, setGps] = useState<GeoPoint | null>(null)
-  const [note, setNote] = useState('')
   const [count, setCount] = useState(0)
   const [error, setError] = useState('')
   const [quality, setQuality] = useState<ImageQuality | null>(null)
@@ -199,7 +192,7 @@ function Collector({
     setImage(null)
     setPreviewUrl('')
     setDims(null)
-    setNote('')
+    setSpecies('')
     setGps(null)
     setQuality(null)
     setWarnings([])
@@ -209,11 +202,11 @@ function Collector({
   }
 
   async function submit() {
-    if (!image || !type) return
+    if (!image || !group) return
     setPhase('uploading')
     try {
       await uploadSample(
-        { image, type, gps, note: note.trim() || undefined, width: dims?.w, height: dims?.h },
+        { image, group, species: species.trim() || undefined, gps, width: dims?.w, height: dims?.h },
         profile,
       )
       if (quality) rememberHash(quality.phash)
@@ -248,9 +241,9 @@ function Collector({
 
       {!image ? (
         <div className="ocr-drop" onClick={() => fileRef.current?.click()}>
-          <div className="ocr-drop-icon">♻️</div>
-          <div className="ocr-drop-title">{t('wasteTake')}</div>
-          <div className="ocr-drop-sub">{t('wasteTakeSub')}</div>
+          <div className="ocr-drop-icon">🌿</div>
+          <div className="ocr-drop-title">{t('speciesTake')}</div>
+          <div className="ocr-drop-sub">{t('speciesTakeSub')}</div>
         </div>
       ) : (
         <>
@@ -263,10 +256,10 @@ function Collector({
           ) : null}
 
           <label className="voice-field">
-            <span>{t('wasteWhichType')}</span>
+            <span>{t('speciesWhichGroup')}</span>
             <div className="crop-chips">
-              {WASTE_TYPES.map((c) => (
-                <button key={c.id} type="button" className={type === c.id ? 'active' : ''} onClick={() => setType(c.id)}>
+              {GROUPS.map((c) => (
+                <button key={c.id} type="button" className={group === c.id ? 'active' : ''} onClick={() => setGroup(c.id)}>
                   {c.emoji} {km ? c.km : c.en}
                 </button>
               ))}
@@ -274,17 +267,16 @@ function Collector({
           </label>
 
           <label className="voice-field">
-            <span>{t('cropNote')}</span>
+            <span>{t('speciesName')}</span>
             <input
               type="text"
-              value={note}
-              maxLength={120}
-              placeholder={t('wasteNotePlaceholder')}
-              onChange={(e) => setNote(e.target.value)}
+              value={species}
+              maxLength={80}
+              placeholder={t('speciesNamePlaceholder')}
+              onChange={(e) => setSpecies(e.target.value)}
             />
           </label>
 
-          <small className="hint">{t('wasteWhereHint')}</small>
           <GeoField gps={gps} onChange={setGps} />
 
           {error ? <p className="voice-error">{error}</p> : null}
@@ -295,7 +287,7 @@ function Collector({
             <button
               className="voice-primary big"
               onClick={submit}
-              disabled={phase === 'uploading' || !type}
+              disabled={phase === 'uploading' || !group}
             >
               {phase === 'uploading' ? `${t('voiceUploading')}…` : `✓ ${t('cropSubmit')}`}
             </button>
@@ -303,7 +295,7 @@ function Collector({
         </>
       )}
 
-      <p className="voice-tip">{t('wasteHint')}</p>
+      <p className="voice-tip">{t('speciesHint')}</p>
     </div>
   )
 }

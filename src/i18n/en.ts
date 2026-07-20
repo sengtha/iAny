@@ -323,6 +323,44 @@ export const en = {
   wasteWhichType: 'What material is it?',
   wasteNotePlaceholder: 'anything useful (no personal info)',
   wasteHint: 'Tip: one item per photo, fill the frame, avoid clutter behind it.',
+  wasteWhereHint: 'Photographing litter outdoors? Add the location to help map it.',
+
+  // Shared "add location" control (litter map / sightings / reports)
+  geoAdd: 'Add location',
+  geoClear: 'Location added',
+  geoLocating: 'Getting location',
+
+  // Contribute species photos (/species)
+  speciesTitle: 'Contribute nature photos',
+  speciesLead:
+    'Photograph a plant, bird, insect, or mosquito and tag what group it is. Helps build a free, offline nature-ID AI — biodiversity monitoring and mosquito (disease-vector) surveillance.',
+  speciesStatSamples: 'photos',
+  speciesOpenModel: 'The nature-ID model built from it is released free for everyone.',
+  speciesConsent:
+    'I agree these photos may be published in an open dataset and used to train free, open AI models.',
+  speciesTip: 'No personal info is collected — only the photo, the group, and (if you add it) the location.',
+  speciesTake: 'Take / choose a nature photo',
+  speciesTakeSub: 'get close and in focus; one living thing per photo',
+  speciesWhichGroup: 'What group is it?',
+  speciesName: 'Species name (optional, if you know it)',
+  speciesNamePlaceholder: 'e.g. Aedes mosquito, myna bird, frangipani…',
+  speciesHint: 'Tip: sharp close-ups help most. For mosquitoes, a clear macro of the body/wings.',
+
+  // Contribute community reports (/report)
+  reportTitle: 'Report a community issue',
+  reportLead:
+    'Photograph a problem in your area (rubbish, a broken light, a pothole, flooding…) and tag it. Builds an open, geotagged dataset to help communities and an offline AI that sorts reports.',
+  reportStatSamples: 'reports',
+  reportPrivacy: 'Photograph the ISSUE, not people. Don’t include faces or plates.',
+  reportOpenModel: 'The report-sorting model built from it is released free for everyone.',
+  reportConsent:
+    'I agree these photos may be published in an open dataset and used to train free, open AI models.',
+  reportTip: 'No personal info is collected — only the issue photo, its type, and (if you add it) the location.',
+  reportTake: 'Take / choose a photo of the issue',
+  reportTakeSub: 'show the problem clearly; the location makes it actionable',
+  reportWhichType: 'What kind of issue?',
+  reportNotePlaceholder: 'a short description (no personal info)',
+  reportHint: 'Tip: add the location so the report can be mapped. Never photograph people.',
 
   // Khmer Braille converter (/braille)
   brTitle: 'Khmer Braille',

@@ -178,6 +178,12 @@ export function LandingView() {
           <Feature icon="♻️" title={L('Waste sorting', 'តម្រៀបសំរាម')}
             badge={L('Collecting data', 'កំពុងប្រមូលទិន្នន័យ')} badgeTone="collecting"
             desc={L('Building an offline classifier for waste — point at an item to know if it’s recyclable and how to sort it.', 'កំពុងបង្កើតឧបករណ៍ចាត់ថ្នាក់សំណល់ ក្រៅបណ្ដាញ — ចង្អុលទៅវត្ថុ ដើម្បីដឹងថាកែច្នៃបាន និងរបៀបតម្រៀប។')} link="/waste" linkLabel={L('Open /waste', 'បើក /waste')} />
+          <Feature icon="🌿" title={L('Nature ID', 'ចាំណាំធម្មជាតិ')}
+            badge={L('Collecting data', 'កំពុងប្រមូលទិន្នន័យ')} badgeTone="collecting"
+            desc={L('Building an offline nature-ID AI — plants, birds, insects, and mosquito (disease-vector) surveillance.', 'កំពុងបង្កើត AI ចាំណាំធម្មជាតិ ក្រៅបណ្ដាញ — រុក្ខជាតិ បក្សី សត្វល្អិត និងឃ្លាំមើលមូស។')} link="/species" linkLabel={L('Open /species', 'បើក /species')} />
+          <Feature icon="📣" title={L('Community reports', 'របាយការណ៍សហគមន៍')}
+            badge={L('Collecting data', 'កំពុងប្រមូលទិន្នន័យ')} badgeTone="collecting"
+            desc={L('Photograph + map local issues (rubbish, flooding, potholes) — a geotagged open dataset + an offline report sorter.', 'ថត + ធ្វើផែនទីបញ្ហាក្នុងតំបន់ (សំរាម ទឹកជំនន់ ផ្លូវខូច) — ទិន្នន័យបើកចំហមានទីតាំង + ឧបករណ៍ចាត់ថ្នាក់ក្រៅបណ្ដាញ។')} link="/report" linkLabel={L('Open /report', 'បើក /report')} />
         </div>
       </section>
 
@@ -207,6 +213,8 @@ export function LandingView() {
             <a className="lp-chip" href="/health-test">🧪 {L('Test', 'តេស្ត')}</a>
             <a className="lp-chip" href="/water">💧 {L('Water', 'ទឹក')}</a>
             <a className="lp-chip" href="/waste">♻️ {L('Waste', 'សំរាម')}</a>
+            <a className="lp-chip" href="/species">🌿 {L('Nature', 'ធម្មជាតិ')}</a>
+            <a className="lp-chip" href="/report">📣 {L('Report', 'របាយការណ៍')}</a>
             <a className="lp-chip" href="/braille">⠿ {L('Braille', 'អក្សរផុស')}</a>
             <a className="lp-chip" href="/contribute">
               {L('All ways to help', 'គ្រប់មធ្យោបាយជួយ')} →
@@ -260,6 +268,8 @@ export function LandingView() {
           <a href="/health">/health</a>
           <a href="/water">/water</a>
           <a href="/waste">/waste</a>
+          <a href="/species">/species</a>
+          <a href="/report">/report</a>
           <a href="/braille">/braille</a>
           <a href="/trace">/trace · {L('experiment', 'ពិសោធន៍')}</a>
         </div>

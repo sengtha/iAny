@@ -84,6 +84,8 @@ export default defineConfig({
           /^\/health-test(\/|\.html|$)/,
           /^\/water(\/|\.html|$)/,
           /^\/waste(\/|\.html|$)/,
+          /^\/species(\/|\.html|$)/,
+          /^\/report(\/|\.html|$)/,
         ],
         runtimeCaching: [
           {
@@ -153,6 +155,8 @@ export default defineConfig({
         healthTest: path.resolve(root, 'health-test.html'),
         water: path.resolve(root, 'water.html'),
         waste: path.resolve(root, 'waste.html'),
+        species: path.resolve(root, 'species.html'),
+        report: path.resolve(root, 'report.html'),
       },
     },
   },
