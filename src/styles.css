@@ -1702,6 +1702,8 @@ progress {
 }
 .label-result.method-badge { border-color: #22c55e; background: color-mix(in srgb, #22c55e 12%, transparent); }
 .label-result.method-pattern { border-color: #fbbf24; background: color-mix(in srgb, #fbbf24 12%, transparent); }
+.label-result.method-barcode { border-color: #38bdf8; background: color-mix(in srgb, #38bdf8 12%, transparent); }
+.label-result.method-barcode .label-code { font-size: 1.5rem; }
 .label-result-tag {
   font-size: 0.78rem;
   font-weight: 700;

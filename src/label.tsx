@@ -20,7 +20,7 @@ function LabelApp() {
           <span aria-hidden>🏷️</span>
           <div>
             <h1>{km ? 'អានស្លាក ច.ប.ផ' : 'Label reader'}</h1>
-            <p>{km ? 'អានលេខចុះបញ្ជីផលិតផល ក្រៅបណ្ដាញ' : 'Read the ច.ប.ផ registration code, offline'}</p>
+            <p>{km ? 'អានលេខ ច.ប.ផ និងបាកូដ ក្រៅបណ្ដាញ' : 'Read the ច.ប.ផ code + barcode, offline'}</p>
           </div>
         </div>
         <button className="voice-lang" onClick={() => setLang(km ? 'en' : 'km')}>
