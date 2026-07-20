@@ -10,6 +10,7 @@
  */
 
 import { serveTrace } from '../trace/worker/handlers'
+import { handleGrove } from '../grove/worker/handlers'
 
 interface Env {
   MODELS: R2Bucket
@@ -160,6 +161,12 @@ export default {
     }
     if (url.pathname.startsWith('/api/trace/')) {
       return serveTrace(url, request, env)
+    }
+    // Grove node — the decentralized garden-carbon network (/garden). Devices
+    // POST signed observations; the node re-verifies every signature before
+    // storing and serves public read-only feeds (see grove/worker/handlers.ts).
+    if (url.pathname.startsWith('/api/grove/')) {
+      return handleGrove(url, request, env)
     }
     // The standalone "Contribute your voice" page (voice.html) is served
     // directly by the asset layer at the clean URL /voice — Cloudflare maps

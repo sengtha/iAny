@@ -8,6 +8,8 @@ import {
   photoHashOf,
   estimateCarbon,
   exportBundle,
+  publish,
+  publishedIds,
   type GardenObservation,
   type Measure,
 } from '../../grove/web/store'
@@ -39,7 +41,12 @@ export function GardenView() {
   const [previewUrl, setPreviewUrl] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [published, setPublished] = useState<Set<string>>(() => publishedIds())
+  const [publishing, setPublishing] = useState(false)
+  const [publishMsg, setPublishMsg] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
+
+  const unpublished = useMemo(() => obs.filter((o) => !published.has(o.id)).length, [obs, published])
 
   useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl) }, [previewUrl])
 
@@ -93,6 +100,24 @@ export function GardenView() {
       setError(e instanceof Error ? e.message : String(e))
     }
     setSaving(false)
+  }
+
+  async function onPublish() {
+    setPublishing(true)
+    setPublishMsg('')
+    try {
+      const r = await publish()
+      setPublished(publishedIds())
+      setPublishMsg(
+        r.accepted > 0
+          ? (km ? `✅ បានផ្សព្វផ្សាយ ${r.accepted} កំណត់ត្រា` : `✅ Published ${r.accepted}`)
+          : (km ? 'ទាំងអស់បានផ្សព្វផ្សាយរួច' : 'All already published'),
+      )
+      if (r.rejected > 0) setPublishMsg((m) => `${m} · ${r.rejected} ${km ? 'បដិសេធ' : 'rejected'}`)
+    } catch (e) {
+      setPublishMsg((km ? 'បរាជ័យ៖ ' : 'Failed: ') + (e instanceof Error ? e.message : String(e)))
+    }
+    setPublishing(false)
   }
 
   function download() {
@@ -186,13 +211,21 @@ export function GardenView() {
         <div className="garden-list">
           <div className="garden-list-head">
             <b>{km ? 'កំណត់ត្រា' : 'Records'}</b>
-            <button className="voice-ghost small" onClick={download}>⬇ {km ? 'នាំចេញ JSON' : 'Export JSON'}</button>
+            <div className="garden-list-actions">
+              <button className="voice-ghost small" onClick={onPublish} disabled={publishing || unpublished === 0}>
+                {publishing ? '…' : `🌐 ${km ? 'ផ្សព្វផ្សាយ' : 'Publish'}${unpublished > 0 ? ` (${unpublished})` : ''}`}
+              </button>
+              <button className="voice-ghost small" onClick={download}>⬇ {km ? 'នាំចេញ JSON' : 'Export JSON'}</button>
+            </div>
           </div>
+          {publishMsg ? <p className="garden-publish-msg">{publishMsg}</p> : null}
           {[...obs].reverse().slice(0, 30).map((o) => (
             <div key={o.id} className="garden-row">
               <span className="garden-row-sp">{km ? SP_KM[o.species] ?? o.species : o.species}{o.count > 1 ? ` ×${o.count}` : ''}</span>
               <span className="garden-row-co2">{o.co2Kg} kg CO₂</span>
-              <span className="garden-row-id" title={o.id}>✅ {o.id.slice(0, 8)}</span>
+              <span className="garden-row-id" title={o.id}>
+                {published.has(o.id) ? '🌐' : '✅'} {o.id.slice(0, 8)}
+              </span>
             </div>
           ))}
         </div>

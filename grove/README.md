@@ -38,16 +38,46 @@ is that substrate.
 
 ```
 grove/
-  SPEC.md          ← the protocol (read this first)
-  core/grove.ts    ← reference implementation: types, canonical hash,
-                     device keys, sign/verify, carbon estimate, attestation, trust
-  README.md        ← you are here
-  LICENSE          ← Apache-2.0
+  SPEC.md              ← the protocol (read this first)
+  BRIDGE.md            ← the CamboVerse read contract (physical ↔ virtual)
+  core/grove.ts        ← reference implementation: types, canonical hash,
+                         device keys, sign/verify, carbon estimate, attestation, trust
+  web/store.ts         ← on-device layer: device keypair, create/sign/store, publish
+  worker/handlers.ts   ← the reference NODE: federated verify-on-ingest + public feeds
+  worker/schema.sql    ← the node's two D1 tables
+  README.md            ← you are here
+  LICENSE              ← Apache-2.0
   CHANGELOG.md
 ```
 
-Web capture UI and a federation node handler are planned (they'll reuse iAny's
-on-device vision + Trace provenance).
+The capture UI lives in the iAny app at [`/garden`](https://iany.app/garden)
+(`src/views/GardenView.tsx`), and iany.app runs the reference node at
+`/api/grove/*`. Both the node and the bridge are self-contained and reusable.
+
+## Run a node
+
+A node is trustless and replaceable — it re-verifies every signature on ingest and
+stores the exact signed bytes so consumers can re-verify independently.
+
+```ts
+import { handleGrove } from './worker/handlers'
+// in your Cloudflare Worker (env.DB is a D1Database):
+if (url.pathname.startsWith('/api/grove/')) return handleGrove(url, request, env)
+```
+
+Apply `worker/schema.sql` once, then:
+
+| Endpoint | |
+|---|---|
+| `POST /api/grove/submit` | one signed observation / array / bundle → verified + stored |
+| `POST /api/grove/attest` | a signed co-signature → verified + stored |
+| `GET  /api/grove/stats` | headline totals |
+| `GET  /api/grove/feed?since=` | recent records (GPS coarsened ~1 km for privacy) |
+| `GET  /api/grove/plot/:plot` | a garden's growth chain + per-record trust |
+| `GET  /api/grove/observation/:id` | one record **with raw signed bytes** (re-verifiable) |
+
+Consumers (dashboards, [CamboVerse](https://github.com/camboversecenter/CamboVerse))
+read these — see [BRIDGE.md](./BRIDGE.md).
 
 ## Quick taste
 

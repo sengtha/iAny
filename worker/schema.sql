@@ -302,3 +302,45 @@ CREATE TABLE IF NOT EXISTS trace_attestations (
   created_at  TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_trace_attest ON trace_attestations (id);
+
+-- Grove — the open, decentralized garden-carbon network (/garden). The user's
+-- phone signs each observation on-device (the source of truth); iany.app runs a
+-- reference NODE that re-verifies every signature before storing and serves
+-- public read-only feeds anyone can consume (dashboards, communities, CamboVerse).
+-- Canonical schema + docs live in grove/worker/schema.sql, grove/SPEC.md and
+-- grove/BRIDGE.md; these two tables are duplicated here so iAny's D1 migration
+-- creates them. `id` is the content hash; `device` is the signer's public key;
+-- `raw` is the exact signed JSON (re-verifiable / federatable).
+CREATE TABLE IF NOT EXISTS grove_observations (
+  id          TEXT PRIMARY KEY,       -- SHA-256 of the canonical observation (64 hex)
+  device      TEXT NOT NULL,          -- signer public key (base64url raw P-256)
+  plot        TEXT NOT NULL,          -- stable plot id grouping a garden over time
+  species     TEXT NOT NULL,          -- species id/name, e.g. "mango"
+  count       INTEGER NOT NULL,       -- identical plants this record represents
+  co2_kg      REAL NOT NULL,          -- estimated CO2e (total = per-plant × count)
+  biomass_kg  REAL NOT NULL,          -- estimated above-ground biomass (total)
+  lat         REAL,                   -- optional GPS claim (as signed)
+  lng         REAL,
+  acc         INTEGER,                -- GPS accuracy radius (metres)
+  observed_at TEXT NOT NULL,          -- device-claimed observation time (untrusted)
+  photo_hash  TEXT NOT NULL,          -- SHA-256 of the photo (provenance anchor)
+  prev        TEXT,                   -- previous observation id for this plot (chain)
+  raw         TEXT NOT NULL,          -- exact signed JSON (re-verifiable / federatable)
+  created_at  TEXT NOT NULL           -- server first-seen (trusted)
+);
+CREATE INDEX IF NOT EXISTS idx_grove_obs_created ON grove_observations (created_at);
+CREATE INDEX IF NOT EXISTS idx_grove_obs_plot ON grove_observations (plot);
+CREATE INDEX IF NOT EXISTS idx_grove_obs_device ON grove_observations (device);
+
+CREATE TABLE IF NOT EXISTS grove_attestations (
+  id          TEXT PRIMARY KEY,       -- SHA-256 of the canonical attestation (64 hex)
+  ref         TEXT NOT NULL,          -- observation id being attested
+  device      TEXT NOT NULL,          -- attester public key (base64url raw P-256)
+  verdict     TEXT NOT NULL,          -- confirm / dispute
+  note        TEXT,
+  at          TEXT NOT NULL,          -- attester-claimed time (untrusted)
+  raw         TEXT NOT NULL,          -- exact signed JSON (re-verifiable)
+  created_at  TEXT NOT NULL           -- server first-seen (trusted)
+);
+CREATE INDEX IF NOT EXISTS idx_grove_att_ref ON grove_attestations (ref);
+CREATE INDEX IF NOT EXISTS idx_grove_att_device ON grove_attestations (device);

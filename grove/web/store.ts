@@ -23,6 +23,10 @@ import {
 const DEVICE_KEY = 'grove.device.v1'
 const OBS_KEY = 'grove.obs.v1'
 const PLOTS_KEY = 'grove.plots.v1'
+const PUBLISHED_KEY = 'grove.published.v1'
+/** Default node = this origin's Grove reference node (iany.app runs one). A user
+ *  can point at any other node — the protocol is federated, the node is replaceable. */
+export const DEFAULT_NODE = '/api/grove'
 
 let cached: { device: string; privateKey: CryptoKey } | null = null
 
@@ -97,6 +101,47 @@ export async function photoHashOf(blob: Blob): Promise<string> {
  *  node / dashboard / CamboVerse. Each record carries its own proof. */
 export function exportBundle(): string {
   return JSON.stringify({ v: 1, kind: 'grove-bundle', observations: loadObservations() }, null, 1)
+}
+
+/** The set of observation ids already accepted by a node (for UI state). */
+export function publishedIds(): Set<string> {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(PUBLISHED_KEY) ?? '[]') as string[])
+  } catch {
+    return new Set()
+  }
+}
+function markPublished(ids: string[]): void {
+  const set = publishedIds()
+  for (const id of ids) set.add(id)
+  localStorage.setItem(PUBLISHED_KEY, JSON.stringify([...set]))
+}
+
+export interface PublishResult {
+  accepted: number
+  rejected: number
+  ids: string[]
+}
+
+/**
+ * Publish local observations to a Grove node. The phone stays the source of
+ * truth — this just mirrors the signed records to a node that re-verifies every
+ * signature before storing. Only sends ones not already published. Any node
+ * works (federated); defaults to this origin's node.
+ */
+export async function publish(node: string = DEFAULT_NODE): Promise<PublishResult> {
+  const already = publishedIds()
+  const pending = loadObservations().filter((o) => !already.has(o.id))
+  if (pending.length === 0) return { accepted: 0, rejected: 0, ids: [] }
+  const res = await fetch(`${node.replace(/\/$/, '')}/submit`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ v: 1, kind: 'grove-bundle', observations: pending }),
+  })
+  if (!res.ok) throw new Error(`node ${res.status}`)
+  const out = (await res.json()) as PublishResult
+  if (out.ids?.length) markPublished(out.ids)
+  return out
 }
 
 export { verifyObservation, estimateCarbon }

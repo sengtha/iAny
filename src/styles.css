@@ -1745,7 +1745,9 @@ progress {
 }
 .garden-est b { font-size: 1.25rem; }
 .garden-list { margin-top: 16px; }
-.garden-list-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.garden-list-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.garden-list-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.garden-publish-msg { margin: 2px 0 8px; font-size: 0.85rem; color: var(--fg-muted); }
 .garden-row {
   display: flex;
   align-items: center;

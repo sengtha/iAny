@@ -187,12 +187,17 @@ export interface DeviceKey {
 /** Generate a device keypair. Persist `keyPair.privateKey` on-device (the web
  *  layer handles storage/backup); publish `device` freely. */
 export async function generateDeviceKey(): Promise<DeviceKey> {
-  const keyPair = await crypto.subtle.generateKey(
+  // Cast: @cloudflare/workers-types types generateKey's return as a
+  // CryptoKeyPair | CryptoKey union (the DOM lib narrows by algorithm). For an
+  // asymmetric algorithm it is always a CryptoKeyPair.
+  const keyPair = (await crypto.subtle.generateKey(
     { name: 'ECDSA', namedCurve: 'P-256' },
     true,
     ['sign', 'verify'],
+  )) as CryptoKeyPair
+  const raw = new Uint8Array(
+    (await crypto.subtle.exportKey('raw', keyPair.publicKey)) as ArrayBuffer,
   )
-  const raw = new Uint8Array(await crypto.subtle.exportKey('raw', keyPair.publicKey))
   return { keyPair, device: b64url(raw) }
 }
 
