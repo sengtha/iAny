@@ -91,7 +91,10 @@ def transcribe(model, proc, ds, batch, dev, dtype):
     for i in range(0, len(ds), batch):
         feats = features(ds[i : i + batch], proc, dev, dtype)
         with torch.no_grad():
-            ids = model.generate(feats, max_new_tokens=225)
+            # 448 = Whisper's max decoder length. Khmer is very token-dense in
+            # Whisper (~2-3 byte-tokens/char, no native merges), so a low cap
+            # truncates long sentences mid-way and massively inflates CER.
+            ids = model.generate(feats, max_new_tokens=448)
         hyps += proc.batch_decode(ids, skip_special_tokens=True)
         print(f"  {len(hyps)}/{len(ds)}", end="\r", flush=True)
     print()
