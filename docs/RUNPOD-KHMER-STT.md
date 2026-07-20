@@ -474,7 +474,11 @@ python whisper.cpp/models/convert-h5-to-ggml.py ./whisper-base-khmer ./whisper .
 # -> ggml-model.bin
 # build tools + quantize (q5_1 = small & good for phones)
 cmake -S whisper.cpp -B whisper.cpp/build && cmake --build whisper.cpp/build -j --config Release
-./whisper.cpp/build/bin/quantize ggml-model.bin ggml-base-khmer-q5_1.bin q5_1
+# NB: whisper.cpp prefixes its binaries now — it's `whisper-quantize`, not `quantize`
+# (likewise `whisper-cli`, not `main`). Older builds used the unprefixed names.
+./whisper.cpp/build/bin/whisper-quantize ggml-model.bin ggml-base-khmer-q5_1.bin q5_1
+# sanity-check it transcribes (16 kHz wav):
+# ./whisper.cpp/build/bin/whisper-cli -m ggml-base-khmer-q5_1.bin -l km -f test.wav
 ```
 
 **B) CTranslate2 for IoT-Linux / server (faster-whisper)**
