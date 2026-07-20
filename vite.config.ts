@@ -87,6 +87,7 @@ export default defineConfig({
           /^\/species(\/|\.html|$)/,
           /^\/report(\/|\.html|$)/,
           /^\/traffic(\/|\.html|$)/,
+          /^\/street(\/|\.html|$)/,
         ],
         runtimeCaching: [
           {
@@ -159,6 +160,7 @@ export default defineConfig({
         species: path.resolve(root, 'species.html'),
         report: path.resolve(root, 'report.html'),
         traffic: path.resolve(root, 'traffic.html'),
+        street: path.resolve(root, 'street.html'),
       },
     },
   },

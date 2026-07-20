@@ -111,6 +111,9 @@ export function ContributePageView() {
           <Card icon="📣" title={L('Report a community issue', 'រាយការណ៍បញ្ហាសហគមន៍')}
             desc={L('Photograph + map local problems (rubbish, flooding, potholes) — helps communities + an offline report AI.', 'ថត + ធ្វើផែនទីបញ្ហា (សំរាម ទឹកជំនន់ ផ្លូវខូច) — ជួយសហគមន៍ + AI របាយការណ៍ក្រៅបណ្ដាញ។')}
             link="/report" linkLabel={L('Open /report', 'បើក /report')} />
+          <Card icon="🛺" title={L('Contribute street-vehicle photos', 'ចូលរួមរូបថតយានយន្តតាមផ្លូវ')}
+            desc={L('Photograph one vehicle + tag its type (tuk-tuk, remork, cyclo…) — builds a Cambodia-aware offline vehicle AI for the traffic counter.', 'ថតយានយន្តមួយ + ដាក់ស្លាកប្រភេទ (តុកតុក រ៉ឺម៉ក ស៊ីក្លូ…) — បង្កើត AI ស្គាល់យានយន្តខ្មែរ ក្រៅបណ្ដាញ សម្រាប់ឧបករណ៍រាប់ចរាចរណ៍។')}
+            link="/street" linkLabel={L('Open /street', 'បើក /street')} />
           <Card icon="🌐" title={L('Translate & improve Khmer', 'បកប្រែ & កែលម្អខ្មែរ')}
             desc={L('Improve the Khmer wording, prompts, and app text. Great first contribution.', 'កែលម្អពាក្យខ្មែរ ប្រយោគ និងអត្ថបទកម្មវិធី។ ការចូលរួមដំបូងដ៏ល្អ។')}
             link={`${GITHUB_URL}/issues`} linkLabel={L('Good first issues', 'កិច្ចការសម្រាប់អ្នកចាប់ផ្ដើម')} external />

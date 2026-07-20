@@ -186,6 +186,9 @@ export function LandingView() {
             desc={L('Photograph + map local issues (rubbish, flooding, potholes) — a geotagged open dataset + an offline report sorter.', 'ថត + ធ្វើផែនទីបញ្ហាក្នុងតំបន់ (សំរាម ទឹកជំនន់ ផ្លូវខូច) — ទិន្នន័យបើកចំហមានទីតាំង + ឧបករណ៍ចាត់ថ្នាក់ក្រៅបណ្ដាញ។')} link="/report" linkLabel={L('Open /report', 'បើក /report')} />
           <Feature icon="🚦" title={L('Traffic counter', 'ឧបករណ៍រាប់ចរាចរណ៍')} badge={L('Experiment', 'ពិសោធន៍')}
             desc={L('Point your camera at traffic to count vehicles + people and read congestion — live, on-device, offline.', 'ចង្អុលកាមេរ៉ាទៅចរាចរណ៍ ដើម្បីរាប់យានយន្ត + មនុស្ស និងស្ថានភាពកកកុញ — ផ្ទាល់ លើឧបករណ៍ ក្រៅបណ្ដាញ។')} link="/traffic" linkLabel={L('Try /traffic', 'សាកល្បង /traffic')} />
+          <Feature icon="🛺" title={L('Street vehicles', 'យានយន្តតាមផ្លូវ')}
+            badge={L('Collecting data', 'កំពុងប្រមូលទិន្នន័យ')} badgeTone="collecting"
+            desc={L('Building a Cambodia-aware vehicle AI — tuk-tuk, remork and cyclo, the classes generic detectors miss. Photograph + tag one vehicle.', 'កំពុងបង្កើត AI ស្គាល់យានយន្តខ្មែរ — តុកតុក រ៉ឺម៉ក ស៊ីក្លូ ដែល AI ទូទៅមិនស្គាល់។ ថត + ដាក់ស្លាកយានយន្តមួយ។')} link="/street" linkLabel={L('Open /street', 'បើក /street')} />
         </div>
       </section>
 
@@ -217,6 +220,7 @@ export function LandingView() {
             <a className="lp-chip" href="/waste">♻️ {L('Waste', 'សំរាម')}</a>
             <a className="lp-chip" href="/species">🌿 {L('Nature', 'ធម្មជាតិ')}</a>
             <a className="lp-chip" href="/report">📣 {L('Report', 'របាយការណ៍')}</a>
+            <a className="lp-chip" href="/street">🛺 {L('Street', 'ផ្លូវ')}</a>
             <a className="lp-chip" href="/braille">⠿ {L('Braille', 'អក្សរផុស')}</a>
             <a className="lp-chip" href="/contribute">
               {L('All ways to help', 'គ្រប់មធ្យោបាយជួយ')} →
@@ -273,6 +277,7 @@ export function LandingView() {
           <a href="/species">/species</a>
           <a href="/report">/report</a>
           <a href="/traffic">/traffic</a>
+          <a href="/street">/street</a>
           <a href="/braille">/braille</a>
           <a href="/trace">/trace · {L('experiment', 'ពិសោធន៍')}</a>
         </div>

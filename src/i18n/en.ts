@@ -377,6 +377,22 @@ export const en = {
     'Counts what’s in the frame now. Tuk-tuks / remork aren’t a standard class yet — they’re counted as car or motorbike. A Cambodia-specific model is future work.',
   trafficPrivacy: 'Runs fully on your device — no video leaves the phone, nothing is uploaded.',
 
+  // Contribute street-vehicle photos (/street)
+  streetTitle: 'Contribute street-vehicle photos',
+  streetLead:
+    'Photograph one vehicle and tag its type — including the Cambodia classes a generic AI lacks (tuk-tuk, remork, cyclo). Helps build a free, offline vehicle recogniser so the traffic counter can count tuk-tuks correctly.',
+  streetStatSamples: 'photos',
+  streetOpenModel: 'The vehicle-recognition model built from it is released free for everyone.',
+  streetConsent:
+    'I agree these photos may be published in an open dataset and used to train free, open AI models.',
+  streetTip: 'No personal info is collected — only the vehicle photo and the type you pick.',
+  streetTake: 'Take / choose a photo of one vehicle',
+  streetTakeSub: 'one vehicle, filling the frame; the whole side is best',
+  streetWhichType: 'What vehicle is it?',
+  streetNotePlaceholder: 'anything useful (no personal info)',
+  streetHint: 'Tip: one vehicle per photo, fill the frame. Don’t photograph faces or number plates.',
+  streetWhereHint: 'Optional: add where the photo was taken (helps balance the dataset by area).',
+
   // Khmer Braille converter (/braille)
   brTitle: 'Khmer Braille',
   brLead:

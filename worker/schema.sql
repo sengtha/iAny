@@ -217,6 +217,30 @@ CREATE TABLE IF NOT EXISTS species_samples (
 CREATE INDEX IF NOT EXISTS idx_species_created ON species_samples (created_at);
 CREATE INDEX IF NOT EXISTS idx_species_grp ON species_samples (grp);
 
+-- Crowd-sourced Cambodia street-vehicle photos (the /street page). Each row is
+-- one (image, vehicle type) sample for training an offline vehicle classifier
+-- with the classes COCO detectors lack (tuk-tuk / remork / cyclo) — so the
+-- /traffic counter can count tuk-tuks correctly. See docs/SMARTCITY-AI.md.
+-- Image in R2 at r2_key (foldered street/<type>/); device is anonymous.
+CREATE TABLE IF NOT EXISTS street_samples (
+  id          TEXT PRIMARY KEY,
+  r2_key      TEXT NOT NULL,          -- R2 key: street/<type>/<day>-<id>.jpg
+  device      TEXT NOT NULL,          -- anonymous per-device id, e.g. t-3f9a2c71
+  type        TEXT NOT NULL,          -- tuktuk / remork / cyclo / motorbike / …  (classifier target)
+  note        TEXT,
+  credit_name TEXT,                   -- opt-in public credit (dataset contributors)
+  region      TEXT,
+  lat         REAL,                   -- optional GPS (where the photo was taken)
+  lng         REAL,
+  acc         INTEGER,                -- GPS accuracy radius (metres)
+  width       INTEGER,
+  height      INTEGER,
+  bytes       INTEGER,
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_street_created ON street_samples (created_at);
+CREATE INDEX IF NOT EXISTS idx_street_type ON street_samples (type);
+
 -- Crowd-sourced citizen infrastructure / environment reports (the /report page).
 -- `type` is the classifier target; lat/lng makes a report actionable/mappable.
 -- Privacy: the issue photo, not people. See docs/ENVIRONMENT-AI.md.

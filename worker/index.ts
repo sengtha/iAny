@@ -139,6 +139,9 @@ export default {
     if (url.pathname.startsWith('/api/report/')) {
       return serveReport(url, request, env)
     }
+    if (url.pathname.startsWith('/api/street/')) {
+      return serveStreet(url, request, env)
+    }
     if (url.pathname.startsWith('/download/')) {
       return serveApk(request, env)
     }
@@ -1331,6 +1334,104 @@ async function wasteStats(env: Env): Promise<Response> {
   const row = await env.DB.prepare(
     `SELECT COUNT(*) AS samples, COUNT(DISTINCT device) AS devices,
             COUNT(DISTINCT type) AS types FROM waste_samples`,
+  ).first<{ samples: number; devices: number; types: number }>()
+  return new Response(
+    JSON.stringify({ samples: row?.samples ?? 0, devices: row?.devices ?? 0, types: row?.types ?? 0 }),
+    { headers: { ...JSON_HEADERS, 'cache-control': 'public, max-age=30' } },
+  )
+}
+
+/* ------------------------------------------------------------------ *
+ * /street — crowd-sourced Cambodia vehicle photos (tuk-tuk, remork,    *
+ * cyclo …) for an OFFLINE vehicle classifier, so the /traffic counter  *
+ * can count tuk-tuks correctly. Image → R2; type → D1.                 *
+ * See docs/SMARTCITY-AI.md.                                            *
+ * ------------------------------------------------------------------ */
+
+const STREET_MAX_BYTES = 8 * 1024 * 1024
+const STREET_DEVICE_RE = /^t-[0-9a-z]{6,16}$/
+// Keep in sync with src/assets/streetLabels.ts (server-side allowlist).
+const STREET_TYPES = new Set([
+  'tuktuk', 'remork', 'moto_trailer', 'motorbike', 'cyclo', 'bicycle',
+  'car', 'pickup', 'van', 'bus', 'truck', 'other',
+])
+
+async function serveStreet(url: URL, request: Request, env: Env): Promise<Response> {
+  const path = url.pathname.slice('/api/street/'.length)
+  if (request.method === 'OPTIONS') {
+    return new Response(null, {
+      headers: { ...JSON_HEADERS, 'access-control-allow-methods': 'GET,POST,OPTIONS',
+        'access-control-allow-headers': 'content-type' },
+    })
+  }
+  try {
+    if (path === 'sample' && request.method === 'POST') return await streetPostSample(request, env)
+    if (path === 'stats' && request.method === 'GET') return await streetStats(env)
+    return json({ error: 'not found' }, 404)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    const hint = /no such table|street_samples/i.test(msg)
+      ? 'street storage not initialised — run the D1 schema migration (worker/schema.sql)'
+      : 'server error'
+    return json({ error: hint, detail: msg }, 500)
+  }
+}
+
+// Public: accept one (image, type) sample. multipart/form-data.
+async function streetPostSample(request: Request, env: Env): Promise<Response> {
+  let form: FormData
+  try {
+    form = await request.formData()
+  } catch {
+    return json({ error: 'expected multipart form' }, 400)
+  }
+  const entry = form.get('image') as unknown
+  const type = String(form.get('type') ?? '').trim()
+  const device = String(form.get('device') ?? '').trim()
+  const consent = String(form.get('consent') ?? '') === '1'
+
+  if (!entry || typeof entry === 'string') return json({ error: 'image required' }, 400)
+  const image = entry as Blob
+  if (!consent) return json({ error: 'consent required' }, 403)
+  if (!STREET_TYPES.has(type)) return json({ error: 'bad type' }, 400)
+  if (!STREET_DEVICE_RE.test(device)) return json({ error: 'bad device id' }, 400)
+  const size = image.size
+  if (!size || size > STREET_MAX_BYTES) return json({ error: 'image too large or empty' }, 413)
+
+  const id = crypto.randomUUID()
+  const now = new Date()
+  const day = now.toISOString().slice(0, 10).replace(/-/g, '')
+  const t = image.type === 'image/png' ? 'png' : 'jpg'
+  const r2Key = `street/${type}/${day}-${id}.${t}`
+  await env.MODELS.put(r2Key, await image.arrayBuffer(), {
+    httpMetadata: { contentType: image.type || 'image/jpeg' },
+    customMetadata: { device, type },
+  })
+
+  const trim = (k: string, max: number): string | null => {
+    const v = String(form.get(k) ?? '').trim()
+    return v ? v.slice(0, max) : null
+  }
+  const num = (k: string): number | null => {
+    const v = Number(form.get(k) ?? 0)
+    return Number.isFinite(v) && v > 0 ? Math.round(v) : null
+  }
+  const geo = parseGeo(form)
+  await env.DB.prepare(
+    `INSERT INTO street_samples
+       (id, r2_key, device, type, note, credit_name, region, lat, lng, acc, width, height, bytes, created_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+  ).bind(
+    id, r2Key, device, type, trim('note', 120), trim('creditName', 60),
+    trim('region', 40), geo.lat, geo.lng, geo.acc, num('width'), num('height'), size, now.toISOString(),
+  ).run()
+  return json({ id })
+}
+
+async function streetStats(env: Env): Promise<Response> {
+  const row = await env.DB.prepare(
+    `SELECT COUNT(*) AS samples, COUNT(DISTINCT device) AS devices,
+            COUNT(DISTINCT type) AS types FROM street_samples`,
   ).first<{ samples: number; devices: number; types: number }>()
   return new Response(
     JSON.stringify({ samples: row?.samples ?? 0, devices: row?.devices ?? 0, types: row?.types ?? 0 }),
