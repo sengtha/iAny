@@ -230,6 +230,12 @@ export const en = {
   ocrReading: 'Reading text from the photo…',
   ocrUploadFailed: 'Could not save. Check your connection and try again.',
   ocrHint: 'Tip: crop close to the text, avoid glare and blur, keep the page flat.',
+  ocrWarnBlurry: 'looks blurry',
+  ocrWarnDark: 'too dark',
+  ocrWarnBright: 'too bright',
+  ocrWarnLowContrast: 'low contrast',
+  ocrQualityRetake: '— a sharper, well-lit photo trains a better model.',
+  ocrDupWarn: 'You already submitted a very similar photo — take a different one, or skip.',
 
   // Khmer Braille converter (/braille)
   brTitle: 'Khmer Braille',

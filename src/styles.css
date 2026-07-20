@@ -1497,6 +1497,20 @@ progress {
   border: 1px solid var(--bg-softer);
   background: var(--bg-soft);
 }
+/* Non-blocking quality / duplicate hints under the /scan preview. */
+.ocr-warn {
+  margin: 8px 0 0;
+  padding: 8px 12px;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  color: #b45309;
+  background: color-mix(in srgb, #f59e0b 12%, transparent);
+  border: 1px solid color-mix(in srgb, #f59e0b 40%, transparent);
+  border-radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  .ocr-warn { color: #fcd34d; }
+}
 .ocr-text {
   border: 1px solid var(--bg-softer);
   background: var(--bg-soft);

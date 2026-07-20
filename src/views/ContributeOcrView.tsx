@@ -11,6 +11,15 @@ import {
   type OcrProfile,
   type OcrStats,
 } from '../lib/ocrContribute'
+import {
+  analyzeImage,
+  assessOcr,
+  loadSubmittedHashes,
+  nearDuplicate,
+  rememberHash,
+  type ImageQuality,
+  type OcrWarning,
+} from '../lib/imageQuality'
 
 /**
  * 📷 Contribute Khmer text photos — a community data-collection screen (/scan).
@@ -23,6 +32,13 @@ import {
  * Consent-first (open dataset + credit), progress + identity kept on-device.
  */
 type Phase = 'idle' | 'ocr' | 'ready' | 'uploading'
+
+const OCR_WARN_KEY = {
+  blurry: 'ocrWarnBlurry',
+  dark: 'ocrWarnDark',
+  bright: 'ocrWarnBright',
+  lowContrast: 'ocrWarnLowContrast',
+} as const
 
 export function ContributeOcrView() {
   const [profile, setProfile] = useState<OcrProfile>(loadOcrProfile)
@@ -146,6 +162,9 @@ function Scanner({
   const [ocrProg, setOcrProg] = useState<OcrProgress | null>(null)
   const [count, setCount] = useState(0)
   const [error, setError] = useState('')
+  const [quality, setQuality] = useState<ImageQuality | null>(null)
+  const [warnings, setWarnings] = useState<OcrWarning[]>([])
+  const [isDup, setIsDup] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -163,6 +182,17 @@ function Scanner({
     setPreviewUrl(URL.createObjectURL(scaled.blob))
     setText('')
     setOcrGuess('')
+    // On-device quality gate + near-duplicate check (instant, no model download).
+    try {
+      const q = await analyzeImage(scaled.blob)
+      setQuality(q)
+      setWarnings(assessOcr(q).warnings)
+      setIsDup(!!nearDuplicate(q.phash, loadSubmittedHashes()))
+    } catch {
+      setQuality(null)
+      setWarnings([])
+      setIsDup(false)
+    }
     setPhase('ocr')
     try {
       const read = await khmerOcr.recognizeImage(scaled.blob, setOcrProg)
@@ -183,6 +213,9 @@ function Scanner({
     setDims(null)
     setOcrGuess('')
     setText('')
+    setQuality(null)
+    setWarnings([])
+    setIsDup(false)
     setPhase('idle')
     if (fileRef.current) fileRef.current.value = ''
   }
@@ -195,6 +228,7 @@ function Scanner({
         { image, text: text.trim(), ocrGuess: ocrGuess || undefined, width: dims?.w, height: dims?.h },
         profile,
       )
+      if (quality) rememberHash(quality.phash) // so a re-submit of this photo is flagged
       setCount((c) => c + 1)
       if (stats) onStats({ ...stats, samples: stats.samples + 1 })
       reset()
@@ -241,6 +275,14 @@ function Scanner({
         <>
           <img className="ocr-preview" src={previewUrl} alt="" />
           {ocrStatusText ? <p className="stt-status">{ocrStatusText}</p> : null}
+          {isDup ? (
+            <p className="ocr-warn">🔁 {t('ocrDupWarn')}</p>
+          ) : null}
+          {warnings.length > 0 ? (
+            <p className="ocr-warn">
+              ⚠ {warnings.map((w) => t(OCR_WARN_KEY[w])).join(' · ')} {t('ocrQualityRetake')}
+            </p>
+          ) : null}
           <label className="voice-field">
             <span>{t('ocrCorrect')}</span>
             <textarea
