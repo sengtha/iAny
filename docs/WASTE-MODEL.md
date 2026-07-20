@@ -42,12 +42,20 @@ app. The public data teaches "what a bottle/can looks like"; your data teaches
 | **[TACO](https://github.com/pedropro/TACO)** | 1,500 | 60 (bottle, can, cap…) | ✅ COCO | **CC BY 4.0** ✅ | real-world litter → detector |
 | **[Open Images V7](https://storage.googleapis.com/openimages/web/index.html)** | huge | "Bottle", "Tin can", "Plastic bag"… | ✅ bbox | CC BY 4.0 ✅ | scale (filter classes) |
 | **[Roboflow Universe](https://universe.roboflow.com/)** — "garbage/recycling detection" | many | varies | ✅ export | varies | quick TFLite-ready sets |
+| **[techsash/waste-classification-data](https://www.kaggle.com/datasets/techsash/waste-classification-data)** | ~25,000 | **Organic vs Recyclable (binary only)** | ❌ | check on Kaggle | **`organic` class + volume only** — too coarse for material labels |
 
 Master index of every waste dataset:
 **[AgaMiko/waste-datasets-review](https://github.com/AgaMiko/waste-datasets-review)**.
 
+> **On `techsash/waste-classification-data`:** big (~25k) but only **binary** (Organic /
+> Recyclable). Its "Recyclable" folder lumps bottle/can/glass/paper into one bucket, so
+> it **can't teach the material distinctions** your 8 classes need — don't map it in
+> wholesale. Do pull its **`O/` (Organic) → `organic`** half: it's far more organic
+> imagery than TrashNet/Drinking Waste have. Skip the `R/` folder for the material model.
+
 **For the classifier (§5):** TrashNet + Drinking Waste (crop each image to its box so
-one item fills the frame — matches how `/waste` is used).
+one item fills the frame — matches how `/waste` is used); optionally
+techsash's Organic half to bulk up `organic`.
 **For the detector (§9):** Drinking Waste + TACO (both already have boxes).
 
 > **License → your model's license.** TrashNet (MIT), TACO / Open Images (CC BY 4.0)
