@@ -260,6 +260,35 @@ export const en = {
   cropSubmit: 'Add photo',
   cropHint: 'Tip: fill the frame with the plant part, avoid glare, one plant per photo.',
 
+  // Health education (/health)
+  healthDisclaimer:
+    'Information only — not a medical diagnosis. This can be wrong and does not replace a health worker. If you feel unwell, seek care. In an emergency, go to the nearest health facility.',
+  healthListen: 'Listen (Khmer)',
+  healthStop: 'Stop',
+  healthLoadingVoice: 'Loading voice…',
+  healthSource: 'Source',
+  healthContentNote:
+    'Starter content based on standard public-health guidance, pending review by health professionals. Not affiliated with any ministry.',
+
+  // Contribute rapid-test photos (/health-test)
+  htestTitle: 'Contribute rapid-test photos',
+  htestLead:
+    'Photograph a used rapid test (RDT) strip and tag its result. Helps build a free, offline AI that reads the result line — so a result is easier to read where health staff are far.',
+  htestDisclaimer:
+    'This helps train a tool that READS a test result — it does not diagnose. The test itself is the medical device. Always follow a health worker’s advice.',
+  htestPrivacy: 'Photograph the STRIP ONLY — never a face, name, or document.',
+  htestStatSamples: 'test photos',
+  htestOpenModel: 'The result-reading model built from it is released free for everyone.',
+  htestConsent:
+    'I agree these test-strip photos may be published in an open dataset and used to train free, open AI models.',
+  htestTip: 'No personal or health-record info is collected — only the strip photo and the result you tag.',
+  htestTake: 'Take / choose a test-strip photo',
+  htestTakeSub: 'fill the frame with the result window; the strip only',
+  htestWhichTest: 'Which test?',
+  htestResult: 'What is the result?',
+  htestNotePlaceholder: 'kit brand, or anything useful (no personal info)',
+  htestHint: 'Tip: good light, no glare, fill the frame with the result window.',
+
   // Khmer Braille converter (/braille)
   brTitle: 'Khmer Braille',
   brLead:

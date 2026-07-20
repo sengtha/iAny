@@ -170,6 +170,8 @@ export function LandingView() {
           <Feature icon="🌱" title={L('Crop health', 'សុខភាពដំណាំ')}
             badge={L('Collecting data', 'កំពុងប្រមូលទិន្នន័យ')} badgeTone="collecting"
             desc={L('Building an open, offline crop-disease AI for farmers — spot problems early with just a phone, no lab or internet.', 'កំពុងបង្កើត AI ជំងឺដំណាំបើកចំហ ក្រៅបណ្ដាញ សម្រាប់កសិករ — រកឃើញបញ្ហាឆាប់ ដោយប្រើតែទូរស័ព្ទ។')} link="/crop" linkLabel={L('Open /crop', 'បើក /crop')} />
+          <Feature icon="🩺" title={L('Health info', 'ព័ត៌មានសុខភាព')}
+            desc={L('Offline Khmer health education — read or listen to basic public-health topics. Information only, not a diagnosis.', 'ការអប់រំសុខភាពខ្មែរ ក្រៅបណ្ដាញ — អាន ឬស្ដាប់ប្រធានបទសុខភាពមូលដ្ឋាន។ ព័ត៌មានតែប៉ុណ្ណោះ មិនមែនការវិនិច្ឆ័យ។')} link="/health" linkLabel={L('Open /health', 'បើក /health')} />
         </div>
       </section>
 
@@ -196,6 +198,7 @@ export function LandingView() {
             <a className="lp-chip" href="/scan">📷 {L('Scan', 'ស្កេន')}</a>
             <a className="lp-chip" href="/sign">🤟 {L('Sign', 'សញ្ញា')}</a>
             <a className="lp-chip" href="/crop">🌱 {L('Crop', 'ដំណាំ')}</a>
+            <a className="lp-chip" href="/health-test">🧪 {L('Test', 'តេស្ត')}</a>
             <a className="lp-chip" href="/braille">⠿ {L('Braille', 'អក្សរផុស')}</a>
             <a className="lp-chip" href="/contribute">
               {L('All ways to help', 'គ្រប់មធ្យោបាយជួយ')} →
@@ -246,6 +249,7 @@ export function LandingView() {
           <a href="/scan">/scan</a>
           <a href="/sign">/sign</a>
           <a href="/crop">/crop</a>
+          <a href="/health">/health</a>
           <a href="/braille">/braille</a>
           <a href="/trace">/trace · {L('experiment', 'ពិសោធន៍')}</a>
         </div>

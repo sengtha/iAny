@@ -120,6 +120,30 @@ CREATE INDEX IF NOT EXISTS idx_crop_created ON crop_samples (created_at);
 CREATE INDEX IF NOT EXISTS idx_crop_crop ON crop_samples (crop);
 CREATE INDEX IF NOT EXISTS idx_crop_condition ON crop_samples (condition);
 
+-- Crowd-sourced rapid diagnostic test (RDT) strip photos (the /health-test page).
+-- Each row is one (strip image, test type, result) sample for training an offline
+-- model that READS the result line (positive/negative/invalid) — reading, not
+-- diagnosing (see docs/HEALTH-AI.md). Privacy: the strip photo only — no faces,
+-- names, or documents. Image in R2 at r2_key (foldered health-test/<test>/<result>/);
+-- device is an anonymous per-device id; credit_name is opt-in.
+CREATE TABLE IF NOT EXISTS health_test_samples (
+  id          TEXT PRIMARY KEY,
+  r2_key      TEXT NOT NULL,          -- R2 key: health-test/<test>/<result>/<day>-<id>.jpg
+  device      TEXT NOT NULL,          -- anonymous per-device id, e.g. h-3f9a2c71
+  test        TEXT NOT NULL,          -- malaria / dengue / pregnancy / covid / other
+  result      TEXT NOT NULL,          -- positive / negative / invalid  (classifier target)
+  note        TEXT,
+  credit_name TEXT,                   -- opt-in public credit (dataset contributors)
+  region      TEXT,
+  width       INTEGER,
+  height      INTEGER,
+  bytes       INTEGER,
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_htest_created ON health_test_samples (created_at);
+CREATE INDEX IF NOT EXISTS idx_htest_test ON health_test_samples (test);
+CREATE INDEX IF NOT EXISTS idx_htest_result ON health_test_samples (result);
+
 -- iAny Trace — optional online registry for proof-of-origin capsules (/trace).
 -- Offline verification works without this; the registry only adds a TRUSTED
 -- first-seen timestamp and double-use transparency (verify_count). `id` is a

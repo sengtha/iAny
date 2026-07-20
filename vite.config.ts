@@ -80,6 +80,8 @@ export default defineConfig({
           /^\/sign(\/|\.html|$)/,
           /^\/trace(\/|\.html|$)/,
           /^\/crop(\/|\.html|$)/,
+          /^\/health(\/|\.html|$)/,
+          /^\/health-test(\/|\.html|$)/,
         ],
         runtimeCaching: [
           {
@@ -145,6 +147,8 @@ export default defineConfig({
         sign: path.resolve(root, 'sign.html'),
         trace: path.resolve(root, 'trace.html'),
         crop: path.resolve(root, 'crop.html'),
+        health: path.resolve(root, 'health.html'),
+        healthTest: path.resolve(root, 'health-test.html'),
       },
     },
   },

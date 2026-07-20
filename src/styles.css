@@ -1518,6 +1518,83 @@ progress {
   color: var(--accent-fg);
 }
 
+/* Health surfaces (/health, /health-test) — disclaimer + topic cards */
+.health-disclaimer {
+  margin: 0 0 14px;
+  padding: 11px 14px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: #b45309;
+  background: color-mix(in srgb, #f59e0b 12%, transparent);
+  border: 1px solid color-mix(in srgb, #f59e0b 40%, transparent);
+  border-radius: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  .health-disclaimer { color: #fcd34d; }
+}
+.health-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0;
+}
+.health-card {
+  border: 1px solid var(--bg-softer);
+  border-radius: 14px;
+  background: var(--bg-soft);
+  overflow: hidden;
+}
+.health-card-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+  background: none;
+  border: 0;
+  text-align: left;
+  font-size: 1rem;
+}
+.health-card-emoji {
+  font-size: 1.3rem;
+}
+.health-card-caret {
+  margin-left: auto;
+  color: var(--fg-muted);
+  font-size: 1.2rem;
+}
+.health-card-body {
+  padding: 0 16px 14px;
+}
+.health-card-body ul {
+  margin: 4px 0 10px;
+  padding-left: 20px;
+  line-height: 1.6;
+  font-size: 0.94rem;
+}
+.health-seek {
+  margin: 0 0 12px;
+  padding: 9px 12px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: #dc2626;
+  background: color-mix(in srgb, #dc2626 10%, transparent);
+  border-radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  .health-seek { color: #fca5a5; }
+}
+.health-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.health-source {
+  font-size: 0.78rem;
+  color: var(--fg-muted);
+}
+
 /* Non-blocking quality / duplicate hints under the /scan preview. */
 .ocr-warn {
   margin: 8px 0 0;
