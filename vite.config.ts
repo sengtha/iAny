@@ -90,6 +90,7 @@ export default defineConfig({
           /^\/street(\/|\.html|$)/,
           /^\/label(\/|\.html|$)/,
           /^\/waste-scan(\/|\.html|$)/,
+          /^\/crop-scan(\/|\.html|$)/,
           /^\/garden(\/|\.html|$)/,
         ],
         runtimeCaching: [
@@ -122,7 +123,7 @@ export default defineConfig({
             // detector) + the /waste classifier .onnx. Cache on first fetch so the
             // live features work offline afterward, like the hand model.
             urlPattern: ({ url }) =>
-              /\/models\/sengtha\/(mediapipe-(embed|detector|classifier)|iany-waste)/.test(url.pathname) ||
+              /\/models\/sengtha\/(mediapipe-(embed|detector|classifier)|iany-(waste|crop|health-rdt))/.test(url.pathname) ||
               url.pathname.endsWith('.tflite'),
             handler: 'CacheFirst',
             options: {
@@ -181,6 +182,7 @@ export default defineConfig({
         street: path.resolve(root, 'street.html'),
         label: path.resolve(root, 'label.html'),
         wasteScan: path.resolve(root, 'waste-scan.html'),
+        cropScan: path.resolve(root, 'crop-scan.html'),
         garden: path.resolve(root, 'garden.html'),
       },
     },
