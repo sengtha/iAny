@@ -133,14 +133,17 @@ missing), its keyword isn't in the paths cell 1a printed — add it to `CROP_KW`
 potato, and bell-pepper map to **`vegetable`** on purpose (they're not distinct iAny
 crops); mango is your cleanest single-crop signal.
 
-### 3c. (optional) Add Cassava — it uses a CSV, not folders
+### 3c. (optional) Add Cassava
 
-The Cassava 2019 set stores all images in one folder and the labels in `train.csv`
-(class ids 0–4, where **4 = healthy**), so the keyword scan can't map it. Add it
-explicitly:
+Cassava (`cassava-leaf-disease-classification`, the 2020 competition) uses **label
+4 = Healthy**, the rest diseases. It comes in **two shapes** on Kaggle — use the cell
+that matches what you attached (run cell 1a to tell which):
+
+**(i) JPEG version** — a `train_images/` folder of `.jpg` + a `train.csv`
+(`image_id, label`). This is the official competition download and most full mirrors.
 
 ```python
-# cell 1c — fold in Cassava (only if you attached cassava-leaf-disease-classification)
+# cell 1c — Cassava from JPEG + CSV
 import pandas as pd, os, shutil, random
 random.seed(42)
 ROOT = "/kaggle/input/cassava-leaf-disease-classification"   # confirm via cell 1a
@@ -154,6 +157,41 @@ for healthy, sub in [(True, df[df.label == 4]), (False, df[df.label != 4])]:
         shutil.copy(f"{ROOT}/train_images/{name}", f"{dst}/{cls}_{i}.jpg")
     print(cls, "→", min(len(ids), CAP))
 ```
+
+**(ii) TFRecords version** — files like `ld_train00-1427.tfrec` and **no
+`train_images/` folder** (the images are serialized *inside* the `.tfrec` files, so
+neither cell 1b nor the JPEG cell above can see them). Decode them instead:
+
+```python
+# cell 1c-tf — Cassava from TFRecords (ld_train*.tfrec)
+import tensorflow as tf, glob, os
+files = sorted(glob.glob("/kaggle/input/**/*.tfrec", recursive=True))
+print(len(files), "tfrec files")
+
+# confirm the feature keys once (cassava uses image / image_name / target):
+ex = tf.train.Example.FromString(next(iter(tf.data.TFRecordDataset(files[:1]))).numpy())
+print("keys:", list(ex.features.feature.keys()))
+
+feat = {"image": tf.io.FixedLenFeature([], tf.string),
+        "target": tf.io.FixedLenFeature([], tf.int64)}
+CAP = 800
+counts = {"cassava_healthy": 0, "cassava_disease": 0}
+for r in tf.data.TFRecordDataset(files):
+    e = tf.io.parse_single_example(r, feat)
+    cls = "cassava_healthy" if int(e["target"]) == 4 else "cassava_disease"
+    if counts[cls] >= CAP:
+        if all(v >= CAP for v in counts.values()):
+            break
+        continue
+    dst = f"/kaggle/working/dataset/{cls}"; os.makedirs(dst, exist_ok=True)
+    open(f"{dst}/{cls}_{counts[cls]}.jpg", "wb").write(e["image"].numpy())  # already JPEG bytes
+    counts[cls] += 1
+print(counts)
+```
+
+> If the key-check prints names other than `image`/`target`, adjust `feat` to match.
+> The `.jpg` written by the TFRecords cell are real JPEG bytes, so §4's loader reads
+> them like any other image.
 
 > **You control the class list.** Whatever classes end up in `dataset/` become the
 > model's labels (alphabetical) — and must match `CROP_MODEL_LABELS` in the app
