@@ -1,5 +1,12 @@
 # RDT-reader model on Kaggle: train → deploy (guide)
 
+> ⏸️ **SHELVED (paused) — not an active model.** No open, downloadable dataset exists
+> for the target task (malaria/dengue strip corpora are research-held; see §0). The
+> `/health-test` **collector stays live** to accumulate real data; this guide is kept
+> for when there's enough of it, or a partner (e.g. FIND). There is **no live
+> `/health-test-scan`** — deliberately, given the medical stakes. Do not deploy an RDT
+> reader on synthetic or thin data.
+
 Goal: read a **rapid diagnostic test (RDT) strip** photo and output
 **positive / negative / invalid** — offline, on any phone. This is **reading a result
 line, not diagnosing.** The *test* is the validated medical device; the model only

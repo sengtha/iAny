@@ -19,6 +19,8 @@ tags:
 
 # iany-health-rdt-v1
 
+> ⏸️ **SHELVED (paused) — not released.** No open dataset was available to train a reliable reader; this card is a template kept for when real data or a partner exists. The `/health-test` collector keeps gathering data. See [docs/HEALTH-TEST-MODEL.md](https://github.com/sengtha/iAny/blob/main/docs/HEALTH-TEST-MODEL.md).
+
 An **on-device rapid-diagnostic-test (RDT) strip reader** — from a photo of a test cassette, it reports **positive / negative / invalid**. A MobileNetV2 exported to **ONNX** for the browser via `onnxruntime-web`. Built for **[iAny](https://iany.app)**, the offline, on-device Khmer AI platform.
 
 > 🛑 **This reads a result line. It does NOT diagnose.** The *test* is the validated medical device; this model only reports what the strip already shows, the way a person would. **Not a medical device. Always confirm with a health worker.** A wrong "negative" can cost a life — the app must show confidence, refuse on low confidence, and keep a human in the loop.

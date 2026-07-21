@@ -48,7 +48,6 @@ const ALLOWED_PREFIXES = [
   'sengtha/mediapipe-classifier/', // MediaPipe Image Classifier (EfficientNet-Lite, superseded)
   'sengtha/iany-waste-v1/', // iAny waste classifier (MobileNetV2 ONNX — live /waste)
   'sengtha/iany-crop-v1/', // iAny crop-health classifier (MobileNetV2 ONNX — live /crop-scan)
-  'sengtha/iany-health-rdt-v1/', // iAny RDT strip reader (MobileNetV2 ONNX — /health-test)
 ]
 // OCR language data, served through the same mirror. Khmer uses the
 // high-accuracy models; English's fast model is accurate enough.

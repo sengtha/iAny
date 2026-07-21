@@ -20,8 +20,7 @@ community and for the community.** The community data collectors (`/voice`,
 | [sengtha/khmer-tts-female-v2](https://huggingface.co/sengtha/khmer-tts-female-v2) | Khmer text-to-speech (female voice) | ONNX (VITS) | App (Radio + TTS) | VITS · DDD-Cambodia (CC-BY-SA-4.0) |
 | [sengtha/khmer-ocr](https://huggingface.co/sengtha/khmer-ocr) | Khmer OCR — detector + recognizer | ONNX | App + mobile · `/scan`, `/label`, `/braille` | seanghay/KhmerOCR (MIT) |
 | [sengtha/iany-waste-v1](https://huggingface.co/sengtha/iany-waste-v1) | Waste-material classifier (7 types: can / glass / paper / plastic / organic / …) | ONNX | App — live [`/waste-scan`](https://iany.app/waste-scan) + `/waste` capture | MobileNetV2 · trained from open waste datasets (see `docs/WASTE-MODEL.md`) |
-| `sengtha/iany-crop-v1` *(planned)* | Crop-health classifier (`<crop>_<condition>`) | ONNX | App `/crop` | MobileNetV2 · open leaf datasets + `/crop` photos — **guide:** `docs/CROP-MODEL.md` |
-| `sengtha/iany-health-rdt-v1` *(planned)* | RDT strip reader (positive / negative / invalid — reading, not diagnosis) | ONNX | App `/health-test` | MobileNetV2 · synthetic + `/health-test` photos — **guide:** `docs/HEALTH-TEST-MODEL.md` |
+| `sengtha/iany-crop-v1` *(experiment)* | Crop-health classifier (`<crop>_<condition>`) | ONNX | App live `/crop-scan` | MobileNetV2 · open field datasets (CCMT, MangoLeafBD, …) — **guide:** `docs/CROP-MODEL.md` |
 | MediaPipe Hand Landmarker | Hand tracking for the `/sign` collector | `.task` | `/sign` | Google (Apache-2.0) — mirrored from Google's model storage, no HF repo needed |
 | MediaPipe Object Detector (EfficientDet-Lite0) | Live vehicle + people detection | `.tflite` | `/traffic` | Google COCO (Apache-2.0) — mirrored, no HF repo needed |
 

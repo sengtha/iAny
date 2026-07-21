@@ -85,16 +85,32 @@ export function CropScanView() {
       setPhase('running')
       loop()
     } catch (e) {
+      const name = (e as { name?: string })?.name ?? ''
       const msg = e instanceof Error ? e.message : String(e)
       // The model repo may not be published yet — say so plainly instead of a raw error.
       const notYet = /model download failed|404|Failed to fetch/i.test(msg)
-      setError(
-        notYet
-          ? (km
-              ? 'ម៉ូឌែលដំណាំមិនទាន់ចេញផ្សាយនៅឡើយ (កំពុងបណ្ដុះបណ្ដាល)។ សូមមើល docs/CROP-MODEL.md។'
-              : "The crop model isn't published yet (still training). See docs/CROP-MODEL.md.")
-          : (km ? 'បើកកាមេរ៉ាមិនបាន' : 'Could not open the camera.'),
-      )
+      let text: string
+      if (notYet) {
+        text = km
+          ? 'ម៉ូឌែលដំណាំមិនទាន់ចេញផ្សាយនៅឡើយ (កំពុងបណ្ដុះបណ្ដាល)។ សូមមើល docs/CROP-MODEL.md។'
+          : "The crop model isn't published yet (still training). See docs/CROP-MODEL.md."
+      } else if (name === 'NotAllowedError' || name === 'SecurityError') {
+        // Most common: permission denied, or an in-app browser (Facebook/Messenger).
+        text = km
+          ? 'កាមេរ៉ាត្រូវបានបិទ។ សូមអនុញ្ញាតកាមេរ៉ា ហើយផ្ទុកឡើងវិញ។ បើអ្នកបើកតំណនេះក្នុង Facebook/Messenger សូមបើកវាក្នុង Chrome ឬ Safari។'
+          : 'Camera blocked. Allow camera access and reload. If you opened this link inside Facebook/Messenger, open it in Chrome or Safari instead.'
+      } else if (name === 'NotFoundError' || name === 'OverconstrainedError') {
+        text = km ? 'រកកាមេរ៉ាមិនឃើញនៅលើឧបករណ៍នេះ។' : 'No camera found on this device.'
+      } else if (name === 'NotReadableError' || name === 'AbortError') {
+        text = km
+          ? 'កាមេរ៉ាកំពុងប្រើដោយកម្មវិធីផ្សេង។ សូមបិទវា ហើយសាកម្ដងទៀត។'
+          : 'Camera is in use by another app. Close it and try again.'
+      } else {
+        text = km
+          ? 'បើកកាមេរ៉ាមិនបាន។ សូមអនុញ្ញាតកាមេរ៉ា ឬបើកក្នុង Chrome/Safari។'
+          : 'Could not open the camera. Allow camera access, or open in Chrome/Safari.'
+      }
+      setError(text)
       setPhase('error')
       stopAll()
     }

@@ -123,7 +123,7 @@ export default defineConfig({
             // detector) + the /waste classifier .onnx. Cache on first fetch so the
             // live features work offline afterward, like the hand model.
             urlPattern: ({ url }) =>
-              /\/models\/sengtha\/(mediapipe-(embed|detector|classifier)|iany-(waste|crop|health-rdt))/.test(url.pathname) ||
+              /\/models\/sengtha\/(mediapipe-(embed|detector|classifier)|iany-(waste|crop))/.test(url.pathname) ||
               url.pathname.endsWith('.tflite'),
             handler: 'CacheFirst',
             options: {
