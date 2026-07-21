@@ -65,7 +65,8 @@ print(labels[int(probs.argmax())], float(probs.max()))
 ## Training data
 
 - **v1 bootstrap: synthetic strips** (generated cassettes with control/test lines at varied intensity, lighting, blur — see [docs/HEALTH-TEST-MODEL.md](https://github.com/sengtha/iAny/blob/main/docs/HEALTH-TEST-MODEL.md) §2). Synthetic data proves the pipeline; it does **not** make the model clinically reliable.
-- **Then:** real photos from **[iany.app/health-test](https://iany.app/health-test)** (strip + result), folded in as they accumulate, replacing synthetic.
+- **Real lateral-flow photos:** the MIT-licensed [COVID-19 LFT image set](https://www.kaggle.com/datasets/mahdimaktabdar/covid19-lateral-flow-test-images) (~325, positive/negative) — a cassette reads the same way across kits, so it transfers the *reading skill*.
+- **Then:** real photos from **[iany.app/health-test](https://iany.app/health-test)** (strip + result), folded in as they accumulate, replacing synthetic. Malaria/dengue strip corpora remain research-held (FIND, Audere) — partner for validated volume.
 - Large real-world RDT image corpora exist but are **research-held** (e.g. FIND, Audere/HealthPulse) — partnering is the route to validated volume.
 
 Base: **MobileNetV2** (ImageNet weights), transfer learning.

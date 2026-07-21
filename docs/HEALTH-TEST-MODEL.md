@@ -39,8 +39,9 @@ gets the plumbing working; real data makes it trustworthy.
 
 - **Accelerator: GPU T4 x2**, **Internet: On**.
 - Store `HF_TOKEN` via **Add-ons → Secrets** for the upload step.
-- Attach any RDT-strip datasets you *do* find on Kaggle/Roboflow (search "rapid test",
-  "lateral flow", "RDT") into `/kaggle/input/…`; fold them in alongside synthetic.
+- **Attach the real dataset** in §2b below (COVID lateral-flow photos) — fold it in
+  alongside the synthetic strips. Search Kaggle/Roboflow for more ("rapid test",
+  "lateral flow", "RDT") as they appear.
 
 The app's labels are in
 [`src/assets/healthTestLabels.ts`](../src/assets/healthTestLabels.ts): result
@@ -105,6 +106,50 @@ for cls in ("positive", "negative", "invalid"):
 > This is a **crutch, not the product.** A model trained only on synthetic strips will
 > look great in the notebook and fail on real photos. Its job is to prove the pipeline
 > and give you a working ONNX to wire up while real data accumulates.
+
+## 2b. Fold in REAL lateral-flow photos (do this — it's what makes v1 usable)
+
+A lateral-flow cassette reads the same way regardless of what it tests (control line +
+test line → positive / negative / invalid), so **real COVID LFT photos transfer
+structurally** to malaria/dengue/pregnancy strips far better than synthetic data. Use:
+
+| Dataset | What | License |
+|---|---|---|
+| **[`mahdimaktabdar/covid19-lateral-flow-test-images`](https://www.kaggle.com/datasets/mahdimaktabdar/covid19-lateral-flow-test-images)** | ~325 real-world LFT photos, **positive / negative**, clear C/T lines | **MIT** ✅ |
+| COVID-LFT research set ([PMC10860423](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10860423/)) | 1015 pos / 1389 neg / **164 invalid** — has your 3rd class | check paper's data-availability |
+| [Roboflow Universe](https://universe.roboflow.com/) — "lateral flow" / "rapid test" | community sets, some with boxes (detect-then-crop) | varies |
+
+> **Malaria strips are still not public** — the big malaria-RDT corpora are research-held
+> (FIND, Audere). The common "malaria datasets" are blood-smear **microscopy**, a
+> different task. For malaria/dengue strips: **partner (FIND)** or collect via
+> `/health-test`. COVID LFTs bootstrap the *reading skill*; local kits come from you.
+
+Attach the Kaggle set, then fold its photos into the same `dataset/<result>/` folders
+(run **cell 1a** to confirm its real folder names first):
+
+```python
+# cell 1b-real — copy the Kaggle COVID-LFT photos into positive/ and negative/
+import os, glob, shutil, random
+random.seed(42)
+OUT, CAP = "/kaggle/working/dataset", 1500
+# label from the folder PATH (this set foldered as .../Positive/ and .../Negative/):
+SRC = "/kaggle/input/covid19-lateral-flow-test-images"   # confirm via cell 1a
+for cls_src, cls in [("positive", "positive"), ("negative", "negative")]:
+    dst = f"{OUT}/{cls}"; os.makedirs(dst, exist_ok=True)
+    imgs = [p for p in glob.glob(f"{SRC}/**/*", recursive=True)
+            if cls_src in p.lower() and p.lower().endswith((".jpg", ".jpeg", ".png"))]
+    random.shuffle(imgs)
+    have = len(os.listdir(dst))
+    for i, p in enumerate(imgs[: max(0, CAP - have)]):
+        shutil.copy(p, f"{dst}/real_{cls}_{i}.jpg")
+    print(cls, "+", min(len(imgs), max(0, CAP - have)), "real")
+```
+
+Then run the **sanitize cell** ([`CROP-MODEL.md` cell 1d](./CROP-MODEL.md) — re-encode to
+clean RGB JPEG, drop unreadable) since real photos often include corrupt files, and
+**oversample real over synthetic** so real photos dominate the final mix. Keep a
+held-out set of **real** strips (ideally photographed on the actual kits you target) as
+the only honest scoreboard; synthetic-inflated accuracy means nothing here.
 
 ---
 
