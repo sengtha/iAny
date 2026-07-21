@@ -30,7 +30,7 @@ Ranked by relevance to Cambodian crops (rice, cassava, maize, mango…):
 
 | Dataset (Kaggle slug) | Size / classes | Fit | Note |
 |---|---|---|---|
-| **`emmarex/plantdisease`** (PlantVillage) | ~54k, 38 classes | big, clean start | **lab backgrounds** → weak field transfer; overlap = maize, pepper, tomato/potato |
+| **PlantVillage** (`emmarex/plantdisease` or similar) | up to ~54k, ~38 classes | big, clean start | **lab backgrounds** → weak field transfer. ⚠️ **Variants differ** — many uploads have only Pepper/Potato/Tomato (**no maize**). Check with cell 1a. |
 | **`aryashah2k/mango-leaf-disease-dataset`** | ~4k, 8 classes | mango, similar climate | CC BY 4.0 |
 | **Cassava Leaf Disease** (`cassava-leaf-disease-classification`) | ~21k **field**, 5 classes | cassava, real phones | competition data — check redistribution |
 | **`minhhuy2810/rice-diseases-image-dataset`** (or similar rice set) | thousands, blast/blight/brown-spot | **rice = #1 crop** | mix several rice sets |
@@ -52,50 +52,113 @@ Master picture + more sets: search Kaggle for "leaf disease" and filter to your 
 
 ---
 
-## 3. Map public labels → iAny classes
+## 3. Build the training folders (`dataset/<class>/…`)
 
 The app's crop taxonomy is in
 [`src/assets/cropLabels.ts`](../src/assets/cropLabels.ts): crops `rice, cassava,
 maize, banana, mango, vegetable, chili, pepper, bean, sugarcane, rubber, other` ×
-conditions `healthy, disease, pest, deficiency, unsure`.
+conditions `healthy, disease, pest, deficiency, unsure`. The goal of this step is to
+copy the attached images into one folder per **`<crop>_<condition>`** class you want
+the model to predict — collapsing each dataset's specific disease into the coarse
+`disease`.
 
-**First model — keep it small and useful.** Train `<crop>_<condition>` classes only
-for crops you have data for, collapsing each dataset's specific disease into the
-coarse `disease`. Add a `background` class so the model can say "not a leaf."
+> **Don't hardcode paths.** Every Kaggle dataset mounts at a *different* folder name,
+> and some PlantVillage uploads have only Pepper/Potato/Tomato (no maize). So do it in
+> two moves: **(3a) look at what's really mounted, then (3b) auto-copy by keyword.**
+
+### 3a. See what's actually attached (run this first)
 
 ```python
-# cell 1 — build /kaggle/working/dataset/<class>/ from the public sets
-import os, shutil, random, pathlib
-random.seed(42)
-OUT = "/kaggle/working/dataset"
-
-# (source folder on Kaggle)  ->  iAny class.  Point these at the real attached paths;
-# print os.listdir('/kaggle/input') first to confirm the exact folder names.
-COPY = [
-    # PlantVillage (maize/corn is the useful overlap)
-    ("/kaggle/input/plantdisease/PlantVillage/Corn_(maize)___healthy", "maize_healthy"),
-    ("/kaggle/input/plantdisease/PlantVillage/Corn_(maize)___Common_rust", "maize_disease"),
-    # Mango
-    ("/kaggle/input/mango-leaf-disease-dataset/MangoLeafBD Dataset/Healthy", "mango_healthy"),
-    ("/kaggle/input/mango-leaf-disease-dataset/MangoLeafBD Dataset/Anthracnose", "mango_disease"),
-    # Cassava (folders are numeric class ids; 4 = healthy in the 2019 set)
-    # ("/kaggle/input/cassava-leaf-disease-classification/train_images", "cassava_*"),  # needs the CSV
-    # Rice — add your attached rice set's healthy / diseased folders here.
-]
-CAP = 800  # per class — keep balanced so a big class can't swamp a small one
-
-for src, cls in COPY:
-    dst = f"{OUT}/{cls}"; os.makedirs(dst, exist_ok=True)
-    imgs = [p for p in pathlib.Path(src).rglob("*") if p.suffix.lower() in (".jpg",".jpeg",".png")]
-    random.shuffle(imgs)
-    for i, p in enumerate(imgs[:CAP]):
-        shutil.copy(p, f"{dst}/{cls}_{i}{p.suffix.lower()}")
-    print(cls, "→", min(len(imgs), CAP))
+# cell 1a — print every folder that actually holds images, with counts
+import os
+for base in sorted(f"/kaggle/input/{d}" for d in os.listdir("/kaggle/input")):
+    for dp, _, files in os.walk(base):
+        imgs = [f for f in files if f.lower().endswith((".jpg", ".jpeg", ".png"))]
+        if imgs:
+            print(len(imgs), "→", dp)
 ```
 
-> Cassava's 2019 set labels images via a CSV (`train.csv`, class ids 0–4, 4=healthy),
-> not folders — read the CSV and copy accordingly. Skip it for a first pass if that's
-> fussy; rice + mango + maize already give you a working model.
+Look at the printed folder names — those are your real class folders (e.g.
+`…/Tomato_healthy`, `…/MangoLeafBD Dataset/Anthracnose`).
+
+### 3b. Auto-copy by keyword (robust — no hardcoded paths)
+
+This scans **everything** under `/kaggle/input`, and for each folder that holds images
+decides its class from keywords **in the full path** (so a crop name on a *parent*
+folder, like MangoLeafBD's, is still caught). `healthy` in the path → `_healthy`,
+otherwise `_disease`.
+
+```python
+# cell 1b — build /kaggle/working/dataset/<class>/ from whatever is attached
+import os, glob, shutil, random
+random.seed(42)
+OUT, CAP = "/kaggle/working/dataset", 800          # CAP per class = balance
+
+# keyword in the folder PATH  ->  iAny crop id.  Extend as you attach more.
+CROP_KW = [("mango", "mango"), ("cassava", "cassava"), ("rice", "rice"),
+           ("corn", "maize"), ("maize", "maize"),
+           ("tomato", "vegetable"), ("potato", "vegetable"), ("pepper", "vegetable")]
+
+def to_class(path):
+    p = path.lower()
+    crop = next((c for kw, c in CROP_KW if kw in p), None)
+    if not crop:
+        return None                                # unknown crop → skip
+    return f"{crop}_{'healthy' if 'healthy' in p else 'disease'}"
+
+counts = {}
+for base in glob.glob("/kaggle/input/*"):
+    for dp, _, files in os.walk(base):
+        imgs = [f for f in files if f.lower().endswith((".jpg", ".jpeg", ".png"))]
+        if not imgs:
+            continue
+        cls = to_class(dp)                         # uses the FULL path, not basename
+        if not cls:
+            continue
+        dst = f"{OUT}/{cls}"; os.makedirs(dst, exist_ok=True)
+        random.shuffle(imgs)
+        have = counts.get(cls, 0)
+        for f in imgs[: max(0, CAP - have)]:
+            shutil.copy(os.path.join(dp, f), f"{dst}/{cls}_{have}.jpg"); have += 1
+        counts[cls] = have
+
+for k in sorted(counts):
+    print(k, "→", counts[k])
+if not counts:
+    print("NO MATCHES — check cell 1a's folder names and extend CROP_KW")
+```
+
+Each printed line is a class with its image count. If a class shows **0** (or is
+missing), its keyword isn't in the paths cell 1a printed — add it to `CROP_KW`. Tomato,
+potato, and bell-pepper map to **`vegetable`** on purpose (they're not distinct iAny
+crops); mango is your cleanest single-crop signal.
+
+### 3c. (optional) Add Cassava — it uses a CSV, not folders
+
+The Cassava 2019 set stores all images in one folder and the labels in `train.csv`
+(class ids 0–4, where **4 = healthy**), so the keyword scan can't map it. Add it
+explicitly:
+
+```python
+# cell 1c — fold in Cassava (only if you attached cassava-leaf-disease-classification)
+import pandas as pd, os, shutil, random
+random.seed(42)
+ROOT = "/kaggle/input/cassava-leaf-disease-classification"   # confirm via cell 1a
+df = pd.read_csv(f"{ROOT}/train.csv")            # columns: image_id, label
+CAP = 800
+for healthy, sub in [(True, df[df.label == 4]), (False, df[df.label != 4])]:
+    cls = f"cassava_{'healthy' if healthy else 'disease'}"
+    dst = f"/kaggle/working/dataset/{cls}"; os.makedirs(dst, exist_ok=True)
+    ids = sub.image_id.tolist(); random.shuffle(ids)
+    for i, name in enumerate(ids[:CAP]):
+        shutil.copy(f"{ROOT}/train_images/{name}", f"{dst}/{cls}_{i}.jpg")
+    print(cls, "→", min(len(ids), CAP))
+```
+
+> **You control the class list.** Whatever classes end up in `dataset/` become the
+> model's labels (alphabetical) — and must match `CROP_MODEL_LABELS` in the app
+> ([`CropScanView.tsx`](../src/views/CropScanView.tsx)). Mango + vegetable alone give a
+> working first model; add cassava/rice/maize datasets to reach the core Cambodian crops.
 
 ---
 
