@@ -82,6 +82,13 @@ pip install -U "mediapipe-model-maker"
 
 ## 2. Fine-tune MobileNetV3 with MediaPipe Model Maker
 
+> 📌 **Want the concrete, tested Kaggle recipe?** Use **[CROP-MODEL.md](./CROP-MODEL.md)**
+> (crop) or **[HEALTH-TEST-MODEL.md](./HEALTH-TEST-MODEL.md)** (RDT reader). They ship
+> the path that actually works on Kaggle today — plain **Keras MobileNetV2 → ONNX →
+> onnxruntime-web** — because `mediapipe-model-maker`/`tflite-support` **fail to
+> install on Python 3.12**. The Model-Maker snippet below is kept for reference/older
+> environments only.
+
 Model Maker fine-tunes a MobileNet backbone and exports **straight to the `.tflite`
 the app already runs** (same MediaPipe runtime as Trace's embedder). Simplest path:
 

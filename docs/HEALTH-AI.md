@@ -113,8 +113,10 @@ Show this (localized) prominently wherever a health feature is used:
   open dataset for an offline RDT reader.
 
 **Next (needs data / partners):**
-- Train the RDT reader (MobileNetV3) from the collected dataset; deploy offline via
-  `src/lib/imageClassifier.ts`, speak the result in Khmer.
+- Train the RDT reader from the collected dataset — step-by-step Kaggle guide in
+  **[HEALTH-TEST-MODEL.md](./HEALTH-TEST-MODEL.md)** (Keras MobileNetV2 → ONNX →
+  onnxruntime-web; bootstrap with synthetic strips, then fold in real `/health-test`
+  photos). Deploy offline, speak the result in Khmer.
 - Partner with MoH / NGOs to review the education content and to validate any
   screening tool before it's presented to the public as more than R&D.
 

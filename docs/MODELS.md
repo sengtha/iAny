@@ -20,6 +20,8 @@ community and for the community.** The community data collectors (`/voice`,
 | [sengtha/khmer-tts-female-v2](https://huggingface.co/sengtha/khmer-tts-female-v2) | Khmer text-to-speech (female voice) | ONNX (VITS) | App (Radio + TTS) | VITS · DDD-Cambodia (CC-BY-SA-4.0) |
 | [sengtha/khmer-ocr](https://huggingface.co/sengtha/khmer-ocr) | Khmer OCR — detector + recognizer | ONNX | App + mobile · `/scan`, `/label`, `/braille` | seanghay/KhmerOCR (MIT) |
 | [sengtha/iany-waste-v1](https://huggingface.co/sengtha/iany-waste-v1) | Waste-material classifier (7 types: can / glass / paper / plastic / organic / …) | ONNX | App — live [`/waste-scan`](https://iany.app/waste-scan) + `/waste` capture | MobileNetV2 · trained from open waste datasets (see `docs/WASTE-MODEL.md`) |
+| `sengtha/iany-crop-v1` *(planned)* | Crop-health classifier (`<crop>_<condition>`) | ONNX | App `/crop` | MobileNetV2 · open leaf datasets + `/crop` photos — **guide:** `docs/CROP-MODEL.md` |
+| `sengtha/iany-health-rdt-v1` *(planned)* | RDT strip reader (positive / negative / invalid — reading, not diagnosis) | ONNX | App `/health-test` | MobileNetV2 · synthetic + `/health-test` photos — **guide:** `docs/HEALTH-TEST-MODEL.md` |
 | MediaPipe Hand Landmarker | Hand tracking for the `/sign` collector | `.task` | `/sign` | Google (Apache-2.0) — mirrored from Google's model storage, no HF repo needed |
 | MediaPipe Object Detector (EfficientDet-Lite0) | Live vehicle + people detection | `.tflite` | `/traffic` | Google COCO (Apache-2.0) — mirrored, no HF repo needed |
 
@@ -42,8 +44,9 @@ with opt-in contributor credit:
 - 📷 `/scan` (Khmer OCR), 🤟 `/sign` (Khmer Sign Language landmarks), 🌱 `/crop`
   (crop-health), 🧪 `/health-test`, 💧 `/water`, ♻️ `/waste`, 🌿 `/species`,
   📣 `/report`, and 🛺 `/street` (Cambodia vehicles) — collecting now, to be
-  released the same way. See `docs/VISION-MOBILENET.md`, `docs/ENVIRONMENT-AI.md`,
-  `docs/SMARTCITY-AI.md`, `docs/WASTE-MODEL.md`, `docs/WATER-READING.md`.
+  released the same way. See `docs/VISION-MOBILENET.md`, `docs/CROP-MODEL.md`,
+  `docs/HEALTH-TEST-MODEL.md`, `docs/ENVIRONMENT-AI.md`, `docs/SMARTCITY-AI.md`,
+  `docs/WASTE-MODEL.md`, `docs/WATER-READING.md`.
 - ♻️ The first vision model from this loop is live: **`sengtha/iany-waste-v1`**
   powers [`/waste-scan`](https://iany.app/waste-scan). It improves as `/waste`
   photos are folded in and retrained.
