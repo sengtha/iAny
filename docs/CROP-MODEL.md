@@ -30,10 +30,12 @@ Ranked by relevance to Cambodian crops (rice, cassava, maize, mango…):
 
 | Dataset (Kaggle slug) | Size / classes | Fit | Note |
 |---|---|---|---|
-| **PlantVillage** (`emmarex/plantdisease` or similar) | up to ~54k, ~38 classes | big, clean start | **lab backgrounds** → weak field transfer. ⚠️ **Variants differ** — many uploads have only Pepper/Potato/Tomato (**no maize**). Check with cell 1a. |
-| **`aryashah2k/mango-leaf-disease-dataset`** | ~4k, 8 classes | mango, similar climate | CC BY 4.0 |
-| **Cassava Leaf Disease** (`cassava-leaf-disease-classification`) | ~21k **field**, 5 classes | cassava, real phones | competition data — check redistribution |
-| **`minhhuy2810/rice-diseases-image-dataset`** (or similar rice set) | thousands, blast/blight/brown-spot | **rice = #1 crop** | mix several rice sets |
+| **CCMT** (`shawontmsez/ccmt-multi-crop-plant-disease-detection-dataset`) | ~24.9k **field**, cashew+cassava+maize+tomato | **3 crops at once**, expert-validated | folder-structured; cell 1b catches it |
+| **`aryashah2k/mango-leaf-disease-dataset`** (MangoLeafBD) | ~4k, 8 classes | mango, similar climate | CC BY 4.0 |
+| **Cassava Leaf Disease** (`cassava-leaf-disease-classification`) | ~21k **field**, 5 classes | harder/real cassava | competition data (CSV or TFRecords — §3c) |
+| **[PlantDoc](https://universe.roboflow.com/joseph-nelson/plantdoc)** (Roboflow) | ~2.6k **in-the-wild**, 27 classes | **real backgrounds** for maize + vegetable | overlaps only Corn/Tomato/Potato/Pepper — see §3d |
+| **PlantVillage** (`emmarex/plantdisease` or similar) | up to ~54k, ~38 classes | big, clean start | **lab backgrounds** → weak field transfer. ⚠️ **Variants differ** (often no maize). Check cell 1a. |
+| **`minhhuy2810/rice-diseases-image-dataset`** (or similar) | thousands | **rice = #1 crop** | mix several rice sets |
 | **`therealoise/bean-leaf-lesions-classification`** (iBean) | ~1.3k field, 3 classes | beans, field | small |
 
 Master picture + more sets: search Kaggle for "leaf disease" and filter to your crops.
@@ -199,7 +201,46 @@ print(counts)
 > working first model; add cassava/rice/maize/cashew datasets to reach the core
 > Cambodian crops.
 
-### 3d. Sanitize the images (do this before training)
+### 3d. (optional) Add PlantDoc — real backgrounds for maize + vegetable
+
+[PlantDoc](https://universe.roboflow.com/joseph-nelson/plantdoc) is ~2.6k **in-the-wild**
+leaf photos (messy real backgrounds), the antidote to PlantVillage's lab shortcut. It
+overlaps your model only on **Corn → maize** and **Tomato/Potato/Pepper → vegetable**
+(no cassava/mango/cashew/rice), so its value is *making maize + vegetable more realistic*,
+not adding crops.
+
+On Roboflow → **Download → Classification → Folder Structure** (not the detection format),
+then attach on Kaggle. **Gotcha:** PlantDoc's healthy folders are named `"<crop> leaf"`
+with **no "healthy" word**, so the cell-1b rule mislabels them — use this instead:
+
+```python
+# cell 1e — fold PlantDoc's maize + vegetable in (disease detected by symptom word)
+import os, shutil, random
+random.seed(42)
+OUT, CAP = "/kaggle/working/dataset", 800
+SRC = "/kaggle/input/<plantdoc-folder>"          # confirm via cell 1a
+DISEASE = ("scab","rust","blight","spot","mildew","mold","virus","rot","mosaic","bacterial")
+def pd_class(name):
+    n = name.lower()
+    crop = ("maize" if "corn" in n else
+            "vegetable" if any(k in n for k in ("tomato","potato","pepper")) else None)
+    return None if not crop else f"{crop}_{'disease' if any(w in n for w in DISEASE) else 'healthy'}"
+counts = {}
+for dp, _, files in os.walk(SRC):
+    imgs = [f for f in files if f.lower().endswith((".jpg",".jpeg",".png"))]
+    cls = pd_class(os.path.basename(dp)) if imgs else None
+    if not cls: continue
+    dst = f"{OUT}/{cls}"; os.makedirs(dst, exist_ok=True)
+    random.shuffle(imgs); have = counts.get(cls, 0)
+    for f in imgs[: max(0, CAP-have)]:
+        shutil.copy(os.path.join(dp, f), f"{dst}/pd_{cls}_{have}.jpg"); have += 1
+    counts[cls] = have
+print(counts)
+```
+
+PlantDoc is normally **CC BY 4.0** — confirm on the page and credit it.
+
+### 3e. Sanitize the images (do this before training — last, after all datasets)
 
 Scraped datasets (CCMT, PlantVillage mirrors, …) almost always contain a few
 **corrupt / truncated / CMYK** JPEGs. `tf.io.decode_jpeg` aborts the *whole batch* on
