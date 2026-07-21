@@ -204,9 +204,17 @@ print(counts)
 
 ```python
 # cell 2 — train
-import tensorflow as tf
+import tensorflow as tf, os, shutil
 IMG, BATCH = 224, 32
 DS = "/kaggle/working/dataset"
+
+# /kaggle/working persists across runs, so an empty class folder left by an earlier
+# prep attempt would become a phantom class (labels count != real classes → the
+# classification_report "Number of classes does not match target_names" error). Drop them.
+for d in list(os.listdir(DS)):
+    p = f"{DS}/{d}"
+    if os.path.isdir(p) and not any(f.lower().endswith((".jpg", ".jpeg", ".png")) for f in os.listdir(p)):
+        shutil.rmtree(p); print("dropped empty class:", d)
 
 train = tf.keras.utils.image_dataset_from_directory(
     DS, validation_split=0.2, subset="training", seed=42,
@@ -262,11 +270,16 @@ model.fit(train, validation_data=val, epochs=6)
 ## 5. Evaluate honestly (per-class, not just top-1)
 
 ```python
-# cell 3 — per-class report
+# cell 3 — per-class report (single pass → true & pred stay aligned)
 import numpy as np
 from sklearn.metrics import classification_report, confusion_matrix
-y_true = np.concatenate([y for _, y in val], 0)
-y_pred = model.predict(val).argmax(1)
+# NB: val is shuffled and RESHUFFLES each iteration, so reading it twice (once for
+# y_true, once for predict) would misalign labels vs predictions. Collect both in ONE pass.
+y_true, y_pred = [], []
+for x, y in val:
+    y_true.append(y.numpy())
+    y_pred.append(model.predict(x, verbose=0).argmax(1))
+y_true = np.concatenate(y_true); y_pred = np.concatenate(y_pred)
 print(classification_report(y_true, y_pred, target_names=labels))
 print(confusion_matrix(y_true, y_pred))
 ```

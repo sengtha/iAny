@@ -116,6 +116,14 @@ import tensorflow as tf
 IMG, BATCH = 224, 32
 DS = "/kaggle/working/dataset"
 
+# Drop any empty class folder left by an earlier run (/kaggle/working persists) — an
+# empty class becomes a phantom label and breaks the eval report's class count.
+import os, shutil
+for d in list(os.listdir(DS)):
+    p = f"{DS}/{d}"
+    if os.path.isdir(p) and not any(f.lower().endswith((".jpg", ".jpeg", ".png")) for f in os.listdir(p)):
+        shutil.rmtree(p)
+
 train = tf.keras.utils.image_dataset_from_directory(DS, validation_split=0.2,
     subset="training", seed=42, image_size=(IMG, IMG), batch_size=BATCH, label_mode="int")
 val = tf.keras.utils.image_dataset_from_directory(DS, validation_split=0.2,
@@ -155,11 +163,14 @@ Keeping the input contract `[-1,1]` identical to crop/waste means the app reuses
 ## 4. Evaluate — and weight the errors by harm
 
 ```python
-# cell 3
+# cell 3 — single pass so true & pred stay aligned (val reshuffles each iteration)
 import numpy as np
 from sklearn.metrics import classification_report, confusion_matrix
-y_true = np.concatenate([y for _, y in val], 0)
-y_pred = model.predict(val).argmax(1)
+y_true, y_pred = [], []
+for x, y in val:
+    y_true.append(y.numpy())
+    y_pred.append(model.predict(x, verbose=0).argmax(1))
+y_true = np.concatenate(y_true); y_pred = np.concatenate(y_pred)
 print(classification_report(y_true, y_pred, target_names=labels))
 print(confusion_matrix(y_true, y_pred))   # rows = true, cols = pred
 ```
