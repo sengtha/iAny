@@ -196,7 +196,35 @@ print(counts)
 > **You control the class list.** Whatever classes end up in `dataset/` become the
 > model's labels (alphabetical) — and must match `CROP_MODEL_LABELS` in the app
 > ([`CropScanView.tsx`](../src/views/CropScanView.tsx)). Mango + vegetable alone give a
-> working first model; add cassava/rice/maize datasets to reach the core Cambodian crops.
+> working first model; add cassava/rice/maize/cashew datasets to reach the core
+> Cambodian crops.
+
+### 3d. Sanitize the images (do this before training)
+
+Scraped datasets (CCMT, PlantVillage mirrors, …) almost always contain a few
+**corrupt / truncated / CMYK** JPEGs. `tf.io.decode_jpeg` aborts the *whole batch* on
+one bad file (`InvalidArgumentError: jpeg::Uncompress failed`), so re-encode
+everything to clean RGB JPEG once and drop anything unreadable:
+
+```python
+# cell 1d — sanitize: re-encode to clean RGB JPEG, delete unreadable files
+import os, glob
+from PIL import Image
+DS = "/kaggle/working/dataset"
+fixed = bad = 0
+for p in glob.glob(f"{DS}/**/*", recursive=True):
+    if not os.path.isfile(p):
+        continue
+    try:
+        Image.open(p).convert("RGB").save(p, "JPEG", quality=90)   # forces full decode
+        fixed += 1
+    except Exception:
+        os.remove(p); bad += 1
+print(f"re-saved {fixed} · removed {bad} bad")
+```
+
+Fast on a few thousand images, and it also normalizes CMYK/progressive/PNG-as-`.jpg`
+files that would otherwise trip the decoder mid-training.
 
 ---
 
