@@ -23,6 +23,7 @@ export const CROPS: CropLabel[] = [
   { id: 'maize', emoji: '🌽', en: 'Maize / corn', km: 'ពោត' },
   { id: 'banana', emoji: '🍌', en: 'Banana', km: 'ចេក' },
   { id: 'mango', emoji: '🥭', en: 'Mango', km: 'ស្វាយ' },
+  { id: 'cashew', emoji: '🥜', en: 'Cashew', km: 'ស្វាយចន្ទី' },
   { id: 'vegetable', emoji: '🥬', en: 'Vegetable', km: 'បន្លែ' },
   { id: 'chili', emoji: '🌶️', en: 'Chili', km: 'ម្ទេស' },
   { id: 'pepper', emoji: '⚫', en: 'Pepper (black)', km: 'ម្រេច' },

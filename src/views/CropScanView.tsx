@@ -14,14 +14,14 @@ import type { Classification } from '../lib/imageClassifier'
 type Phase = 'idle' | 'loading' | 'running' | 'error'
 
 // Must match the uploaded model's labels.txt ORDER exactly (alphabetical from the
-// training folders — see docs/CROP-MODEL.md §4). Starter classes; extend as the
-// model grows to more crops/conditions.
+// training folders — see docs/CROP-MODEL.md). iany-crop-v1: cashew/cassava/maize/
+// mango/vegetable × healthy/disease, trained from open field datasets (CCMT etc.).
 const CROP_MODEL_LABELS = [
-  'background',
+  'cashew_disease', 'cashew_healthy',
   'cassava_disease', 'cassava_healthy',
   'maize_disease', 'maize_healthy',
   'mango_disease', 'mango_healthy',
-  'rice_disease', 'rice_healthy',
+  'vegetable_disease', 'vegetable_healthy',
 ]
 
 const classifier = createWasteClassifier({

@@ -968,7 +968,7 @@ const CROP_DEVICE_RE = /^c-[0-9a-z]{6,16}$/
 // Keep in sync with src/assets/cropLabels.ts (server-side allowlist so the label
 // space stays clean for training).
 const CROP_IDS = new Set([
-  'rice', 'cassava', 'maize', 'banana', 'mango', 'vegetable',
+  'rice', 'cassava', 'maize', 'banana', 'mango', 'cashew', 'vegetable',
   'chili', 'pepper', 'bean', 'sugarcane', 'rubber', 'other',
 ])
 const CONDITION_IDS = new Set(['healthy', 'disease', 'pest', 'deficiency', 'unsure'])

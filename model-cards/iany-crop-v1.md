@@ -29,19 +29,21 @@ Classifies a single crop **leaf** into a `<crop>_<condition>` class, for early, 
 
 ## Labels (output order — this order matters)
 
-Starter classes (alphabetical — the softmax output order). `labels.txt` in this repo is authoritative and grows as more crops/conditions are trained.
+10 classes (alphabetical — the softmax output order). `labels.txt` in this repo is authoritative and grows as more crops/conditions are trained.
 
 ```
-0 background        (not a leaf)
-1 cassava_disease
-2 cassava_healthy
-3 maize_disease
-4 maize_healthy
-5 mango_disease
-6 mango_healthy
-7 rice_disease
-8 rice_healthy
+0 cashew_disease
+1 cashew_healthy
+2 cassava_disease
+3 cassava_healthy
+4 maize_disease
+5 maize_healthy
+6 mango_disease
+7 mango_healthy
+8 vegetable_disease
+9 vegetable_healthy
 ```
+`vegetable` bundles tomato/potato/bell-pepper (not distinct iAny crops).
 
 ## Input / preprocessing (important)
 
@@ -68,20 +70,21 @@ print(labels[int(probs.argmax())], float(probs.max()))
 
 ## Training data
 
-Bootstrapped from open leaf datasets, then fine-tuned on **[iany.app/crop](https://iany.app/crop)** contributions (real Cambodian crops on real phones):
+**v1** is bootstrapped from open datasets (not yet fine-tuned on Cambodian photos):
 
-- **PlantVillage** (maize/corn overlap)
-- **MangoLeafBD** (CC BY 4.0)
-- **Cassava Leaf Disease** (Kaggle) — real field images
-- open **rice** leaf-disease sets + **iBean** (beans)
+- **CCMT** (Cashew, Cassava, Maize, Tomato; Ghana, field-captured, expert-validated) — cashew, cassava, maize, and `vegetable` (tomato)
+- **MangoLeafBD** (CC BY 4.0) — mango
+- **PlantVillage** — bell-pepper / potato / tomato → `vegetable`
+- (optional) **Cassava Leaf Disease 2020** (Kaggle) — harder real-field cassava
 
 Base: **MobileNetV2** (ImageNet weights), transfer learning. Full recipe: [docs/CROP-MODEL.md](https://github.com/sengtha/iAny/blob/main/docs/CROP-MODEL.md).
 
 ## Limitations
 
-- **v1 / experiment.** Bootstrapped largely on non-Cambodian, sometimes lab-background data — accuracy on real Cambodian fields is rougher until `/crop` photos are folded in and the model is retrained.
-- **Coarse conditions** (healthy / disease) by design — naming the exact disease needs many per-disease examples (a later, finer model).
-- Best on **one leaf filling the frame**, decent light. A small model has a lower ceiling; collect where it's weak.
+- **v1 / Experiment — do not trust the headline accuracy.** Reported validation accuracy is high (~0.99) but **in-distribution**: each crop comes from one dataset, so the model separates classes partly by *dataset style* (background, camera), not pathology. On **real Cambodian phone photos** accuracy is materially lower. The `/crop-scan` UI labels this a guess for exactly this reason.
+- **The fix is data, not training.** Folding in real `/crop` field photos (and retraining) is what makes it trustworthy — expect the number to *drop* then, which is the point.
+- **Coarse conditions** (healthy / disease) by design; CCMT's maize "diseases" include some pests. Naming the exact disease needs a later, finer model.
+- Best on **one leaf filling the frame**, decent light.
 
 ## Intended use
 

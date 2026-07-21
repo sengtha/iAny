@@ -313,8 +313,29 @@ print(confusion_matrix(y_true, y_pred))
 ```
 
 Expect `disease ↔ healthy` confusion on look-alike leaves. A weak class = a `/crop`
-collection target. **Keep a held-out set of your OWN Cambodian phone photos** — a good
-score on clean lab images means little until it survives real fields.
+collection target.
+
+> ⚠️ **A near-perfect score (~0.99 everywhere) is a warning, not a win.** When each
+> crop comes from its own dataset, the model can separate classes by *dataset style*
+> (background, camera) instead of real pathology, and the validation set — drawn from
+> the same clean pile — hides it. The headline number is **in-distribution**; real
+> Cambodian phone photos will score much lower. This is expected for a bootstrap v1.
+
+### The test that actually matters — one real photo
+
+```python
+# cell 3b — classify a photo YOU took (upload it via the Kaggle panel), not from any dataset
+import tensorflow as tf, numpy as np
+img = tf.keras.utils.load_img("/kaggle/working/test.jpg", target_size=(224, 224))
+x = tf.keras.applications.mobilenet_v2.preprocess_input(np.array(img)[None].astype("float32"))
+p = model.predict(x, verbose=0)[0]
+for i in p.argsort()[::-1][:3]:
+    print(f"{labels[i]:20s} {p[i]*100:5.1f}%")
+```
+
+If it's wrong or low-confidence, that's the true state of the model — and exactly why
+`/crop-scan` ships labeled *Experiment*. The real fix is §7 (fold in real `/crop`
+photos), which breaks the dataset-style shortcut and makes the number mean something.
 
 ---
 
