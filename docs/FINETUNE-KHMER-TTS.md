@@ -1,5 +1,8 @@
 # Fine-tune a Khmer female TTS voice (MMS-TTS / VITS) — Kaggle
 
+> 🗣️ **Want a male voice?** Same recipe → [`FINETUNE-KHMER-TTS-MALE.md`](./FINETUNE-KHMER-TTS-MALE.md)
+> (pick a male speaker, match the step count for equal quality).
+
 Goal: one **good, offline, single female** Khmer voice. We fine-tune
 `facebook/mms-tts-khm` (a VITS model that already knows Khmer) on **one female
 speaker** from **DDD-Cambodia/khmer-speech-dataset** (727h, 5F/7M, per-speaker
