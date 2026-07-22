@@ -77,6 +77,30 @@ pod you get more speed and **no 12h session limit**, so 200k can finish in one r
 
 ---
 
+## Cell 0 — environment (run FIRST on a fresh pod, then RESTART the kernel)
+
+`finetune-hf-vits` targets a 2024-era stack; modern pods ship bleeding-edge packages
+that break it in a chain (transformers 5.x, datasets 4.x/torchcodec, numpy 2.x, missing
+hf_transfer). Pin a **coherent set once**, then **restart the kernel** so the numpy
+downgrade takes effect. Do this before Cell 1.
+
+```python
+import subprocess, sys
+subprocess.run([sys.executable,"-m","pip","install","-q",
+    "numpy==1.26.4",             # 2.x + the older pandas/pyarrow -> import errors
+    "transformers==4.46.3",      # 5.x removed VitsConfig.pad_token_id
+    "datasets[audio]==2.21.0",   # 4.x decodes audio via torchcodec (needs a CUDA lib absent here)
+    "huggingface_hub", "hf_transfer",  # RunPod sets HF_HUB_ENABLE_HF_TRANSFER=1
+    "pyarrow", "pandas", "soundfile", "librosa", "cython", "setuptools",
+], check=True)
+print("env pinned ✓ — now RESTART the kernel (Kernel → Restart), then run Cell 1 onward")
+```
+
+> After the restart you can skip Cell 0. The transformers/datasets pins also live in
+> Cell 2c as a safety net (re-running Cell 2c won't undo them).
+
+---
+
 ## Cell 1 — INTERACTIVE: audition the male voices, pick the best
 
 > **DDD is stored as parquet** (shards `data/train-*.parquet`, columns `speaker_id`,
