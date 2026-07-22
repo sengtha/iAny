@@ -32,6 +32,44 @@ base model, same engine, same loss weights. The **only** differences are:
 
 ---
 
+## Run on a RunPod RTX pod (recommended — faster than Kaggle, no 12h wipe)
+
+The cells below are **not** Kaggle-specific; only the HF-token line changes. On an RTX
+pod you get more speed and **no 12h session limit**, so 200k can finish in one run.
+
+1. **runpod.io → Deploy → Pods → GPU:** an **RTX 4090 / A5000 / A6000** (Community Cloud
+   is cheaper). Template: **RunPod PyTorch 2.x**. **Disk ≥ 100 GB** at `/workspace`
+   (one speaker's audio + checkpoints). Prefer a **Network Volume** so `/workspace`
+   survives a pod restart. Connect → **Jupyter Lab** → new notebook. Work under
+   `/workspace`. **Stop the pod when done** (you pay while it runs).
+2. **Auth** — replace the two Kaggle-secret lines at the top of Cell 2 with:
+   ```python
+   from huggingface_hub import login
+   login("hf_xxxxxxxxxxxx")          # your HF Write token
+   HF_TOKEN = "hf_xxxxxxxxxxxx"       # cfg["hub_token"] still needs it
+   ```
+   Everything else in Cells 1–2 runs unchanged.
+3. **VRAM → batch size** (`per_device_train_batch_size`):
+
+   | GPU VRAM | batch | note |
+   |---|---|---|
+   | **≥24 GB** (4090, A5000, A6000) | **16** (as-is) | fastest |
+   | 16 GB (4060 Ti 16G, A4000) | 12–16 | |
+   | 12 GB | 8 + `gradient_accumulation_steps: 2` | keep **effective batch 16** for parity |
+
+4. **Speed:** a 4090/A5000 is ~3–5× a Kaggle T4, so **200k ≈ 10–20h**, usually one
+   session. Even so, keep `save_steps: 500` — a pod can be interrupted. Cell 2's step 5
+   already **resumes from the last checkpoint on HF**, so a fresh pod picks right back up.
+
+> **⚠️ Data-format footgun (check this first).** This guide's Cell 2 downloads loose
+> per-speaker WAVs (`snapshot_download(allow_patterns=["…_khm_*.wav"])`). Your repo's
+> [`RUNPOD-TTS-KHMER.md`](./RUNPOD-TTS-KHMER.md) notes DDD is now **parquet with embedded
+> audio**. If `print("training clips:", len(ds))` shows **0**, the WAV glob found nothing
+> → build the dataset with the **streaming parquet decode in `RUNPOD-TTS-KHMER.md` §2**
+> (filter to your male `speaker_id`), then feed it into Cell 2's training config instead.
+
+---
+
 ## Cell 1 — INTERACTIVE: audition the 7 male voices, pick the best
 
 Run in a normal (interactive) session so you can *listen*. Same as the female Cell 1,
@@ -75,9 +113,11 @@ Pick the `speaker_id` you like (clear, warm, low noise) → use it as `CHOSEN_SP
 
 ## Cell 2 — BATCH: fine-tune MMS on that male voice (checkpoints + resumes)
 
-Setup once: **Secrets →** `HF_TOKEN` (Write). Internet **On**. GPU (T4/P100/A100).
-Set `CHOSEN_SPK` + `MAX_STEPS`. Run as **Save & Run All (Commit)**; re-run the same
-commit to resume from the last HF checkpoint (essential — 200k won't fit one session).
+GPU: Kaggle T4/P100, or a **RunPod RTX 4090 / A5000 / A6000** (see the RunPod section
+above for the token change + VRAM). Set `CHOSEN_SPK` + `MAX_STEPS`. **Kaggle:** Secrets →
+`HF_TOKEN` (Write), Internet On, run as **Save & Run All (Commit)** and re-run to resume.
+**RunPod:** swap in `login("hf_…")` (above) and just run the cell — it resumes from the
+last HF checkpoint automatically if interrupted.
 
 ```python
 import os, glob, subprocess, sys, json
