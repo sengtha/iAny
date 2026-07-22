@@ -190,6 +190,11 @@ if not os.path.exists("finetune-hf-vits"):
     subprocess.run(["git","clone","https://github.com/ylacombe/finetune-hf-vits"], check=True)
 subprocess.run([sys.executable,"-m","pip","install","-q","-r","finetune-hf-vits/requirements.txt"], check=True)
 
+# finetune-hf-vits pins transformers>=4.35.1 (open-ended), but recent pods ship
+# transformers 5.x, which removed VitsConfig.pad_token_id -> the repo's vendored VITS
+# code crashes ("'VitsConfig' object has no attribute 'pad_token_id'"). Pin to 4.x.
+subprocess.run([sys.executable,"-m","pip","install","-q","transformers==4.46.3"], check=True)
+
 # Python 3.12 removed distutils (which monotonic_align/setup.py imports); setuptools provides
 # the shim. Install setuptools+cython; do NOT upgrade numpy (torch/transformers are built
 # against the pod's numpy — bumping to 2.x breaks them with an ABI error).
