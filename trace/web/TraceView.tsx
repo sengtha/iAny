@@ -164,8 +164,18 @@ function MatcherToggle({ m, L }: { m: MatcherState; L: LFn }) {
 
 /* ------------------------------------------------------------------ create */
 
+/** Message when some/all picked photos couldn't be decoded (e.g. HEIC). */
+function photoErrorText(failed: number, total: number, L: LFn): string {
+  return failed >= total
+    ? L("Couldn't read that photo. Some phones save HEIC — try JPEG/PNG (in Camera settings, set 'Most Compatible').",
+        "មិនអាចអានរូបនោះបានទេ។ ទូរស័ព្ទខ្លះរក្សាទុកជា HEIC — សូមប្រើ JPEG/PNG (ក្នុងការកំណត់កាមេរ៉ា ជ្រើស 'ត្រូវគ្នាបំផុត')។")
+    : L(`${failed} photo(s) couldn't be read and were skipped.`,
+        `រូបភាព ${failed} មិនអាចអានបាន ត្រូវបានរំលង។`)
+}
+
 function Create({ L }: { L: LFn }) {
   const [photos, setPhotos] = useState<{ sig: PhotoSig }[]>([])
+  const [photoError, setPhotoError] = useState<string | null>(null)
   const [boxText, setBoxText] = useState('')
   const [producer, setProducer] = useState('')
   const [product, setProduct] = useState('')
@@ -184,14 +194,22 @@ function Create({ L }: { L: LFn }) {
 
   async function addPhotos(files: FileList) {
     setBusy(true)
-    const sigs = await Promise.all(
+    setPhotoError(null)
+    // Process each photo independently: one un-decodable image (e.g. an iPhone
+    // HEIC that this browser can't read) must not drop the whole batch, which
+    // would leave the proof stuck with no photos. A failed embedding likewise
+    // falls back to the classical signature rather than losing the photo.
+    const results = await Promise.allSettled(
       [...files].map(async (f) => {
         const sig = await photoSignature(f)
-        const emb = await m.embed(f)
+        const emb = await m.embed(f).catch(() => null)
         return { sig: emb ? { ...sig, embed: emb } : sig }
       }),
     )
-    setPhotos((p) => [...p, ...sigs])
+    const ok = results.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []))
+    const failed = results.length - ok.length
+    if (ok.length) setPhotos((p) => [...p, ...ok])
+    if (failed) setPhotoError(photoErrorText(failed, results.length, L))
     setBusy(false)
   }
 
@@ -317,6 +335,7 @@ function Create({ L }: { L: LFn }) {
           <small>{photos.length ? L('Add photo', 'បន្ថែមរូប') : L('Take photo', 'ថតរូប')}</small>
         </button>
       </div>
+      {photoError && <p className="voice-error">⚠ {photoError}</p>}
       {photos.length > 0 && (
         <div className="trace-angles">
           {[L('Front', 'ខាងមុខ'), L('Back / label', 'ខាងក្រោយ / ស្លាក'), L('Close-up', 'រូបជិត')].map((a, i) => (
@@ -420,6 +439,7 @@ function Verify({ L, preload }: { L: LFn; preload?: TraceCapsule }) {
   const [capsule, setCapsule] = useState<TraceCapsule | null>(preload ?? null)
   const [integrityOk, setIntegrityOk] = useState(true)
   const [photos, setPhotos] = useState<PhotoSig[]>([])
+  const [photoError, setPhotoError] = useState<string | null>(null)
   const [boxText, setBoxText] = useState('')
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<VerifyResult | null>(null)
@@ -442,14 +462,20 @@ function Verify({ L, preload }: { L: LFn; preload?: TraceCapsule }) {
 
   async function addPhotos(files: FileList) {
     setBusy(true)
-    const sigs = await Promise.all(
+    setPhotoError(null)
+    // Resilient like Create: skip an un-decodable image instead of losing the
+    // whole batch, and fall back to the classical signature if embedding fails.
+    const results = await Promise.allSettled(
       [...files].map(async (f) => {
         const sig = await photoSignature(f)
-        const emb = await m.embed(f)
+        const emb = await m.embed(f).catch(() => null)
         return emb ? { ...sig, embed: emb } : sig
       }),
     )
-    setPhotos((p) => [...p, ...sigs])
+    const ok = results.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []))
+    const failed = results.length - ok.length
+    if (ok.length) setPhotos((p) => [...p, ...ok])
+    if (failed) setPhotoError(photoErrorText(failed, results.length, L))
     setBusy(false)
   }
 
@@ -504,6 +530,7 @@ function Verify({ L, preload }: { L: LFn; preload?: TraceCapsule }) {
         {photos.map((p, i) => <img key={i} src={p.thumb} alt="" />)}
         <button className="trace-add" onClick={() => fileRef.current?.click()}>＋</button>
       </div>
+      {photoError && <p className="voice-error">⚠ {photoError}</p>}
       {originHasEmbed && !m.on && (
         <small className="hint">✨ {L('This proof used better matching — turn it on for the most accurate result.',
           'ភស្តុតាងនេះប្រើការផ្គូផ្គងកាន់តែល្អ — សូមបើកវាដើម្បីលទ្ធផលត្រឹមត្រូវបំផុត។')}</small>

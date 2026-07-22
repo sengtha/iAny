@@ -19,14 +19,24 @@ version (`v`) as its compatibility anchor; see [`SPEC.md`](./SPEC.md).
   unchanged apart from the additive optional `embed` field (still pinned by `id`).
 
 ### Fixed
-- **Proof-strength tier stuck on "Basic".** Level 2 · Good required **≥ 2
-  photos**, and every higher tier is gated behind it — so a proof made the
-  encouraged way (one photo, then a label, location, and witness) never left
-  Basic no matter what trust info was added. Level 2 now needs **≥ 1 photo + a
-  label**, so single-photo proofs climb Good → Strong → Full journey as signals
-  are added. Extra photos still strengthen the appearance match (a separate
-  axis). Updated `proofTier` (`core/trace.ts`), the Create hint, and SPEC §6 /
-  GUIDE tables.
+- **Proof-strength tier stuck on "Basic" — two causes.**
+  1. *Photo ingest was all-or-nothing.* `addPhotos` decoded the picked files
+     with `Promise.all`, so a **single un-decodable image** (e.g. an iPhone
+     **HEIC** that Chrome/Android can't read) rejected the whole batch: no
+     photos were stored and, on Create, `busy` never cleared — the meter sat on
+     Basic with nothing registered. Ingest is now per-photo
+     (`Promise.allSettled`): good photos are kept, undecodable ones are skipped
+     with a clear "try JPEG/PNG" message, and a failed learned-embedding falls
+     back to the classical signature instead of dropping the photo. Applied to
+     both Create and Verify.
+  2. *The tier gate was too strict.* Level 2 · Good required **≥ 2 photos**, and
+     every higher tier is gated behind it — so a proof made the encouraged way
+     (one photo, then a label, location, and witness) never left Basic no matter
+     what trust info was added. Level 2 now needs **≥ 1 photo + a label**, so
+     single-photo proofs climb Good → Strong → Full journey as signals are
+     added. Extra photos still strengthen the appearance match (a separate
+     axis). Updated `proofTier` (`core/trace.ts`), the Create hint, and SPEC §6 /
+     GUIDE tables.
 
 ### Changed
 - **Extracted into a self-contained `trace/` folder** (engine / web / worker +
