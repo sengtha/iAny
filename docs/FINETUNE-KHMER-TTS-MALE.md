@@ -68,53 +68,70 @@ pod you get more speed and **no 12h session limit**, so 200k can finish in one r
    session. Even so, keep `save_steps: 500` — a pod can be interrupted. Cell 2's step 5
    already **resumes from the last checkpoint on HF**, so a fresh pod picks right back up.
 
-> **⚠️ Data-format footgun (check this first).** This guide's Cell 2 downloads loose
-> per-speaker WAVs (`snapshot_download(allow_patterns=["…_khm_*.wav"])`). Your repo's
-> [`RUNPOD-TTS-KHMER.md`](./RUNPOD-TTS-KHMER.md) notes DDD is now **parquet with embedded
-> audio**. If `print("training clips:", len(ds))` shows **0**, the WAV glob found nothing
-> → build the dataset with the **streaming parquet decode in `RUNPOD-TTS-KHMER.md` §2**
-> (filter to your male `speaker_id`), then feed it into Cell 2's training config instead.
+> **✅ Data format.** Cells 1–2 read DDD's **parquet** shards directly (there are no loose
+> WAVs or CSV). Watch the `training clips: N` print in Cell 2 — if it's **0**, either
+> `CHOSEN_SPK` is wrong (male ids start `m-`) or `shards_of` isn't set (re-run Cell 1's
+> profiling). Cell 2 reuses `paths` + `shards_of` from Cell 1.
 
 ---
 
-## Cell 1 — INTERACTIVE: audition the 7 male voices, pick the best
+## Cell 1 — INTERACTIVE: audition the male voices, pick the best
 
-Run in a normal (interactive) session so you can *listen*. Same as the female Cell 1,
-but filtered to **male**.
+> **DDD is stored as parquet** (shards `data/train-*.parquet`, columns `speaker_id`,
+> `duration`, `audio` embedded bytes, `transcript`) — **there are no loose WAVs or a
+> CSV**. Speaker IDs are prefixed **`f-` / `m-`**, so male = ids starting `m-`. This
+> mirrors [`RUNPOD-TTS-KHMER.md`](./RUNPOD-TTS-KHMER.md) §2–3. Run in a normal
+> (interactive) session so you can *listen*.
 
 ```python
-from huggingface_hub import hf_hub_download, list_repo_files, snapshot_download
-from IPython.display import Audio, display
-import pandas as pd, glob, os
-
+# 1) profile every speaker's hours + which shards they're in (reads only tiny columns)
+import io, numpy as np, soundfile as sf, pyarrow.parquet as pq
+from huggingface_hub import HfFileSystem, hf_hub_download, login
+from IPython.display import Audio as Player, display
+from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
+login("hf_xxxxxxxx")                                   # your HF token (RunPod). Kaggle: use Secrets.
 REPO = "DDD-Cambodia/khmer-speech-dataset"
 
-# 1) metadata only (not the 495GB of audio)
-meta_dir = snapshot_download(REPO, repo_type="dataset",
-    allow_patterns=["*.csv","*.tsv","*.json","*.jsonl"])
-meta_files = [f for f in glob.glob(meta_dir+"/**/*", recursive=True) if os.path.isfile(f)]
-meta = pd.read_csv([f for f in meta_files if f.endswith((".csv",".tsv"))][0])
-print(meta.columns.tolist())                 # <-- confirm the real column names
+fs = HfFileSystem()
+paths = sorted(fs.glob(f"datasets/{REPO}/data/train-*.parquet"))
+print(len(paths), "shards")
 
-SPK, GENDER, TEXT = "speaker_id", "gender", "text"   # <-- fix to real names
-male = meta[meta[GENDER].astype(str).str.lower().str.startswith("m")]
-print("\nmale speakers (clips each):")
-print(male.groupby(SPK).size().sort_values(ascending=False))
-males = male[SPK].unique().tolist()
+def scan(ip):
+    idx, pth = ip
+    with fs.open(pth) as f:
+        t = pq.read_table(f, columns=["speaker_id","duration"]).to_pydict()
+    return idx, list(zip(t["speaker_id"], t["duration"]))
+
+dur=defaultdict(float); cnt=defaultdict(int); shards_of=defaultdict(set); done=0
+with ThreadPoolExecutor(max_workers=16) as ex:         # 16 = fast; retries on HTTP 429
+    for idx, pairs in ex.map(scan, list(enumerate(paths))):
+        for s,d in pairs: dur[s]+=float(d or 0); cnt[s]+=1; shards_of[s].add(idx)
+        done+=1
+        if done%300==0: print("scanned",done,"/",len(paths),flush=True)
+
+print("\n=== MALE speakers by hours (id starts 'm-') ===")
+for s,h,c in sorted([(s,dur[s],cnt[s]) for s in cnt if str(s).lower().startswith("m")], key=lambda x:-x[1]):
+    print(f"{s}: ~{h/3600:.1f}h ({c} clips), {len(shards_of[s])} shards")
 ```
 
 ```python
-# 2) play 3 clips per male speaker so you can choose the nicest / clearest voice
-allw = [f for f in list_repo_files(REPO, repo_type="dataset") if f.endswith(".wav")]
-for spk in males:
-    picks = [f for f in allw if os.path.basename(f).startswith(f"{spk}_khm_")][:3]
-    print(f"\n===== speaker {spk} =====")
-    for w in picks:
-        p = hf_hub_download(REPO, w, repo_type="dataset")
-        print(os.path.basename(w)); display(Audio(p))
+# 2) listen to one male speaker (re-run with different ids to compare)
+CHOSEN_SPK = "m-xxxx-xxxx"                              # a male with the most hours, ≥ ~15h
+p = hf_hub_download(REPO, paths[min(shards_of[CHOSEN_SPK])].split(f"{REPO}/",1)[-1], repo_type="dataset")
+tbl = pq.read_table(p, columns=["speaker_id","audio","transcript"]).to_pydict()
+shown=0
+for s,a,t in zip(tbl["speaker_id"],tbl["audio"],tbl["transcript"]):
+    if str(s)!=CHOSEN_SPK: continue
+    b = a["bytes"] if a.get("bytes") else open(a["path"],"rb").read()
+    y,sr = sf.read(io.BytesIO(b), dtype="float32")
+    print(t[:60]); display(Player(y.mean(1) if y.ndim>1 else y, rate=sr))
+    shown+=1
+    if shown>=3: break
 ```
 
-Pick the `speaker_id` you like (clear, warm, low noise) → use it as `CHOSEN_SPK` below.
+Pick the clearest/warmest low-noise male (≥ ~15h) → set it as `CHOSEN_SPK` below.
+Keep the `shards_of` / `paths` variables — Cell 2 reuses them.
 
 ---
 
@@ -127,41 +144,41 @@ above for the token change + VRAM). Set `CHOSEN_SPK` + `MAX_STEPS`. **Kaggle:** 
 last HF checkpoint automatically if interrupted.
 
 ```python
-import os, glob, subprocess, sys, json
+import os, io, pathlib, subprocess, sys, json, pyarrow.parquet as pq, soundfile as sf, librosa
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-from kaggle_secrets import UserSecretsClient
-HF_TOKEN = UserSecretsClient().get_secret("HF_TOKEN")
+# TOKEN — RunPod: login("hf_…"); Kaggle: from kaggle_secrets import UserSecretsClient; ...get_secret("HF_TOKEN")
+from huggingface_hub import login, snapshot_download, hf_hub_download, HfApi
+HF_TOKEN = "hf_xxxxxxxx"; login(HF_TOKEN)
 
 REPO       = "DDD-Cambodia/khmer-speech-dataset"
-CHOSEN_SPK = "SPK_ID_HERE"                       # <-- your male pick from Cell 1
+CHOSEN_SPK = "m-xxxx-xxxx"                       # <-- your male pick from Cell 1
 OUT_REPO   = "sengtha/khmer-tts-male-v1"         # your fine-tuned MALE voice
 BASE_DISC  = "sengtha/mms-khm-with-disc"         # generator+discriminator (shared with female; reused)
 MAX_STEPS  = 200_000                             # <-- MATCH the female voice (30_000 = quick first pass)
-SPK, TEXT  = "speaker_id", "text"                # <-- match Cell 1 column names
+TARGET_HOURS = 25                                # 20–40h of clean speech is plenty
 
-from huggingface_hub import login, snapshot_download, HfApi
-login(HF_TOKEN)
-
-# 1) download ONLY this speaker's audio + metadata (~1/12 of the data, not 495GB)
-data_dir = snapshot_download(REPO, repo_type="dataset",
-    allow_patterns=[f"{CHOSEN_SPK}_khm_*.wav","*.csv","*.tsv","*.json","*.jsonl"],
-    max_workers=8)
-
-# 2) build a HF audio dataset (audio + text) filtered to this speaker
-import pandas as pd
+# 1+2) build the HF dataset from PARQUET shards (reuses paths/shards_of from Cell 1;
+#      if this cell runs standalone, re-run Cell 1's profiling first).
 from datasets import Dataset, Audio
-meta = pd.read_csv(glob.glob(data_dir+"/**/*.csv", recursive=True)[0])
-meta = meta[meta[SPK].astype(str) == str(CHOSEN_SPK)].copy()
-def wav_path(row):
-    hits = glob.glob(f"{data_dir}/**/{CHOSEN_SPK}_khm_*{row['sentence_id']}*.wav", recursive=True)
-    return hits[0] if hits else None
-meta["audio"] = meta.apply(wav_path, axis=1)
-meta = meta.dropna(subset=["audio"])
-ds = Dataset.from_dict({"audio": meta["audio"].tolist(),
-                        "text":  meta[TEXT].astype(str).tolist()})
-ds = ds.cast_column("audio", Audio(sampling_rate=16000))
+out = pathlib.Path("male_wavs"); out.mkdir(exist_ok=True)
+apaths=[]; texts=[]; sec=0.0; i=0
+for si in sorted(shards_of[CHOSEN_SPK]):
+    p = hf_hub_download(REPO, paths[si].split(f"{REPO}/",1)[-1], repo_type="dataset")
+    tbl = pq.read_table(p, columns=["speaker_id","audio","transcript","duration"]).to_pydict()
+    for s,a,t,d in zip(tbl["speaker_id"],tbl["audio"],tbl["transcript"],tbl["duration"]):
+        if str(s)!=CHOSEN_SPK: continue
+        b = a["bytes"] if a.get("bytes") else open(a["path"],"rb").read()
+        y,sr = sf.read(io.BytesIO(b), dtype="float32")
+        if y.ndim>1: y=y.mean(1)
+        if sr!=16000: y=librosa.resample(y, orig_sr=sr, target_sr=16000); sr=16000
+        wp=str(out/f"{i:06d}.wav"); sf.write(wp,y,sr); apaths.append(wp); texts.append(str(t)); i+=1
+        sec += float(d) if d else len(y)/sr
+    os.remove(p)                                 # free disk as we go
+    print(f"shard {si}: ~{sec/3600:.1f}h", flush=True)
+    if sec/3600 >= TARGET_HOURS: break
+ds = Dataset.from_dict({"audio":apaths,"text":texts}).cast_column("audio", Audio(sampling_rate=16000))
 ds.save_to_disk("khm_male_ds")
-print("training clips:", len(ds))
+print("training clips:", len(ds))                # must be > 0
 
 # 3) engine (adds the discriminator base transformers lacks)
 if not os.path.exists("finetune-hf-vits"):
