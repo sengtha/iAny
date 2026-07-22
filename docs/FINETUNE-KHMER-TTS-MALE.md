@@ -42,14 +42,21 @@ pod you get more speed and **no 12h session limit**, so 200k can finish in one r
    (one speaker's audio + checkpoints). Prefer a **Network Volume** so `/workspace`
    survives a pod restart. Connect → **Jupyter Lab** → new notebook. Work under
    `/workspace`. **Stop the pod when done** (you pay while it runs).
-2. **Auth** — replace the two Kaggle-secret lines at the top of Cell 2 with:
+2. **Install deps first** — the RunPod PyTorch image doesn't ship them (Kaggle does).
+   Run this before Cell 1, or you'll get `ModuleNotFoundError: No module named
+   'huggingface_hub'`:
+   ```python
+   !pip install -q huggingface_hub datasets pandas soundfile librosa
+   ```
+   (Cell 2's step 3 installs the training deps via `finetune-hf-vits/requirements.txt`.)
+3. **Auth** — replace the two Kaggle-secret lines at the top of Cell 2 with:
    ```python
    from huggingface_hub import login
    login("hf_xxxxxxxxxxxx")          # your HF Write token
    HF_TOKEN = "hf_xxxxxxxxxxxx"       # cfg["hub_token"] still needs it
    ```
    Everything else in Cells 1–2 runs unchanged.
-3. **VRAM → batch size** (`per_device_train_batch_size`):
+4. **VRAM → batch size** (`per_device_train_batch_size`):
 
    | GPU VRAM | batch | note |
    |---|---|---|
@@ -57,7 +64,7 @@ pod you get more speed and **no 12h session limit**, so 200k can finish in one r
    | 16 GB (4060 Ti 16G, A4000) | 12–16 | |
    | 12 GB | 8 + `gradient_accumulation_steps: 2` | keep **effective batch 16** for parity |
 
-4. **Speed:** a 4090/A5000 is ~3–5× a Kaggle T4, so **200k ≈ 10–20h**, usually one
+5. **Speed:** a 4090/A5000 is ~3–5× a Kaggle T4, so **200k ≈ 10–20h**, usually one
    session. Even so, keep `save_steps: 500` — a pod can be interrupted. Cell 2's step 5
    already **resumes from the last checkpoint on HF**, so a fresh pod picks right back up.
 
