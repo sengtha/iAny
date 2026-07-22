@@ -183,13 +183,24 @@ print("training clips:", len(apaths))          # must be > 0
 ```
 
 ```python
-# ── Cell 2c — one-time engine + discriminator base (rebuilds mms-khm-with-disc if deleted) ──
-import os, sys, subprocess
+# ── Cell 2c — engine + discriminator base (Py3.12-safe; rebuilds mms-khm-with-disc if deleted) ──
+import os, sys, subprocess, glob
 from huggingface_hub import HfApi
 if not os.path.exists("finetune-hf-vits"):
     subprocess.run(["git","clone","https://github.com/ylacombe/finetune-hf-vits"], check=True)
-    subprocess.run([sys.executable,"-m","pip","install","-q","-r","finetune-hf-vits/requirements.txt"], check=True)
-    subprocess.run("cd finetune-hf-vits/monotonic_align && python setup.py build_ext --inplace", shell=True, check=True)
+subprocess.run([sys.executable,"-m","pip","install","-q","-r","finetune-hf-vits/requirements.txt"], check=True)
+
+# Python 3.12 removed distutils (which monotonic_align/setup.py imports); setuptools provides
+# the shim. Ensure setuptools/cython/numpy exist, then build with output captured.
+subprocess.run([sys.executable,"-m","pip","install","-q","-U","setuptools","cython","numpy"], check=True)
+env = {**os.environ, "SETUPTOOLS_USE_DISTUTILS": "local"}
+r = subprocess.run("cd finetune-hf-vits/monotonic_align && python setup.py build_ext --inplace",
+                   shell=True, capture_output=True, text=True, env=env)
+print("STDOUT:\n", r.stdout[-1500:]); print("STDERR:\n", r.stderr[-3000:])
+so = glob.glob("finetune-hf-vits/monotonic_align/**/*.so", recursive=True)
+assert so, "monotonic_align build FAILED — read the STDERR above (may need: apt-get install -y build-essential)"
+print("monotonic_align built ✓", so)
+
 if not HfApi().repo_exists(BASE_DISC):
     print("rebuilding discriminator base (a few min)…", flush=True)
     subprocess.run([sys.executable,"finetune-hf-vits/convert_original_discriminator_checkpoint.py",
