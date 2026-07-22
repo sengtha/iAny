@@ -88,6 +88,7 @@ downgrade takes effect. Do this before Cell 1.
 import subprocess, sys
 subprocess.run([sys.executable,"-m","pip","install","-q",
     "numpy==1.26.4",             # 2.x + the older pandas/pyarrow -> import errors
+    "scipy==1.13.1",             # pod's scipy wants numpy>=2.0; pin one that supports 1.26
     "transformers==4.46.3",      # 5.x removed VitsConfig.pad_token_id
     "datasets[audio]==2.21.0",   # 4.x decodes audio via torchcodec (needs a CUDA lib absent here)
     "huggingface_hub", "hf_transfer",  # RunPod sets HF_HUB_ENABLE_HF_TRANSFER=1
