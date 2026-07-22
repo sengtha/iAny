@@ -223,6 +223,14 @@ if not os.path.exists("finetune-hf-vits"):
     subprocess.run(["git","clone","https://github.com/ylacombe/finetune-hf-vits"], check=True)
 subprocess.run([sys.executable,"-m","pip","install","-q","-r","finetune-hf-vits/requirements.txt"], check=True)
 
+# Single-speaker patch: the script only adds batch["speaker_id"] when >1 speaker, but
+# the model call reads it unconditionally -> KeyError for one voice. Make it tolerant.
+_p = "finetune-hf-vits/run_vits_finetuning.py"; _s = open(_p).read()
+if 'if "speaker_id" in batch' not in _s:
+    _s = _s.replace('speaker_id=batch["speaker_id"],',
+                    'speaker_id=(batch["speaker_id"] if "speaker_id" in batch else None),')
+    open(_p, "w").write(_s); print("patched single-speaker speaker_id access")
+
 # The repo's open-ended pins pull incompatible latest versions. Pin the tested pair:
 #  - transformers 5.x removed VitsConfig.pad_token_id -> vendored VITS crashes.
 #  - datasets 4.x decodes audio via torchcodec -> needs libnvrtc.so.13 the pod lacks.
