@@ -200,13 +200,22 @@ subprocess.run([sys.executable,"-m","pip","install","-q","transformers==4.46.3"]
 # the shim. Install setuptools+cython; do NOT upgrade numpy (torch/transformers are built
 # against the pod's numpy — bumping to 2.x breaks them with an ABI error).
 subprocess.run([sys.executable,"-m","pip","install","-q","-U","setuptools","cython","hf_transfer"], check=True)
+import shutil
 env = {**os.environ, "SETUPTOOLS_USE_DISTUTILS": "local"}
-r = subprocess.run("cd finetune-hf-vits/monotonic_align && python setup.py build_ext --inplace",
-                   shell=True, capture_output=True, text=True, env=env)
-print("STDOUT:\n", r.stdout[-1500:]); print("STDERR:\n", r.stderr[-3000:])
-so = glob.glob("finetune-hf-vits/monotonic_align/**/*.so", recursive=True)
-assert so, "monotonic_align build FAILED — read the STDERR above (may need: apt-get install -y build-essential)"
-print("monotonic_align built ✓", so)
+subprocess.run("cd finetune-hf-vits/monotonic_align && python setup.py build_ext --inplace",
+               shell=True, env=env, check=False)
+# The package's __init__ does `from .monotonic_align.core import ...`, so the built core*.so
+# must live in a NESTED monotonic_align/monotonic_align/ dir — modern build_ext puts it
+# elsewhere, so place it there and verify the ACTUAL import (not just that a .so exists).
+ma = "finetune-hf-vits/monotonic_align"; nested = f"{ma}/monotonic_align"
+os.makedirs(nested, exist_ok=True); open(f"{nested}/__init__.py","a").close()
+for so in glob.glob(f"{ma}/**/core*.so", recursive=True):
+    dst = f"{nested}/{os.path.basename(so)}"
+    if os.path.abspath(so) != os.path.abspath(dst): shutil.copy(so, dst)
+chk = subprocess.run([sys.executable,"-c","from monotonic_align import maximum_path; print('MA OK')"],
+                     cwd="finetune-hf-vits", capture_output=True, text=True)
+assert "MA OK" in chk.stdout, "monotonic_align import failed (may need apt-get install -y build-essential):\n"+chk.stderr[-2000:]
+print("monotonic_align ✓")
 
 if not HfApi().repo_exists(BASE_DISC):
     print("rebuilding discriminator base (a few min)…", flush=True)
