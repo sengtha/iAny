@@ -181,7 +181,8 @@ for si in sorted(shards_of[CHOSEN_SPK]):
     os.remove(p)
     print(f"  ~{sec/3600:.1f}h", flush=True)
     if sec/3600 >= TARGET_HOURS: break
-ds = Dataset.from_dict({"audio":apaths,"text":texts}).cast_column("audio",Audio(sampling_rate=16000))
+# speaker_id is required by the trainer's model call (all 0 = single speaker).
+ds = Dataset.from_dict({"audio":apaths,"text":texts,"speaker_id":[0]*len(apaths)}).cast_column("audio",Audio(sampling_rate=16000))
 print("training clips:", len(apaths))          # must be > 0
 # The trainer loads with load_dataset(DATA_REPO) — which can't read a local save_to_disk
 # folder — so push to the Hub (also persists it, so resumes don't rebuild).
@@ -248,6 +249,7 @@ cfg = {  # IDENTICAL loss weights to the female voice — this is the quality re
   "project_name":"khm-male-tts","model_name_or_path":BASE_DISC,"hub_model_id":OUT_REPO,
   "output_dir":"./vits_out","overwrite_output_dir":True,
   "dataset_name":DATA_REPO,"audio_column_name":"audio","text_column_name":"text",
+  "speaker_id_column_name":"speaker_id",   # single speaker (all 0); required by the trainer
   "train_split_name":"train","do_train":True,
   "max_steps":MAX_STEPS,"per_device_train_batch_size":16,"gradient_accumulation_steps":1,
   "learning_rate":2e-4,"warmup_ratio":0.01,"fp16":True,"preprocessing_num_workers":4,
