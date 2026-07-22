@@ -147,6 +147,7 @@ disconnect, and you check progress with **Cell 2e**. It still checkpoints to HF 
 # ── Cell 2a — settings + login (edit these) ──────────────────────────────
 CHOSEN_SPK   = "m-xxxx-xxxx"                 # your male pick from Cell 1
 OUT_REPO     = "sengtha/khmer-tts-male-v1"   # your voice repo (created on first push)
+DATA_REPO    = "sengtha/ddd-male-tts"        # the training set is pushed here (trainer loads via load_dataset)
 BASE_DISC    = "sengtha/mms-khm-with-disc"   # discriminator base (auto-rebuilt if missing)
 MAX_STEPS    = 200_000                        # match the female voice
 TARGET_HOURS = 25
@@ -179,8 +180,12 @@ for si in sorted(shards_of[CHOSEN_SPK]):
     os.remove(p)
     print(f"  ~{sec/3600:.1f}h", flush=True)
     if sec/3600 >= TARGET_HOURS: break
-Dataset.from_dict({"audio":apaths,"text":texts}).cast_column("audio",Audio(sampling_rate=16000)).save_to_disk("khm_male_ds")
+ds = Dataset.from_dict({"audio":apaths,"text":texts}).cast_column("audio",Audio(sampling_rate=16000))
 print("training clips:", len(apaths))          # must be > 0
+# The trainer loads with load_dataset(DATA_REPO) — which can't read a local save_to_disk
+# folder — so push to the Hub (also persists it, so resumes don't rebuild).
+ds.push_to_hub(DATA_REPO, private=True)
+print("pushed dataset →", DATA_REPO)
 ```
 
 ```python
@@ -241,14 +246,14 @@ print("resume from:", resume)
 cfg = {  # IDENTICAL loss weights to the female voice — this is the quality recipe
   "project_name":"khm-male-tts","model_name_or_path":BASE_DISC,"hub_model_id":OUT_REPO,
   "output_dir":"./vits_out","overwrite_output_dir":True,
-  "dataset_name":"khm_male_ds","audio_column_name":"audio","text_column_name":"text",
+  "dataset_name":DATA_REPO,"audio_column_name":"audio","text_column_name":"text",
   "train_split_name":"train","do_train":True,
   "max_steps":MAX_STEPS,"per_device_train_batch_size":16,"gradient_accumulation_steps":1,
   "learning_rate":2e-4,"warmup_ratio":0.01,"fp16":True,"preprocessing_num_workers":4,
   "do_step_schedule_per_epoch":True,
   "weight_disc":3,"weight_fmaps":1,"weight_gen":1,"weight_kl":1.5,"weight_mel":35,"weight_duration":1,
   "save_steps":500,"save_total_limit":2,"logging_steps":20,
-  "push_to_hub":True,"hub_token":HF_TOKEN,"report_to":[],
+  "push_to_hub":True,"hub_token":HF_TOKEN,"token":HF_TOKEN,"report_to":[],
 }
 if resume: cfg["resume_from_checkpoint"] = resume
 json.dump(cfg, open("ft.json","w"), indent=2)
