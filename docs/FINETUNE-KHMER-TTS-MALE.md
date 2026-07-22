@@ -46,10 +46,11 @@ pod you get more speed and **no 12h session limit**, so 200k can finish in one r
    Run this before Cell 1, or you'll get `ModuleNotFoundError: No module named
    'huggingface_hub'`:
    ```python
-   !pip install -q huggingface_hub hf_transfer datasets pandas soundfile librosa pyarrow
+   !pip install -q huggingface_hub hf_transfer "datasets[audio]==2.21.0" pandas soundfile librosa pyarrow
    ```
    (`hf_transfer` because RunPod sets `HF_HUB_ENABLE_HF_TRANSFER=1` and errors without it.
-   Cell 2c installs the training deps via `finetune-hf-vits/requirements.txt`.)
+   `datasets==2.21.0` because 4.x decodes audio via **torchcodec**, which needs a CUDA lib
+   the pod lacks (`libnvrtc.so.13`); 2.x uses soundfile. Cell 2c pins transformers+datasets.)
 3. **Auth** — replace the two Kaggle-secret lines at the top of Cell 2 with:
    ```python
    from huggingface_hub import login
@@ -196,10 +197,10 @@ if not os.path.exists("finetune-hf-vits"):
     subprocess.run(["git","clone","https://github.com/ylacombe/finetune-hf-vits"], check=True)
 subprocess.run([sys.executable,"-m","pip","install","-q","-r","finetune-hf-vits/requirements.txt"], check=True)
 
-# finetune-hf-vits pins transformers>=4.35.1 (open-ended), but recent pods ship
-# transformers 5.x, which removed VitsConfig.pad_token_id -> the repo's vendored VITS
-# code crashes ("'VitsConfig' object has no attribute 'pad_token_id'"). Pin to 4.x.
-subprocess.run([sys.executable,"-m","pip","install","-q","transformers==4.46.3"], check=True)
+# The repo's open-ended pins pull incompatible latest versions. Pin the tested pair:
+#  - transformers 5.x removed VitsConfig.pad_token_id -> vendored VITS crashes.
+#  - datasets 4.x decodes audio via torchcodec -> needs libnvrtc.so.13 the pod lacks.
+subprocess.run([sys.executable,"-m","pip","install","-q","transformers==4.46.3","datasets[audio]==2.21.0"], check=True)
 
 # Python 3.12 removed distutils (which monotonic_align/setup.py imports); setuptools provides
 # the shim. Install setuptools+cython; do NOT upgrade numpy (torch/transformers are built
