@@ -166,8 +166,11 @@ Keep the `shards_of` / `paths` variables — Cell 2 reuses them.
 
 Split into small steps so it's easy to follow. **Cell 2d launches training detached**
 (`start_new_session=True`) → the cell returns immediately, the run survives a browser
-disconnect, and you check progress with **Cell 2e**. It still checkpoints to HF every
-500 steps and resumes automatically.
+disconnect, and you check progress with **Cell 2e**. It saves **local** checkpoints to
+`output_dir` (on the persistent `/workspace` volume) and pushes the finished model to
+`OUT_REPO` **at the end of the run**. To get a listenable voice + a Hub push sooner,
+**train in segments** — set `MAX_STEPS` to e.g. `40000` first, listen, then raise it and
+re-run (it resumes from the local checkpoint).
 
 ```python
 # ── Cell 2a — settings + login (edit these) ──────────────────────────────
@@ -267,20 +270,18 @@ print("engine ready ✓")
 
 ```python
 # ── Cell 2d — write config + LAUNCH TRAINING IN BACKGROUND (detached; survives disconnect) ──
+# NOTE: this script pushes the model to OUT_REPO only ONCE, at the end of the run. During
+# training it saves LOCAL checkpoints to output_dir. So put output_dir on the persistent
+# /workspace volume (survives a pod restart) and resume from the newest LOCAL checkpoint.
 import json, glob, subprocess
-from huggingface_hub import HfApi, snapshot_download
-resume = None                                   # auto-resume from the last HF checkpoint
-if HfApi().repo_exists(OUT_REPO):
-    try:
-        ck = snapshot_download(OUT_REPO, allow_patterns=["checkpoint-*/*"])
-        cks = sorted(glob.glob(ck+"/checkpoint-*"), key=lambda p:int(p.split("-")[-1]))
-        resume = cks[-1] if cks else None
-    except Exception: pass
-print("resume from:", resume)
+OUTPUT_DIR = "/workspace/vits_out"              # persistent Network Volume
+cks = sorted(glob.glob(f"{OUTPUT_DIR}/checkpoint-*"), key=lambda p:int(p.split("-")[-1]))
+resume = cks[-1] if cks else None
+print("resume from local checkpoint:", resume)
 
 cfg = {  # IDENTICAL loss weights to the female voice — this is the quality recipe
   "project_name":"khm-male-tts","model_name_or_path":BASE_DISC,"hub_model_id":OUT_REPO,
-  "output_dir":"./vits_out","overwrite_output_dir":True,
+  "output_dir":OUTPUT_DIR,"overwrite_output_dir":True,
   "dataset_name":DATA_REPO,"audio_column_name":"audio","text_column_name":"text",
   "speaker_id_column_name":"speaker_id",   # single speaker (all 0); required by the trainer
   "train_split_name":"train","do_train":True,
@@ -314,17 +315,22 @@ the browser; on a RunPod pod the run keeps going and auto-resumes if the pod res
 
 ---
 
-## Resuming (background run, or after a stop)
+## Checkpoints, pushing & resuming (important)
 
-- **RunPod (background):** Cell 2d runs detached, so it keeps going if you close the
-  browser. If the **pod restarts**, just re-run **2a → 2b → 2c → 2d** — Cell 2d's
-  `resume` logic pulls the newest checkpoint from `OUT_REPO` and continues from there.
-  Watch with **2e**; stop with `!pkill -f run_vits_finetuning`.
-- **Kaggle (12h limit):** run 2a–2d as **Save & Run All (Commit)**; re-commit to resume
-  (same checkpoint logic). Background mode isn't needed there.
-- **Compute:** ~30k steps ≈ 5–9h on a T4 (≈ **2–4h on a 4090/A5000**), so **200k ≈
-  10–20h on RTX**, often one background run. Listen to the checkpoint samples and stop
-  when it matches the female voice — you may not need the full 200k.
+- **The Hub push happens only at the END of a run** (the script does
+  `model.save_pretrained(output_dir)` → `push_to_hub(OUT_REPO)` after `MAX_STEPS`).
+  During training it saves **local** checkpoints to `output_dir` every `save_steps`.
+- **Keep `output_dir` on the persistent volume** (`/workspace/vits_out`) so a RunPod
+  restart doesn't lose progress. Cell 2d resumes from the newest **local** checkpoint.
+- **Train in segments to hear progress + get Hub pushes sooner.** Set `MAX_STEPS=40000`
+  first → it finishes, pushes a real voice to `OUT_REPO`, you listen; then raise
+  `MAX_STEPS` and re-run **2d** — it resumes from the local checkpoint and pushes again
+  at the new target. Repeat until it matches the female voice (likely before 200k).
+- **Restart recovery:** if the pod restarts, re-run **2a → 2c → 2d** (dataset's already
+  on the Hub, so you can skip 2b). Cell 2d finds `/workspace/vits_out/checkpoint-*` and
+  continues. Watch with **2e**; stop with `!pkill -f run_vits_finetuning`.
+- **Compute:** ~30k steps ≈ **2–4h on a 4090/A5000** (~5–9h on a T4), so **200k ≈
+  10–20h on RTX**.
 
 ## Use the voice offline (later)
 
