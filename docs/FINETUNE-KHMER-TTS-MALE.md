@@ -46,9 +46,10 @@ pod you get more speed and **no 12h session limit**, so 200k can finish in one r
    Run this before Cell 1, or you'll get `ModuleNotFoundError: No module named
    'huggingface_hub'`:
    ```python
-   !pip install -q huggingface_hub datasets pandas soundfile librosa
+   !pip install -q huggingface_hub hf_transfer datasets pandas soundfile librosa pyarrow
    ```
-   (Cell 2's step 3 installs the training deps via `finetune-hf-vits/requirements.txt`.)
+   (`hf_transfer` because RunPod sets `HF_HUB_ENABLE_HF_TRANSFER=1` and errors without it.
+   Cell 2c installs the training deps via `finetune-hf-vits/requirements.txt`.)
 3. **Auth** — replace the two Kaggle-secret lines at the top of Cell 2 with:
    ```python
    from huggingface_hub import login
@@ -198,7 +199,7 @@ subprocess.run([sys.executable,"-m","pip","install","-q","transformers==4.46.3"]
 # Python 3.12 removed distutils (which monotonic_align/setup.py imports); setuptools provides
 # the shim. Install setuptools+cython; do NOT upgrade numpy (torch/transformers are built
 # against the pod's numpy — bumping to 2.x breaks them with an ABI error).
-subprocess.run([sys.executable,"-m","pip","install","-q","-U","setuptools","cython"], check=True)
+subprocess.run([sys.executable,"-m","pip","install","-q","-U","setuptools","cython","hf_transfer"], check=True)
 env = {**os.environ, "SETUPTOOLS_USE_DISTUTILS": "local"}
 r = subprocess.run("cd finetune-hf-vits/monotonic_align && python setup.py build_ext --inplace",
                    shell=True, capture_output=True, text=True, env=env)
