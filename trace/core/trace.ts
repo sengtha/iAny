@@ -91,7 +91,7 @@ export interface Tier {
 
 export function proofTier(i: TierInput): Tier {
   let level: Tier['level'] = 1
-  if (i.photos >= 2 && i.hasLabel) level = 2
+  if (i.photos >= 1 && i.hasLabel) level = 2
   if (level >= 2 && (i.hasGeo || i.hasWitness)) level = 3
   if (level >= 3 && i.inChain) level = 4
   const nextKey: Tier['nextKey'] =

@@ -128,9 +128,15 @@ A capsule's tier is derived purely from what it contains — no extra fields:
 | Level | Condition |
 |---|---|
 | 1 · Basic | ≥ 1 photo |
-| 2 · Good | ≥ 2 photos **and** non-empty `boxText` |
+| 2 · Good | ≥ 1 photo **and** non-empty `boxText` |
 | 3 · Strong | level ≥ 2 **and** (`gps` **or** `witness`) |
 | 4 · Full journey | level ≥ 3 **and** in a chain (`prev`, or `event.step > 1`) |
+
+Each level is *cumulative* over the one below, so every optional signal a maker
+adds — the label, then a location or witness, then a journey link — lifts the
+tier, even for the encouraged single-photo proof. Extra photos never *lower* a
+tier; they strengthen the appearance match (§5), which is a separate axis from
+these tiers. `boxText` is whitespace-trimmed before the emptiness test.
 
 ## 7. Optional online registry (HTTP)
 

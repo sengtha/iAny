@@ -34,7 +34,7 @@ Create screen shows the current level and the cheapest thing to add next.
 | Level | What it needs | Who it's for |
 |---|---|---|
 | **1 · Basic** | 1 photo | any farmer, 10 seconds |
-| **2 · Good** | 2+ photos + the label | a bit more care |
+| **2 · Good** | a photo + the label | a bit more care |
 | **3 · Strong** | + location **or** a witness | serious sellers |
 | **4 · Full journey** | linked into an event chain | exporters / co-ops |
 

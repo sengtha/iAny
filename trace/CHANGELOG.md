@@ -18,6 +18,16 @@ version (`v`) as its compatibility anchor; see [`SPEC.md`](./SPEC.md).
   capsule stays verifiable with or without the model. The capsule format is
   unchanged apart from the additive optional `embed` field (still pinned by `id`).
 
+### Fixed
+- **Proof-strength tier stuck on "Basic".** Level 2 · Good required **≥ 2
+  photos**, and every higher tier is gated behind it — so a proof made the
+  encouraged way (one photo, then a label, location, and witness) never left
+  Basic no matter what trust info was added. Level 2 now needs **≥ 1 photo + a
+  label**, so single-photo proofs climb Good → Strong → Full journey as signals
+  are added. Extra photos still strengthen the appearance match (a separate
+  axis). Updated `proofTier` (`core/trace.ts`), the Create hint, and SPEC §6 /
+  GUIDE tables.
+
 ### Changed
 - **Extracted into a self-contained `trace/` folder** (engine / web / worker +
   docs + license) so Trace can be run, embedded, or split out (`git subtree

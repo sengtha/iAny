@@ -734,7 +734,7 @@ function tierName(level: number, L: LFn): string {
 
 function tierHint(key: Tier['nextKey'], L: LFn): string {
   return {
-    photo2label: L('Add another photo + the label to reach "Good".', 'បន្ថែមរូបមួយទៀត + ស្លាក ដើម្បីទៅ "ល្អ"។'),
+    photo2label: L('Add the box / label text to reach "Good".', 'បន្ថែមអក្សរនៅលើប្រអប់ / ស្លាក ដើម្បីទៅ "ល្អ"។'),
     geowitness: L('Add location or a witness to reach "Strong".', 'បន្ថែមទីតាំង ឬសាក្សី ដើម្បីទៅ "រឹងមាំ"។'),
     journey: L('Link it into a journey for the top level.', 'ភ្ជាប់ទៅដំណើរ សម្រាប់កម្រិតខ្ពស់បំផុត។'),
   }[key ?? 'journey'] ?? ''
