@@ -191,8 +191,9 @@ if not os.path.exists("finetune-hf-vits"):
 subprocess.run([sys.executable,"-m","pip","install","-q","-r","finetune-hf-vits/requirements.txt"], check=True)
 
 # Python 3.12 removed distutils (which monotonic_align/setup.py imports); setuptools provides
-# the shim. Ensure setuptools/cython/numpy exist, then build with output captured.
-subprocess.run([sys.executable,"-m","pip","install","-q","-U","setuptools","cython","numpy"], check=True)
+# the shim. Install setuptools+cython; do NOT upgrade numpy (torch/transformers are built
+# against the pod's numpy — bumping to 2.x breaks them with an ABI error).
+subprocess.run([sys.executable,"-m","pip","install","-q","-U","setuptools","cython"], check=True)
 env = {**os.environ, "SETUPTOOLS_USE_DISTUTILS": "local"}
 r = subprocess.run("cd finetune-hf-vits/monotonic_align && python setup.py build_ext --inplace",
                    shell=True, capture_output=True, text=True, env=env)
