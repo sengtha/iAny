@@ -135,31 +135,33 @@ Keep the `shards_of` / `paths` variables — Cell 2 reuses them.
 
 ---
 
-## Cell 2 — BATCH: fine-tune MMS on that male voice (checkpoints + resumes)
+## Cell 2 — fine-tune (five short cells; training runs in the background)
 
-GPU: Kaggle T4/P100, or a **RunPod RTX 4090 / A5000 / A6000** (see the RunPod section
-above for the token change + VRAM). Set `CHOSEN_SPK` + `MAX_STEPS`. **Kaggle:** Secrets →
-`HF_TOKEN` (Write), Internet On, run as **Save & Run All (Commit)** and re-run to resume.
-**RunPod:** swap in `login("hf_…")` (above) and just run the cell — it resumes from the
-last HF checkpoint automatically if interrupted.
+Split into small steps so it's easy to follow. **Cell 2d launches training detached**
+(`start_new_session=True`) → the cell returns immediately, the run survives a browser
+disconnect, and you check progress with **Cell 2e**. It still checkpoints to HF every
+500 steps and resumes automatically.
 
 ```python
-import os, io, pathlib, subprocess, sys, json, pyarrow.parquet as pq, soundfile as sf, librosa
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
-# TOKEN — RunPod: login("hf_…"); Kaggle: from kaggle_secrets import UserSecretsClient; ...get_secret("HF_TOKEN")
-from huggingface_hub import login, snapshot_download, hf_hub_download, HfApi
-HF_TOKEN = "hf_xxxxxxxx"; login(HF_TOKEN)
+# ── Cell 2a — settings + login (edit these) ──────────────────────────────
+CHOSEN_SPK   = "m-xxxx-xxxx"                 # your male pick from Cell 1
+OUT_REPO     = "sengtha/khmer-tts-male-v1"   # your voice repo (created on first push)
+BASE_DISC    = "sengtha/mms-khm-with-disc"   # discriminator base (auto-rebuilt if missing)
+MAX_STEPS    = 200_000                        # match the female voice
+TARGET_HOURS = 25
+HF_TOKEN     = "hf_xxxxxxxx"
+REPO         = "DDD-Cambodia/khmer-speech-dataset"
+from huggingface_hub import login; login(HF_TOKEN)
+print("ok — speaker:", CHOSEN_SPK)
+```
 
-REPO       = "DDD-Cambodia/khmer-speech-dataset"
-CHOSEN_SPK = "m-xxxx-xxxx"                       # <-- your male pick from Cell 1
-OUT_REPO   = "sengtha/khmer-tts-male-v1"         # your fine-tuned MALE voice
-BASE_DISC  = "sengtha/mms-khm-with-disc"         # generator+discriminator (shared with female; reused)
-MAX_STEPS  = 200_000                             # <-- MATCH the female voice (30_000 = quick first pass)
-TARGET_HOURS = 25                                # 20–40h of clean speech is plenty
-
-# 1+2) build the HF dataset from PARQUET shards (reuses paths/shards_of from Cell 1;
-#      if this cell runs standalone, re-run Cell 1's profiling first).
+```python
+# ── Cell 2b — build the training set from parquet (reuses paths + shards_of from Cell 1) ──
+import io, os, pathlib, pyarrow.parquet as pq, soundfile as sf, librosa
+from huggingface_hub import hf_hub_download
 from datasets import Dataset, Audio
+assert 'shards_of' in globals(), "run Cell 1 first (it sets paths + shards_of)"
+
 out = pathlib.Path("male_wavs"); out.mkdir(exist_ok=True)
 apaths=[]; texts=[]; sec=0.0; i=0
 for si in sorted(shards_of[CHOSEN_SPK]):
@@ -173,86 +175,88 @@ for si in sorted(shards_of[CHOSEN_SPK]):
         if sr!=16000: y=librosa.resample(y, orig_sr=sr, target_sr=16000); sr=16000
         wp=str(out/f"{i:06d}.wav"); sf.write(wp,y,sr); apaths.append(wp); texts.append(str(t)); i+=1
         sec += float(d) if d else len(y)/sr
-    os.remove(p)                                 # free disk as we go
-    print(f"shard {si}: ~{sec/3600:.1f}h", flush=True)
+    os.remove(p)
+    print(f"  ~{sec/3600:.1f}h", flush=True)
     if sec/3600 >= TARGET_HOURS: break
-ds = Dataset.from_dict({"audio":apaths,"text":texts}).cast_column("audio", Audio(sampling_rate=16000))
-ds.save_to_disk("khm_male_ds")
-print("training clips:", len(ds))                # must be > 0
+Dataset.from_dict({"audio":apaths,"text":texts}).cast_column("audio",Audio(sampling_rate=16000)).save_to_disk("khm_male_ds")
+print("training clips:", len(apaths))          # must be > 0
+```
 
-# 3) engine (adds the discriminator base transformers lacks)
+```python
+# ── Cell 2c — one-time engine + discriminator base (rebuilds mms-khm-with-disc if deleted) ──
+import os, sys, subprocess
+from huggingface_hub import HfApi
 if not os.path.exists("finetune-hf-vits"):
-    subprocess.run(["git","clone","https://github.com/ylacombe/finetune-hf-vits"])
-    subprocess.run([sys.executable,"-m","pip","install","-q","-r","finetune-hf-vits/requirements.txt"])
-    subprocess.run("cd finetune-hf-vits/monotonic_align && python setup.py build_ext --inplace",
-                   shell=True)
-
-# 4) reuse the SAME generator+discriminator base built for the female voice (build if absent)
-if HfApi().repo_exists(BASE_DISC):
-    print("disc base exists:", BASE_DISC)
-else:
+    subprocess.run(["git","clone","https://github.com/ylacombe/finetune-hf-vits"], check=True)
+    subprocess.run([sys.executable,"-m","pip","install","-q","-r","finetune-hf-vits/requirements.txt"], check=True)
+    subprocess.run("cd finetune-hf-vits/monotonic_align && python setup.py build_ext --inplace", shell=True, check=True)
+if not HfApi().repo_exists(BASE_DISC):
+    print("rebuilding discriminator base (a few min)…", flush=True)
     subprocess.run([sys.executable,"finetune-hf-vits/convert_original_discriminator_checkpoint.py",
                     "--language_code","khm","--pytorch_dump_folder_path","mms-khm-disc",
                     "--push_to_hub", BASE_DISC], check=True)
+print("engine ready ✓")
+```
 
-# 5) resume from the last checkpoint OUT_REPO pushed (so 200k spans sessions)
-resume = None
+```python
+# ── Cell 2d — write config + LAUNCH TRAINING IN BACKGROUND (detached; survives disconnect) ──
+import json, glob, subprocess
+from huggingface_hub import HfApi, snapshot_download
+resume = None                                   # auto-resume from the last HF checkpoint
 if HfApi().repo_exists(OUT_REPO):
     try:
-        ckpt = snapshot_download(OUT_REPO, allow_patterns=["checkpoint-*/*"])
-        cks = sorted(glob.glob(ckpt+"/checkpoint-*"), key=lambda p: int(p.split("-")[-1]))
+        ck = snapshot_download(OUT_REPO, allow_patterns=["checkpoint-*/*"])
+        cks = sorted(glob.glob(ck+"/checkpoint-*"), key=lambda p:int(p.split("-")[-1]))
         resume = cks[-1] if cks else None
-        print("resuming from", resume)
-    except Exception as e:
-        print("no resumable checkpoint:", e)
+    except Exception: pass
+print("resume from:", resume)
 
-# 6) training config — IDENTICAL loss weights to the female voice (this is the quality recipe)
-cfg = {
-  "project_name": "khm-male-tts",
-  "model_name_or_path": BASE_DISC,
-  "hub_model_id": OUT_REPO,
-  "output_dir": "./vits_out",
-  "overwrite_output_dir": True,
-  "dataset_name": "khm_male_ds",        # load_from_disk path
-  "audio_column_name": "audio",
-  "text_column_name": "text",
-  "train_split_name": "train",
-  "do_train": True,
-  "max_steps": MAX_STEPS,               # <-- match the female voice
-  "per_device_train_batch_size": 16,
-  "gradient_accumulation_steps": 1,
-  "learning_rate": 2e-4,
-  "warmup_ratio": 0.01,
-  "fp16": True,
-  "preprocessing_num_workers": 4,
-  "do_step_schedule_per_epoch": True,
-  "weight_disc": 3, "weight_fmaps": 1, "weight_gen": 1,
-  "weight_kl": 1.5, "weight_mel": 35, "weight_duration": 1,
-  "save_steps": 500, "save_total_limit": 2,
-  "logging_steps": 20,
-  "push_to_hub": True, "hub_token": HF_TOKEN,
-  "report_to": [],
+cfg = {  # IDENTICAL loss weights to the female voice — this is the quality recipe
+  "project_name":"khm-male-tts","model_name_or_path":BASE_DISC,"hub_model_id":OUT_REPO,
+  "output_dir":"./vits_out","overwrite_output_dir":True,
+  "dataset_name":"khm_male_ds","audio_column_name":"audio","text_column_name":"text",
+  "train_split_name":"train","do_train":True,
+  "max_steps":MAX_STEPS,"per_device_train_batch_size":16,"gradient_accumulation_steps":1,
+  "learning_rate":2e-4,"warmup_ratio":0.01,"fp16":True,"preprocessing_num_workers":4,
+  "do_step_schedule_per_epoch":True,
+  "weight_disc":3,"weight_fmaps":1,"weight_gen":1,"weight_kl":1.5,"weight_mel":35,"weight_duration":1,
+  "save_steps":500,"save_total_limit":2,"logging_steps":20,
+  "push_to_hub":True,"hub_token":HF_TOKEN,"report_to":[],
 }
 if resume: cfg["resume_from_checkpoint"] = resume
 json.dump(cfg, open("ft.json","w"), indent=2)
 
-# 7) train (auto-pushes checkpoint-500,-1000,… to OUT_REPO -> survives the 12h wipe)
-subprocess.run(["accelerate","launch","finetune-hf-vits/run_vits_finetuning.py","ft.json"], check=True)
-print("SESSION DONE. Re-run this commit to continue from the last checkpoint.")
+logf = open("train.log","w")
+proc = subprocess.Popen(["accelerate","launch","finetune-hf-vits/run_vits_finetuning.py","ft.json"],
+                        stdout=logf, stderr=subprocess.STDOUT, start_new_session=True)
+print("🚀 training PID", proc.pid, "— running in background. Watch it with Cell 2e.")
 ```
+
+```python
+# ── Cell 2e — MONITOR (re-run anytime; this does NOT stop training) ──
+!echo "--- alive? ---"; ps aux | grep -m1 "[r]un_vits_finetuning" || echo "NOT RUNNING (see train.log)"
+!echo "--- last log ---"; tail -n 30 train.log
+!echo "--- gpu ---"; nvidia-smi --query-gpu=utilization.gpu,memory.used --format=csv,noheader
+# to STOP training:  !pkill -f run_vits_finetuning
+```
+
+Run **2a → 2b** (check `training clips > 0`) **→ 2c** (rebuilds your deleted disc base)
+**→ 2d** (starts training, returns instantly) **→ 2e** (re-run to watch). You can close
+the browser; on a RunPod pod the run keeps going and auto-resumes if the pod restarts.
 
 ---
 
-## Running it across sessions (200k needs several)
+## Resuming (background run, or after a stop)
 
-1. First run builds/reuses the discriminator base (step 4), preps data, starts training,
-   pushes `checkpoint-500, -1000, …` to `OUT_REPO`.
-2. Kaggle stops at 12h → **Save & Run All (Commit) again**; step 5 pulls the newest
-   checkpoint and step 6 sets `resume_from_checkpoint`, so it continues seamlessly.
-3. Repeat until it sounds as good as the female voice. **Compute:** ~30k steps ≈ 5–9h
-   on a T4, so **200k ≈ 4–6 T4 sessions** (or ~2 on an A100). Listen to the saved
-   samples at each checkpoint and stop when parity is reached — you may not need the
-   full 200k.
+- **RunPod (background):** Cell 2d runs detached, so it keeps going if you close the
+  browser. If the **pod restarts**, just re-run **2a → 2b → 2c → 2d** — Cell 2d's
+  `resume` logic pulls the newest checkpoint from `OUT_REPO` and continues from there.
+  Watch with **2e**; stop with `!pkill -f run_vits_finetuning`.
+- **Kaggle (12h limit):** run 2a–2d as **Save & Run All (Commit)**; re-commit to resume
+  (same checkpoint logic). Background mode isn't needed there.
+- **Compute:** ~30k steps ≈ 5–9h on a T4 (≈ **2–4h on a 4090/A5000**), so **200k ≈
+  10–20h on RTX**, often one background run. Listen to the checkpoint samples and stop
+  when it matches the female voice — you may not need the full 200k.
 
 ## Use the voice offline (later)
 
