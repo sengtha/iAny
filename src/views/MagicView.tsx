@@ -6,6 +6,7 @@ import {
   releaseGestureRecognizer,
   type Pt,
 } from '../lib/gestureRecognizer'
+import { initAudio, setFire, setRain, boom, whoosh, stopAudio } from '../lib/magicSound'
 
 /**
  * ✨ Magic (/magic) — a try-it demo of **gesture → command** with a little fire
@@ -64,6 +65,7 @@ export function MagicView() {
     streamRef.current?.getTracks().forEach((t) => t.stop())
     streamRef.current = null
     releaseGestureRecognizer()
+    stopAudio()
     particles.current = []
     rings.current = []
     fire.current = 0
@@ -71,6 +73,7 @@ export function MagicView() {
 
   async function start() {
     setError('')
+    initAudio()          // create the AudioContext inside the click gesture (autoplay policy)
     setPhase('loading')
     setProgress(0.1)
     try {
@@ -118,7 +121,12 @@ export function MagicView() {
         const g = recognize(v, now)
         gestureRef.current = g.name
         lmRef.current = g.landmarks
-        if (g.name !== lastGesture.current) { lastGesture.current = g.name; setSpell(g.name) }
+        if (g.name !== lastGesture.current) {
+          lastGesture.current = g.name
+          setSpell(g.name)
+          if (g.name === 'Closed_Fist') boom()
+          else if (g.name === 'Open_Palm') whoosh()   // ignite
+        }
       }
       render(c)
     }
@@ -159,6 +167,10 @@ export function MagicView() {
 
     // --- draw the fire from its current intensity (persists between frames) ---
     if (fire.current > 0.02) drawFire(ctx, fx, fy, fire.current)
+
+    // --- sound: fire crackle tracks intensity, rain patter while thumb-down ---
+    setFire(fire.current)
+    setRain(name === 'Thumb_Down')
 
     step(ctx)
   }
