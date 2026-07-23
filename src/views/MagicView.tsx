@@ -33,7 +33,7 @@ interface Particle {
 }
 interface Ring { x: number; y: number; r: number; vr: number; age: number; max: number; hue: number; w: number }
 
-const MAX_PARTICLES = 900
+const MAX_PARTICLES = 1100
 
 export function MagicView() {
   const { lang } = useI18n()
@@ -45,6 +45,7 @@ export function MagicView() {
 
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const meterFillRef = useRef<HTMLDivElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const rafRef = useRef(0)
   const lastTs = useRef(0)
@@ -154,7 +155,7 @@ export function MagicView() {
       fistArmed.current = 25                       // arm the "burst into fire" for the next open palm
     } else if (name === 'Open_Palm') {
       // ignite / grow a BIG fire; a recent fist makes the ignition burst bigger
-      fire.current = Math.min(1, fire.current + (fistArmed.current > 0 ? 0.09 : 0.045))
+      fire.current = Math.min(1, fire.current + (fistArmed.current > 0 ? 0.13 : 0.07))
       if (fistArmed.current > 0 && Math.random() < 0.4) {
         rings.current.push({ x: fx, y: fy, r: 10, vr: 6, age: 0, max: 30, hue: 30, w: 7 })
       }
@@ -171,6 +172,9 @@ export function MagicView() {
     // --- sound: fire crackle tracks intensity, rain patter while thumb-down ---
     setFire(fire.current)
     setRain(name === 'Thumb_Down')
+
+    // --- intensity meter (update the DOM directly, no React re-render) ---
+    if (meterFillRef.current) meterFillRef.current.style.width = Math.round(fire.current * 100) + '%'
 
     step(ctx)
   }
@@ -204,6 +208,13 @@ export function MagicView() {
         ) : null}
         <div className="live-guess-tag">{km ? 'វេទមន្ត (ពិសោធន៍)' : 'Magic (experiment)'}</div>
       </div>
+
+      {showFire ? (
+        <div className="magic-meter-row">
+          <span aria-hidden>🔥</span>
+          <div className="magic-meter"><div className="magic-meter-fill" ref={meterFillRef} /></div>
+        </div>
+      ) : null}
 
       {phase === 'idle' || phase === 'error' ? (
         <div className="magic-legend">
@@ -240,25 +251,27 @@ export function MagicView() {
   /* --------------------------------------------------------- effects engine --- */
 
   function drawFire(ctx: CanvasRenderingContext2D, x: number, y: number, lvl: number) {
-    // base glow
+    // base glow (big, warm)
     ctx.globalCompositeOperation = 'lighter'
-    const gr = ctx.createRadialGradient(x, y, 0, x, y, 90 * lvl + 25)
-    gr.addColorStop(0, `hsla(35,100%,60%,${0.28 * lvl})`)
-    gr.addColorStop(1, 'hsla(20,100%,50%,0)')
+    const glowR = 155 * lvl + 30
+    const gr = ctx.createRadialGradient(x, y, 0, x, y, glowR)
+    gr.addColorStop(0, `hsla(35,100%,60%,${0.34 * lvl})`)
+    gr.addColorStop(0.5, `hsla(20,100%,50%,${0.14 * lvl})`)
+    gr.addColorStop(1, 'hsla(15,100%,45%,0)')
     ctx.fillStyle = gr
-    ctx.beginPath(); ctx.arc(x, y, 90 * lvl + 25, 0, Math.PI * 2); ctx.fill()
+    ctx.beginPath(); ctx.arc(x, y, glowR, 0, Math.PI * 2); ctx.fill()
 
-    // flame + ember particles rising from the palm; count + size scale with intensity
-    const n = Math.round(4 + lvl * 16)
-    const spread = 14 + lvl * 42
+    // flame + ember particles rising from the palm; count + size + height scale with intensity
+    const n = Math.round(8 + lvl * 30)
+    const spread = 18 + lvl * 74
     for (let i = 0; i < n; i++) {
       if (particles.current.length >= MAX_PARTICLES) break
-      const up = -(2.4 + lvl * 5) * rand(0.6, 1.2)
+      const up = -(3 + lvl * 7.5) * rand(0.6, 1.25)
       particles.current.push(mk({
-        x: x + rand(-spread, spread), y: y + rand(-8, 12),
-        vx: rand(-0.8, 0.8), vy: up,
-        size: (6 + lvl * 14) * rand(0.5, 1), hue: rand(8, 48),
-        grav: -0.03, kind: 'fire', max: Math.round(rand(34, 70)),
+        x: x + rand(-spread, spread), y: y + rand(-10, 14),
+        vx: rand(-1, 1), vy: up,
+        size: (9 + lvl * 24) * rand(0.5, 1), hue: rand(6, 48),
+        grav: -0.035, kind: 'fire', max: Math.round(rand(42, 96)),
       }))
     }
     if (Math.random() < 0.5 * lvl) {
