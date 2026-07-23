@@ -92,6 +92,7 @@ export default defineConfig({
           /^\/waste-scan(\/|\.html|$)/,
           /^\/crop-scan(\/|\.html|$)/,
           /^\/garden(\/|\.html|$)/,
+          /^\/magic(\/|\.html|$)/,
         ],
         runtimeCaching: [
           {
@@ -108,8 +109,8 @@ export default defineConfig({
             // time it's fetched — whether by the Models-screen pre-download or
             // by MediaPipe itself on /sign — so /sign works offline afterwards.
             urlPattern: ({ url }) =>
-              /\/models\/sengtha\/mediapipe-hand\//.test(url.pathname) ||
-              url.pathname.endsWith('hand_landmarker.task'),
+              /\/models\/sengtha\/mediapipe-(hand|gesture)\//.test(url.pathname) ||
+              url.pathname.endsWith('.task'),
             handler: 'CacheFirst',
             options: {
               cacheName: 'runtime-hand-model',
@@ -184,6 +185,7 @@ export default defineConfig({
         wasteScan: path.resolve(root, 'waste-scan.html'),
         cropScan: path.resolve(root, 'crop-scan.html'),
         garden: path.resolve(root, 'garden.html'),
+        magic: path.resolve(root, 'magic.html'),
       },
     },
   },

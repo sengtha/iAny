@@ -195,6 +195,8 @@ export function LandingView() {
             desc={L('Point your camera at an item to identify its material — plastic bottle, can, glass, paper — live and on-device, offline.', 'ចង្អុលកាមេរ៉ាទៅវត្ថុ ដើម្បីស្គាល់ប្រភេទសម្ភារៈ — ដបផ្លាស្ទិច កំប៉ុង កែវ ក្រដាស — ផ្ទាល់ លើឧបករណ៍ ក្រៅបណ្ដាញ។')} link="/waste-scan" linkLabel={L('Try /waste-scan', 'សាកល្បង /waste-scan')} />
           <Feature icon="🌱" title={L('Crop scan', 'ស្កេនដំណាំ')} badge={L('Experiment', 'ពិសោធន៍')}
             desc={L('Point your camera at a crop leaf to identify it + its health — healthy or disease — live and on-device, offline.', 'ចង្អុលកាមេរ៉ាទៅស្លឹកដំណាំ ដើម្បីស្គាល់ប្រភេទ និងសុខភាព — មានសុខភាព ឬជំងឺ — ផ្ទាល់ លើឧបករណ៍ ក្រៅបណ្ដាញ។')} link="/crop-scan" linkLabel={L('Try /crop-scan', 'សាកល្បង /crop-scan')} />
+          <Feature icon="✨" title={L('Hand Magic', 'វេទមន្តដៃ')} badge={L('Experiment', 'ពិសោធន៍')}
+            desc={L('Cast spells with hand gestures on the live camera — each gesture triggers a different effect. A playful demo of gesture → command, on-device.', 'បង្កើតវេទមន្តដោយកាយវិការដៃលើកាមេរ៉ា — កាយវិការនីមួយៗបង្កើតបែបផែនផ្សេងៗ។ ការបង្ហាញ កាយវិការ → បញ្ជា លើឧបករណ៍។')} link="/magic" linkLabel={L('Try /magic', 'សាកល្បង /magic')} />
           <Feature icon="🌳" title={L('Garden carbon', 'កាបូនសួន')} badge={L('Experiment', 'ពិសោធន៍')}
             desc={L('Log your garden trees + estimate their CO₂, signed on your device — an open, decentralized record anyone can verify. Estimates, not credits.', 'កត់ត្រាដើមឈើក្នុងសួន + ប៉ាន់ស្មាន CO₂ ចុះហត្ថលេខាលើឧបករណ៍ — កំណត់ត្រាបើកចំហ ដែលនរណាក៏ផ្ទៀងផ្ទាត់បាន។ ការប៉ាន់ស្មាន មិនមែនក្រេឌីត។')} link="/garden" linkLabel={L('Try /garden', 'សាកល្បង /garden')} />
         </div>
@@ -289,6 +291,7 @@ export function LandingView() {
           <a href="/label">/label</a>
           <a href="/waste-scan">/waste-scan</a>
           <a href="/crop-scan">/crop-scan</a>
+          <a href="/magic">/magic</a>
           <a href="/garden">/garden</a>
           <a href="/braille">/braille</a>
           <a href="/trace">/trace · {L('experiment', 'ពិសោធន៍')}</a>

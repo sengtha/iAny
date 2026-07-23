@@ -43,6 +43,7 @@ const ALLOWED_PREFIXES = [
   'sengtha/whisper-tiny-khmer/', // Khmer STT v1 (whisper-tiny; superseded)
   'sengtha/whisper-base-khmer/', // Khmer STT (whisper-base fine-tune — PWA ONNX + mobile GGML)
   'sengtha/mediapipe-hand/', // MediaPipe hand_landmarker.task (KSL /sign collector)
+  'sengtha/mediapipe-gesture/', // MediaPipe gesture_recognizer.task (live /magic gesture demo)
   'sengtha/mediapipe-embed/', // MediaPipe Image Embedder (Trace "better matching")
   'sengtha/mediapipe-detector/', // MediaPipe Object Detector (EfficientDet, /traffic)
   'sengtha/mediapipe-classifier/', // MediaPipe Image Classifier (EfficientNet-Lite, superseded)
@@ -62,6 +63,10 @@ function isAllowedKey(key: string): boolean {
 // on first fetch like every other model.
 const MEDIAPIPE_HAND_URL =
   'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task'
+// MediaPipe Gesture Recognizer (~8 MB, Apache-2.0) — 7 built-in hand gestures + 21
+// landmarks, for the live /magic gesture-to-command demo. Mirrored from Google's storage.
+const MEDIAPIPE_GESTURE_URL =
+  'https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task'
 // MediaPipe Image Embedder (MobileNetV3-small, ~4 MB, Apache-2.0) — the optional
 // "better matching" model for Trace. Mirrored from Google's model storage.
 const MEDIAPIPE_EMBED_URL =
@@ -85,6 +90,9 @@ function upstreamUrl(key: string, hfPath: string): string {
   }
   if (key.startsWith('sengtha/mediapipe-hand/')) {
     return MEDIAPIPE_HAND_URL
+  }
+  if (key.startsWith('sengtha/mediapipe-gesture/')) {
+    return MEDIAPIPE_GESTURE_URL
   }
   if (key.startsWith('sengtha/mediapipe-embed/')) {
     return MEDIAPIPE_EMBED_URL
