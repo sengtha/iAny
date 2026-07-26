@@ -174,7 +174,7 @@ export default {
     // Grove node — the decentralized garden-carbon network (/garden). Devices
     // POST signed observations; the node re-verifies every signature before
     // storing and serves public read-only feeds (see grove/worker/handlers.ts).
-    if (url.pathname.startsWith('/api/grove/')) {
+    if (url.pathname === '/api/grove' || url.pathname.startsWith('/api/grove/')) {
       return handleGrove(url, request, env)
     }
     // The standalone "Contribute your voice" page (voice.html) is served
