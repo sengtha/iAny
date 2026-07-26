@@ -2688,3 +2688,9 @@ progress {
 .trace-foot-co a:hover {
   text-decoration: underline;
 }
+
+/* The primary anchoring action — a link, because the signing happens on CSB
+   with the user's own wallet and never in this app. */
+.garden-chain-sign {
+  display: block; text-align: center; text-decoration: none; margin-top: 10px;
+}
