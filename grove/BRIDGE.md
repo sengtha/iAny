@@ -118,7 +118,25 @@ players can tell a lone self-claim from a community-attested one.
 
 ---
 
-## 6. Status
+## 6. Optional: the chain's half
+
+A signature carries who signed and what they said. It cannot carry a date anybody
+else agrees with, and it cannot make anyone accountable for having gone to look —
+both of which matter the moment money is attached to a grove surviving.
+
+[ANCHORING.md](./ANCHORING.md) describes an **optional** path: commit a record's
+content hash to [CSB](https://github.com/sengtha/CSB), where a block timestamp
+replaces the phone's clock and confirmations count only from **licensed** field
+verifiers. Only the hash and `keccak256(plot)` are sent — never the plot name,
+GPS, photo, or device key.
+
+CamboVerse reads that status alongside the signed records and shows it as a
+provenance tier on each plot (`✓ verified by a licensed field verifier` /
+`⛓ awaiting a verifier`), plus any survival-based pledge riding on the grove. A
+plot that was never anchored renders exactly as before — the chain adds
+provenance, never plants.
+
+## 7. Status
 
 Draft v1, tracking [SPEC.md](./SPEC.md). The read shape above is stable; additive
 fields may appear in minor revisions (`id` always pins the exact contents present).

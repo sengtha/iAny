@@ -1778,6 +1778,26 @@ progress {
 .garden-list-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
 .garden-list-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .garden-publish-msg { margin: 2px 0 8px; font-size: 0.85rem; color: var(--fg-muted); }
+/* ---- optional: the chain's half of the record (grove/ANCHORING.md) ---- */
+.garden-chain {
+  margin: 18px 0 8px; padding: 12px 14px; border: 1px solid var(--line, rgba(128, 128, 128, 0.25));
+  border-radius: 12px;
+}
+.garden-chain-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+.garden-chain-head small { opacity: 0.55; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.garden-chain-lead { font-size: 0.8rem; line-height: 1.55; opacity: 0.8; margin: 0 0 10px; }
+.garden-chain-note { font-size: 0.76rem; line-height: 1.5; opacity: 0.72; margin: 8px 0 0; }
+.garden-chain-status { display: grid; gap: 4px; margin-top: 8px; }
+.garden-chain-status > div { display: flex; justify-content: space-between; gap: 10px; font-size: 0.8rem; }
+.garden-chain-status span { opacity: 0.65; }
+.garden-chain-status b { font-weight: 700; text-align: right; }
+.garden-chain-call { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+.garden-chain-call code {
+  flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 0.72rem; opacity: 0.8; background: rgba(128, 128, 128, 0.12);
+  padding: 6px 8px; border-radius: 8px;
+}
+
 .garden-row {
   display: flex;
   align-items: center;
