@@ -13,6 +13,7 @@ import {
   type GardenObservation,
   type Measure,
 } from '../../grove/web/store'
+import { anchorCall, readPlotStatus, type CsbPlotStatus } from '../../grove/core/csb'
 
 /**
  * 🌳 Garden (/garden) — create **signed, verifiable** garden/tree observations on
@@ -21,6 +22,8 @@ import {
  * dashboard / CamboVerse. See grove/SPEC.md. Estimates, not certified credits.
  */
 const SPECIES = ['mango', 'coconut', 'jackfruit', 'longan', 'guava', 'tamarind', 'teak', 'banana', 'other']
+/** Where the optional CSB read endpoint is remembered. Empty = chain off. */
+const CSB_KEY = 'grove.csb.base.v1'
 const SP_KM: Record<string, string> = {
   mango: 'ស្វាយ', coconut: 'ដូង', jackfruit: 'ខ្នុរ', longan: 'មៀន', guava: 'ត្របែក',
   tamarind: 'អំពិល', teak: 'ម៉ៃសាក់', banana: 'ចេក', other: 'ផ្សេង',
@@ -47,6 +50,45 @@ export function GardenView() {
   const fileRef = useRef<HTMLInputElement>(null)
 
   const unpublished = useMemo(() => obs.filter((o) => !published.has(o.id)).length, [obs, published])
+
+  // ---- optional: the chain's half (see grove/ANCHORING.md) ----------------
+  // Everything below is additive. The garden works, signs, exports and publishes
+  // with no chain at all; anchoring only adds a date somebody else agrees with
+  // and a place a licensed verifier can put their name.
+  const [csbBase, setCsbBase] = useState(() => localStorage.getItem(CSB_KEY) ?? '')
+  const [chain, setChain] = useState<CsbPlotStatus | null>(null)
+  const [copied, setCopied] = useState(false)
+
+  const plotId = plot.trim() || 'home-garden-01'
+  /** Newest record for the plot being edited — the one an anchor would commit. */
+  const newest = useMemo(
+    () => [...obs].reverse().find((o) => o.plot === plotId) ?? null,
+    [obs, plotId],
+  )
+
+  useEffect(() => {
+    if (!csbBase.trim()) { setChain(null); return }
+    let stale = false
+    void readPlotStatus(csbBase, plotId).then((s) => { if (!stale) setChain(s) })
+    return () => { stale = true }
+  }, [csbBase, plotId, obs.length])
+
+  /** Calldata for anchoring `newest`, chained onto whatever the chain holds now. */
+  const anchor = useMemo(() => {
+    if (!newest) return null
+    // `prev` must be the chain's CURRENT head, not this phone's idea of it — the
+    // plot may have been anchored from another device, and CSB refuses an anchor
+    // that would fork a plot's history.
+    const head = chain?.anchored ? chain.head?.observationId ?? null : null
+    try {
+      return anchorCall({ ...newest, prev: head ? head.replace(/^0x/, '') : null })
+    } catch {
+      return null
+    }
+  }, [newest, chain])
+
+  const alreadyAnchored =
+    !!newest && !!chain?.head && chain.head.observationId.replace(/^0x/, '') === newest.id
 
   useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl) }, [previewUrl])
 
@@ -230,6 +272,101 @@ export function GardenView() {
           ))}
         </div>
       ) : null}
+
+      <div className="garden-chain">
+        <div className="garden-chain-head">
+          <b>⛓ {km ? 'ចងភ្ជាប់លើ CSB' : 'Anchor on CSB'}</b>
+          <small>{km ? 'ស្រេចចិត្ត' : 'optional'}</small>
+        </div>
+        <p className="garden-chain-lead">
+          {km
+            ? 'ហត្ថលេខាបញ្ជាក់ថា “នរណានិយាយ” មិនមែន “ពិតឬអត់”។ ការចងភ្ជាប់បន្ថែមកាលបរិច្ឆេទដែលអ្នកដទៃយល់ព្រម និងកន្លែងឲ្យអ្នកផ្ទៀងផ្ទាត់មានអាជ្ញាបណ្ណដាក់ឈ្មោះ។ មានតែ hash ទេដែលចេញទៅ។'
+            : 'A signature proves who said something, never that it is true. Anchoring adds a date somebody else agrees with, and a place a licensed field verifier can put their name. Only the hash leaves this phone — never the plot name, the photo, or your location.'}
+        </p>
+
+        <label className="voice-field">
+          <span>{km ? 'អាសយដ្ឋាន CSB' : 'CSB read endpoint'}</span>
+          <input
+            type="text" value={csbBase} spellCheck={false} placeholder="https://csb.example"
+            onChange={(e) => {
+              setCsbBase(e.target.value)
+              localStorage.setItem(CSB_KEY, e.target.value)
+            }}
+          />
+        </label>
+
+        {!csbBase.trim() ? null : !chain?.available ? (
+          <p className="garden-chain-note">
+            {km ? 'មិនអាចទាក់ទង CSB បានទេ — សួនរបស់អ្នកនៅតែដំណើរការធម្មតា។' : 'CSB not reachable — your garden works exactly as before.'}
+            {chain?.reason ? <> <small>({chain.reason})</small></> : null}
+          </p>
+        ) : !chain.anchored ? (
+          <p className="garden-chain-note">
+            {km ? 'សួននេះមិនទាន់ចងភ្ជាប់ទេ។' : 'This plot has never been anchored.'}
+          </p>
+        ) : (
+          <div className="garden-chain-status">
+            <div><span>{km ? 'កំណត់ត្រាបានចង' : 'Anchored records'}</span><b>{chain.records}</b></div>
+            <div>
+              <span>{km ? 'ដើមឈើបានផ្ទៀងផ្ទាត់' : 'Verified trees'}</span>
+              <b>{chain.verifiedCount ? chain.verifiedCount : (km ? 'រង់ចាំ' : 'awaiting a verifier')}</b>
+            </div>
+            {chain.verifier ? (
+              <div>
+                <span>{km ? 'ផ្ទៀងផ្ទាត់ដោយ' : 'Verified by'}</span>
+                <b>{chain.verifier.label || chain.verifier.classes.join(', ')}</b>
+              </div>
+            ) : null}
+            {chain.title ? (
+              <div>
+                <span>{km ? 'ប័ណ្ណសួន' : 'Grove title'}</span>
+                <b>{chain.title.supply} {chain.title.symbol}</b>
+              </div>
+            ) : null}
+          </div>
+        )}
+
+        {anchor && !alreadyAnchored ? (
+          <>
+            <p className="garden-chain-note">
+              {km
+                ? 'ចម្លង calldata នេះទៅកាបូប CSB របស់អ្នក ដើម្បីចុះហត្ថលេខានិងផ្ញើ។ Gas ឥតគិតថ្លៃ។'
+                : 'Copy this calldata into your CSB wallet to sign and send it. Gas on CSB is free, so anchoring costs a signature.'}
+            </p>
+            <div className="garden-chain-call">
+              <code title={anchor.data}>{anchor.data.slice(0, 42)}…</code>
+              <button
+                className="voice-ghost small"
+                onClick={() => {
+                  void navigator.clipboard?.writeText(anchor.data)
+                  setCopied(true)
+                  setTimeout(() => setCopied(false), 1500)
+                }}
+              >
+                {copied ? '✓' : (km ? '⧉ ចម្លង' : '⧉ Copy')}
+              </button>
+            </div>
+            <p className="garden-chain-note">
+              <small>
+                {km ? 'ដើម' : 'trees'}: {anchor.liveCount} · plot {anchor.plotId.slice(0, 10)}… ·{' '}
+                {anchor.prevId.startsWith('0x0000') ? (km ? 'កំណត់ត្រាដំបូង' : 'first record') : `prev ${anchor.prevId.slice(0, 10)}…`}
+              </small>
+            </p>
+          </>
+        ) : alreadyAnchored ? (
+          <p className="garden-chain-note">
+            ✓ {km ? 'កំណត់ត្រាចុងក្រោយបានចងរួចហើយ។' : 'Your newest record for this plot is already anchored.'}
+          </p>
+        ) : null}
+
+        <p className="garden-chain-note">
+          <small>
+            {km
+              ? 'CSB កត់ត្រា ដើមឈើ មិនមែនកាបូន។ គ្មានអ្វីនៅទីនេះជាក្រេឌីតកាបូនទេ។'
+              : 'CSB records trees, not carbon. Nothing here is a carbon credit — it is a count somebody can walk out and check.'}
+          </small>
+        </p>
+      </div>
 
       <p className="voice-tip">
         {km
