@@ -138,7 +138,16 @@ export async function publish(node: string = DEFAULT_NODE): Promise<PublishResul
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ v: 1, kind: 'grove-bundle', observations: pending }),
   })
-  if (!res.ok) throw new Error(`node ${res.status}`)
+  if (!res.ok) {
+    // Surface the node's own explanation (e.g. "grove node not initialised — run
+    // the D1 schema migration") instead of a bare status, so a misconfigured node
+    // is self-diagnosing in the UI rather than an opaque "node 500".
+    const detail = await res.json().then(
+      (b: { error?: string; detail?: string }) => b?.error || b?.detail || '',
+      () => '',
+    )
+    throw new Error(detail ? `node ${res.status}: ${detail}` : `node ${res.status}`)
+  }
   const out = (await res.json()) as PublishResult
   if (out.ids?.length) markPublished(out.ids)
   return out
