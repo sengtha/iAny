@@ -195,6 +195,53 @@ export function anchorCall(obs: GardenObservation, opts: { liveCount?: number } 
   return { data, observationId, plotId, prevId, liveCount, species };
 }
 
+/**
+ * Living plants in a plot right now — the number CSB means by `liveCount`.
+ *
+ * NOT the newest record's own `count`. A Grove record covers one planting; a
+ * plot usually holds several (a jackfruit, a guava and a longan are three
+ * plants, recorded three times). Anchoring the newest record's count would tell
+ * the chain a three-tree garden has one tree, and since `verifiedCountOf` feeds
+ * the title's supply and a pledge's survival threshold, that understatement
+ * propagates into how many shares exist and whether a sponsor's money releases.
+ *
+ * The rule mirrors the one CamboVerse renders from, so the twin and the chain
+ * cannot disagree: follow each `prev` chain back, treat a change of species as
+ * a different plant (the phone links a plot's records linearly regardless of
+ * what was measured), and sum the LATEST record of each chain.
+ */
+export function plotLiveCount(observations: GardenObservation[], plot: string): number {
+  const inPlot = observations.filter((o) => o.plot === plot);
+  if (!inPlot.length) return 0;
+
+  const byId = new Map(inPlot.map((o) => [o.id, o]));
+  const referenced = new Set<string>();
+  for (const o of inPlot) if (o.prev) referenced.add(o.prev);
+
+  const seen = new Set<string>();
+  let total = 0;
+  // A "tail" is a record nothing points back to — the newest in its chain.
+  for (const tail of inPlot.filter((o) => !referenced.has(o.id))) {
+    let cur: GardenObservation | undefined = tail;
+    let latest: GardenObservation | null = null;
+    while (cur && !seen.has(cur.id)) {
+      if (latest && cur.species !== latest.species) break; // a different plant
+      seen.add(cur.id);
+      latest = latest ?? cur;
+      cur = cur.prev ? byId.get(cur.prev) : undefined;
+    }
+    if (latest) total += Math.max(0, Math.floor(latest.count));
+  }
+  // Anything left over (a broken or cyclic prev link) is its own plant.
+  for (const o of inPlot) {
+    if (!seen.has(o.id)) {
+      seen.add(o.id);
+      total += Math.max(0, Math.floor(o.count));
+    }
+  }
+  return total;
+}
+
 /** Truncate to at most `max` UTF-8 bytes without splitting a character. */
 function truncateUtf8(text: string, max: number): string {
   const enc = new TextEncoder();

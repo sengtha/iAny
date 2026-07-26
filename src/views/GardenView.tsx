@@ -13,7 +13,7 @@ import {
   type GardenObservation,
   type Measure,
 } from '../../grove/web/store'
-import { anchorCall, readPlotStatus, type CsbPlotStatus } from '../../grove/core/csb'
+import { anchorCall, plotLiveCount, readPlotStatus, type CsbPlotStatus } from '../../grove/core/csb'
 
 /**
  * 🌳 Garden (/garden) — create **signed, verifiable** garden/tree observations on
@@ -73,6 +73,17 @@ export function GardenView() {
     return () => { stale = true }
   }, [csbBase, plotId, obs.length])
 
+  /**
+   * Living plants in this plot — what the chain means by `liveCount`.
+   *
+   * The plot's total, NOT the newest record's own count. A record covers one
+   * planting; a plot usually holds several, so anchoring the newest record's
+   * count alone would tell the chain a three-tree garden has one tree — and
+   * that number is what a title's supply and a pledge's survival threshold
+   * are read from.
+   */
+  const liveCount = useMemo(() => plotLiveCount(obs, plotId), [obs, plotId])
+
   /** Calldata for anchoring `newest`, chained onto whatever the chain holds now. */
   const anchor = useMemo(() => {
     if (!newest) return null
@@ -81,11 +92,11 @@ export function GardenView() {
     // that would fork a plot's history.
     const head = chain?.anchored ? chain.head?.observationId ?? null : null
     try {
-      return anchorCall({ ...newest, prev: head ? head.replace(/^0x/, '') : null })
+      return anchorCall({ ...newest, prev: head ? head.replace(/^0x/, '') : null }, { liveCount })
     } catch {
       return null
     }
-  }, [newest, chain])
+  }, [newest, chain, liveCount])
 
   const alreadyAnchored =
     !!newest && !!chain?.head && chain.head.observationId.replace(/^0x/, '') === newest.id
@@ -330,9 +341,21 @@ export function GardenView() {
           <>
             <p className="garden-chain-note">
               {km
-                ? 'ចម្លង calldata នេះទៅកាបូប CSB របស់អ្នក ដើម្បីចុះហត្ថលេខានិងផ្ញើ។ Gas ឥតគិតថ្លៃ។'
-                : 'Copy this calldata into your CSB wallet to sign and send it. Gas on CSB is free, so anchoring costs a signature.'}
+                ? 'បើកនៅ CSB ដើម្បីពិនិត្យ និងចុះហត្ថលេខាដោយកាបូបផ្ទាល់ខ្លួន។ Gas ឥតគិតថ្លៃ។'
+                : 'Open it on CSB to read what it commits and sign with your own wallet. Gas on CSB is free, so anchoring costs a signature.'}
             </p>
+            {/* Copying 330 characters of hex on a phone is a bad time, so the
+                primary path is a link that carries it. The calldata is not a
+                secret — it is the same public hash anyone can recompute from
+                the record — so putting it in a URL discloses nothing. */}
+            <a
+              className="voice-primary big garden-chain-sign"
+              href={`${csbBase.replace(/\/+$/, '')}/anchor.html?data=${anchor.data}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              ⛓ {km ? 'ចុះហត្ថលេខានៅ CSB' : 'Sign on CSB'}
+            </a>
             <div className="garden-chain-call">
               <code title={anchor.data}>{anchor.data.slice(0, 42)}…</code>
               <button
