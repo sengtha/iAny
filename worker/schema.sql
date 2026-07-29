@@ -96,6 +96,24 @@ CREATE TABLE IF NOT EXISTS sign_samples (
 CREATE INDEX IF NOT EXISTS idx_sign_created ON sign_samples (created_at);
 CREATE INDEX IF NOT EXISTS idx_sign_label ON sign_samples (label);
 
+-- Uploaded Khmer Sign Language videos (the /sign "Upload a video" mode). Unlike
+-- sign_samples (landmarks only, live capture), these are whole video files the
+-- contributor OWNS or has permission to share, paired with the Khmer text of what
+-- is signed. Video → R2 (sign-video/<yyyymmdd>/<id>.<ext>), metadata → here.
+CREATE TABLE IF NOT EXISTS sign_videos (
+  id          TEXT PRIMARY KEY,
+  r2_key      TEXT NOT NULL,          -- R2 object key: sign-video/<yyyymmdd>/<id>.<ext>
+  device      TEXT NOT NULL,          -- anonymous per-device id, e.g. g-3f9a2c71
+  label       TEXT NOT NULL,          -- the Khmer text/gloss of what is signed
+  mime        TEXT NOT NULL,          -- video/mp4, video/webm, …
+  bytes       INTEGER NOT NULL,       -- stored video size
+  credit_name TEXT,                   -- opt-in public credit (dataset contributors)
+  region      TEXT,                   -- optional province/dialect
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sign_videos_created ON sign_videos (created_at);
+CREATE INDEX IF NOT EXISTS idx_sign_videos_label ON sign_videos (label);
+
 -- Crowd-sourced crop photos (the /crop page). Each row is one (image, crop,
 -- condition) sample for training an open, offline crop-health classifier
 -- (MobileNetV3 — see docs/VISION-MOBILENET.md). The image lives in R2 at r2_key

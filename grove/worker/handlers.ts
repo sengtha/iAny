@@ -53,6 +53,7 @@ export async function handleGrove(url: URL, request: Request, env: GroveEnv): Pr
     })
   }
   try {
+    if (path === '' && request.method === 'GET') return await groveIndex(env)
     if (path === 'submit' && request.method === 'POST') return await groveSubmit(request, env)
     if (path === 'attest' && request.method === 'POST') return await groveAttest(request, env)
     if (path === 'stats' && request.method === 'GET') return await groveStats(env)
@@ -170,23 +171,51 @@ async function groveAttest(request: Request, env: GroveEnv): Promise<Response> {
   return json({ ok: true, id: a.id })
 }
 
+// Node root — a friendly JSON index so hitting the bare node URL returns data
+// (endpoints + live totals) instead of the app's HTML shell. This is the whole
+// self-describing surface of a Grove node.
+async function groveIndex(env: GroveEnv): Promise<Response> {
+  return new Response(
+    JSON.stringify({
+      name: 'grove-node',
+      spec: 'https://iany.app (grove/SPEC.md, grove/BRIDGE.md)',
+      endpoints: {
+        submit: 'POST /api/grove/submit',
+        attest: 'POST /api/grove/attest',
+        stats: 'GET /api/grove/stats',
+        feed: 'GET /api/grove/feed?since=<iso>&limit=<n>',
+        plot: 'GET /api/grove/plot/:plot',
+        observation: 'GET /api/grove/observation/:id',
+      },
+      stats: await statsTotals(env),
+    }),
+    { headers: { ...JSON_HEADERS, 'cache-control': 'public, max-age=30' } },
+  )
+}
+
 // Public aggregate — live totals for a dashboard's headline numbers.
 async function groveStats(env: GroveEnv): Promise<Response> {
+  return new Response(JSON.stringify(await statsTotals(env)), {
+    headers: { ...JSON_HEADERS, 'cache-control': 'public, max-age=30' },
+  })
+}
+
+// Shared totals query (used by both the node index and /stats).
+async function statsTotals(env: GroveEnv): Promise<{
+  observations: number; devices: number; plots: number; plants: number; co2Kg: number
+}> {
   const row = await env.DB.prepare(
     `SELECT COUNT(*) AS observations, COUNT(DISTINCT device) AS devices,
             COUNT(DISTINCT plot) AS plots, COALESCE(SUM(count), 0) AS plants,
             COALESCE(SUM(co2_kg), 0) AS co2Kg FROM grove_observations`,
   ).first<{ observations: number; devices: number; plots: number; plants: number; co2Kg: number }>()
-  return new Response(
-    JSON.stringify({
-      observations: row?.observations ?? 0,
-      devices: row?.devices ?? 0,
-      plots: row?.plots ?? 0,
-      plants: row?.plants ?? 0,
-      co2Kg: Math.round((row?.co2Kg ?? 0) * 100) / 100,
-    }),
-    { headers: { ...JSON_HEADERS, 'cache-control': 'public, max-age=30' } },
-  )
+  return {
+    observations: row?.observations ?? 0,
+    devices: row?.devices ?? 0,
+    plots: row?.plots ?? 0,
+    plants: row?.plants ?? 0,
+    co2Kg: Math.round((row?.co2Kg ?? 0) * 100) / 100,
+  }
 }
 
 // Public feed: recent verified observations, newest first. GPS is coarsened to

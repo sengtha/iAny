@@ -2174,6 +2174,56 @@ progress {
   margin: 10px 0 4px;
 }
 
+/* /sign — mode toggle (record live vs upload a video) */
+.sign-modetabs {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+.sign-modetab {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--fg-muted);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sign-modetab.active {
+  border-color: var(--accent);
+  color: var(--fg);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+}
+
+/* /sign — video upload picker + preview */
+.sign-filepick {
+  display: block;
+  margin: 14px 0 10px;
+  padding: 18px 14px;
+  border: 1.5px dashed var(--border);
+  border-radius: 14px;
+  text-align: center;
+  color: var(--fg-muted);
+  font-weight: 600;
+  cursor: pointer;
+}
+.sign-filepick:hover {
+  border-color: var(--accent);
+  color: var(--fg);
+}
+.sign-filepick input {
+  display: none;
+}
+.sign-uploadpreview {
+  width: 100%;
+  max-height: 320px;
+  border-radius: 14px;
+  background: #000;
+  margin: 0 0 10px;
+}
+
 /* iAny Trace (/trace) — proof of origin trust score */
 /* Two big, plain choices — a maker vs. a buyer — instead of a row of tabs. */
 .trace-modes {
