@@ -96,7 +96,11 @@ export const CARBON_FRACTION = 0.47
 export const CO2_PER_C = 3.6667
 /** Fallback wood density g/cm³ when species is unknown. */
 export const DEFAULT_WOOD_DENSITY = 0.6
-/** A few common Cambodian garden species (g/cm³). Extend freely. */
+/**
+ * Common Cambodian garden species (g/cm³, approximate basic specific gravity —
+ * average published values per species, not a per-tree measurement). Extend freely;
+ * keys must match the species ids in src/views/GardenView.tsx's SPECIES_LIST.
+ */
 export const WOOD_DENSITY: Record<string, number> = {
   mango: 0.52,
   jackfruit: 0.6,
@@ -105,7 +109,26 @@ export const WOOD_DENSITY: Record<string, number> = {
   tamarind: 0.8,
   longan: 0.62,
   guava: 0.66,
-  // herbaceous (banana, papaya) → tiny woody biomass; see estimateCarbon()
+  banana: 0.3, // herbaceous pseudostem, mostly water
+  rambutan: 0.6,
+  durian: 0.4,
+  papaya: 0.2, // soft, pithy, hollow stem
+  pomelo: 0.7,
+  lime: 0.7,
+  'star-fruit': 0.55,
+  'sugar-apple': 0.45,
+  soursop: 0.4,
+  sapodilla: 0.95,
+  mangosteen: 0.75,
+  avocado: 0.5,
+  neem: 0.65,
+  banyan: 0.45,
+  bodhi: 0.45,
+  'sugar-palm': 0.7,
+  'areca-palm': 0.45,
+  rubber: 0.55,
+  lychee: 0.7,
+  cashew: 0.45,
 }
 
 /* -------------------------------------------------------- canonical + hash --- */
