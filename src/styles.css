@@ -1900,6 +1900,55 @@ progress {
   color: var(--accent-fg);
 }
 
+/* Species combobox (/garden) — searchable, filters as you type in either language */
+.species-combo {
+  position: relative;
+}
+.species-combo-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--bg-soft);
+  border: 1px solid var(--bg-softer);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  padding: 4px;
+}
+.species-combo-panel button {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.92rem;
+  min-height: 0;
+}
+.species-combo-panel button.active {
+  background: var(--accent);
+  color: var(--accent-fg);
+}
+.species-combo-panel button small {
+  color: var(--fg-muted);
+  font-style: italic;
+}
+.species-combo-panel button.active small {
+  color: inherit;
+  opacity: 0.85;
+}
+.species-combo-empty {
+  padding: 8px 10px;
+  font-size: 0.85rem;
+  color: var(--fg-muted);
+}
+
 /* Health surfaces (/health, /health-test) — disclaimer + topic cards */
 .health-disclaimer {
   margin: 0 0 14px;
