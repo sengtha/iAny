@@ -12,9 +12,12 @@ import {
   deviceId,
   EMPTY_SIGN_PROFILE,
   fetchSignStats,
+  isSupportedSignVideo,
   loadSignProfile,
   saveSignProfile,
+  SIGN_VIDEO_MAX_BYTES,
   uploadSample,
+  uploadSignVideo,
   type SignProfile,
   type SignStats,
 } from '../lib/signContribute'
@@ -40,25 +43,65 @@ export function ContributeSignView() {
   const [profile, setProfile] = useState<SignProfile>(loadSignProfile)
   const [started, setStarted] = useState(false)
   const [stats, setStats] = useState<SignStats | null>(null)
+  const [mode, setMode] = useState<'record' | 'upload'>('record')
 
   useEffect(() => {
     void fetchSignStats().then(setStats)
   }, [])
 
-  if (!started || !profile.consent) {
-    return (
-      <ConsentGate
-        profile={profile}
-        stats={stats}
-        onStart={(p) => {
-          saveSignProfile(p)
-          setProfile(p)
-          setStarted(true)
-        }}
-      />
-    )
-  }
-  return <Recorder profile={profile} stats={stats} onStats={setStats} />
+  return (
+    <>
+      <ModeTabs mode={mode} onMode={setMode} />
+      {mode === 'upload' ? (
+        <VideoUploader
+          profile={profile}
+          stats={stats}
+          onStats={setStats}
+          onProfile={(p) => {
+            saveSignProfile(p)
+            setProfile(p)
+          }}
+        />
+      ) : !started || !profile.consent ? (
+        <ConsentGate
+          profile={profile}
+          stats={stats}
+          onStart={(p) => {
+            saveSignProfile(p)
+            setProfile(p)
+            setStarted(true)
+          }}
+        />
+      ) : (
+        <Recorder profile={profile} stats={stats} onStats={setStats} />
+      )}
+    </>
+  )
+}
+
+/** Two ways to contribute: record live (landmarks) or upload an owned video. */
+function ModeTabs({ mode, onMode }: { mode: 'record' | 'upload'; onMode: (m: 'record' | 'upload') => void }) {
+  const { t } = useI18n()
+  return (
+    <div className="sign-modetabs" role="tablist">
+      <button
+        role="tab"
+        aria-selected={mode === 'record'}
+        className={`sign-modetab ${mode === 'record' ? 'active' : ''}`}
+        onClick={() => onMode('record')}
+      >
+        🎥 {t('signModeRecord')}
+      </button>
+      <button
+        role="tab"
+        aria-selected={mode === 'upload'}
+        className={`sign-modetab ${mode === 'upload' ? 'active' : ''}`}
+        onClick={() => onMode('upload')}
+      >
+        ⬆️ {t('signModeUpload')}
+      </button>
+    </div>
+  )
 }
 
 /* -------------------------------------------------------------------------- */
@@ -138,6 +181,184 @@ function ConsentGate({
         onClick={() => onStart(draft)}
       >
         {t('signStart')}
+      </button>
+      <p className="voice-anon">
+        {t('voiceAnon')}: {deviceId()}
+      </p>
+    </div>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Upload mode — donate a Khmer Sign Language video you OWN or have permission to
+ * share, with its Khmer text. Unlike live recording (landmarks only), the actual
+ * video is stored, so this carries its own explicit rights consent.
+ */
+function VideoUploader({
+  profile,
+  stats,
+  onStats,
+  onProfile,
+}: {
+  profile: SignProfile
+  stats: SignStats | null
+  onStats: (s: SignStats | null) => void
+  onProfile: (p: SignProfile) => void
+}) {
+  const { t } = useI18n()
+  const [file, setFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState('')
+  const [label, setLabel] = useState('')
+  const [creditName, setCreditName] = useState(profile.creditName)
+  const [region, setRegion] = useState(profile.region)
+  const [consent, setConsent] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [done, setDone] = useState(0)
+
+  // Revoke the object URL when it changes or the component unmounts.
+  useEffect(() => () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl)
+  }, [previewUrl])
+
+  function pick(f: File | null) {
+    setError('')
+    setPreviewUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev)
+      return ''
+    })
+    if (!f) {
+      setFile(null)
+      return
+    }
+    if (!isSupportedSignVideo(f)) {
+      setError(t('signUploadNotVideo'))
+      setFile(null)
+      return
+    }
+    if (f.size > SIGN_VIDEO_MAX_BYTES) {
+      setError(t('signUploadTooLarge'))
+      setFile(null)
+      return
+    }
+    setFile(f)
+    setPreviewUrl(URL.createObjectURL(f))
+  }
+
+  async function submit() {
+    if (!file || !label.trim()) {
+      setError(t('signUploadEmpty'))
+      return
+    }
+    if (!consent) {
+      setError(t('signUploadNeedConsent'))
+      return
+    }
+    setBusy(true)
+    setError('')
+    try {
+      await uploadSignVideo(file, label.trim(), { consent, creditName, region })
+      // Remember credit/region for the next upload (keep the record-mode consent).
+      onProfile({ consent: profile.consent, creditName, region })
+      if (stats) onStats({ ...stats, videos: (stats.videos ?? 0) + 1 })
+      setDone((c) => c + 1)
+      setLabel('')
+      pick(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('signUploadFailed'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="contribute">
+      <h2 className="contribute-title">⬆️ {t('signUploadTitle')}</h2>
+      <p className="contribute-lead">{t('signUploadLead')}</p>
+
+      {stats && (stats.videos ?? 0) > 0 ? (
+        <div className="voice-stats">
+          <b>{(stats.videos ?? 0).toLocaleString()}</b> {t('signStatVideos')}
+          {done > 0 ? (
+            <>
+              {' · '}
+              <b>{done}</b> {t('signDoneCount')}
+            </>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className="voice-openbox">
+        <div className="voice-openrow">📼 {t('signUploadPrivacy')}</div>
+        <div className="voice-openrow">🗂️ {t('signOpenData')}</div>
+        <div className="voice-openrow">🏅 {t('voiceOpenCredit')}</div>
+        <div className="voice-openrow">🆓 {t('signOpenModel')}</div>
+      </div>
+
+      <label className="sign-filepick">
+        <input
+          type="file"
+          accept="video/*"
+          onChange={(e) => pick(e.target.files?.[0] ?? null)}
+        />
+        <span>{file ? `🎬 ${file.name}` : `📁 ${t('signUploadPick')}`}</span>
+      </label>
+
+      {previewUrl ? (
+        <video className="sign-uploadpreview" src={previewUrl} controls playsInline />
+      ) : null}
+
+      <fieldset className="voice-fields">
+        <label className="voice-field">
+          <span>{t('signUploadLabel')}</span>
+          <input
+            type="text"
+            lang="km"
+            value={label}
+            maxLength={200}
+            placeholder={t('signUploadLabelPlaceholder')}
+            onChange={(e) => setLabel(e.target.value)}
+          />
+          <small>{t('signUploadLabelHint')}</small>
+        </label>
+        <label className="voice-field">
+          <span>{t('voiceCreditName')}</span>
+          <input
+            type="text"
+            value={creditName}
+            maxLength={60}
+            placeholder={t('voiceCreditPlaceholder')}
+            onChange={(e) => setCreditName(e.target.value)}
+          />
+        </label>
+        <label className="voice-field">
+          <span>{t('voiceRegion')}</span>
+          <input
+            type="text"
+            value={region}
+            maxLength={40}
+            placeholder={t('voiceRegionPlaceholder')}
+            onChange={(e) => setRegion(e.target.value)}
+          />
+        </label>
+      </fieldset>
+
+      <label className="voice-consent">
+        <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
+        <span>{t('signUploadConsent')}</span>
+      </label>
+
+      {error ? <p className="voice-error">{error}</p> : null}
+      {done > 0 && !error ? <p className="sign-review-note">✅ {t('signUploadDone')}</p> : null}
+
+      <button
+        className="voice-primary big"
+        disabled={busy || !file || !label.trim() || !consent}
+        onClick={submit}
+      >
+        {busy ? `${t('voiceUploading')}…` : `⬆️ ${t('signUploadSubmit')}`}
       </button>
       <p className="voice-anon">
         {t('voiceAnon')}: {deviceId()}

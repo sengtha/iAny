@@ -450,6 +450,27 @@ export const en = {
   signReviewNote: 'Review your gesture, then submit or redo.',
   signUploadFailed: 'Could not save. Check your connection and try again.',
   signHint: 'Tip: sign at a natural speed, keep your hand fully inside the frame.',
+  // /sign — "Upload a video" mode (donate an owned KSL video + its Khmer text)
+  signModeRecord: 'Record live',
+  signModeUpload: 'Upload a video',
+  signUploadTitle: 'Upload a signed video',
+  signUploadLead:
+    'Have a Khmer Sign Language video you own or have permission to share? Add it with its Khmer text so it can join the open dataset.',
+  signStatVideos: 'videos',
+  signUploadPrivacy:
+    'Unlike live recording, an uploaded video is stored as-is. Only upload videos you own or have permission to share.',
+  signUploadPick: 'Choose a video',
+  signUploadLabel: 'Khmer text (what is signed)',
+  signUploadLabelPlaceholder: 'e.g. សួស្តី',
+  signUploadLabelHint: 'The word, phrase, or sentence shown in the video.',
+  signUploadConsent:
+    'I own this video or have permission to share it, and I agree it can be released as part of an open Khmer Sign Language dataset and used to train and share a free model.',
+  signUploadSubmit: 'Upload video',
+  signUploadEmpty: 'Choose a video and enter its Khmer text.',
+  signUploadNeedConsent: 'Please confirm you have the right to share this video.',
+  signUploadTooLarge: 'Video is too large (max 64 MB). Trim or compress it and try again.',
+  signUploadNotVideo: 'Please choose a video file (mp4, webm, mov…).',
+  signUploadDone: 'Thank you! Your video was added to the dataset.',
 }
 
 export type Translation = typeof en

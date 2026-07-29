@@ -70,6 +70,23 @@ by `scripts/copy-ort.mjs` (runs before dev/build), so it's served same-origin to
   credit field.
 - Delete any sample: `DELETE /api/sign/admin/sample/<id>` with the admin token.
 
+### Two ways to contribute
+`/sign` has a mode toggle at the top:
+
+1. **Record live** (default) — the on-device hand tracker records **landmarks
+   only, never the video** (`POST /api/sign/sample`, JSON → `sign_samples`). Tiny
+   and identity-free.
+2. **Upload a video** — for contributors who **own or have permission to share**
+   an existing Khmer Sign Language clip, paired with its Khmer text. The **actual
+   video** is streamed to R2 (`POST /api/sign/video`, ≤ 64 MB, mp4/webm/mov/mkv/3gp)
+   and metadata → `sign_videos`. This mode carries its own explicit rights
+   consent, since unlike mode 1 the video is stored as-is.
+
+Both modes need the schema migration above (the `sign_videos` table was added
+alongside `sign_samples`). Admin for uploaded videos mirrors samples:
+- List: `GET /api/sign/admin/videos` · download: `GET /api/sign/admin/video/<id>`
+- Delete: `DELETE /api/sign/admin/video/<id>` (all with the admin token).
+
 ## Exporting the dataset
 The token is the Worker's `RADIO_ADMIN_TOKEN` secret:
 
