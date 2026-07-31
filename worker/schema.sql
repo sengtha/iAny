@@ -321,6 +321,39 @@ CREATE TABLE IF NOT EXISTS trace_attestations (
 );
 CREATE INDEX IF NOT EXISTS idx_trace_attest ON trace_attestations (id);
 
+-- Companion custody layer — supply-chain actors (delivery, warehouse, exporter)
+-- join the proof with device-SIGNED events, verified on ingest (ECDSA-P256).
+-- Canonical schema + docs live in trace/worker/schema.sql and trace/core/companion.ts;
+-- duplicated here so iAny's D1 migration creates them.
+CREATE TABLE IF NOT EXISTS trace_custody (
+  id          TEXT PRIMARY KEY,      -- SHA-256 of the signed record (dedupe key)
+  capsule     TEXT NOT NULL,         -- product capsule id this event is about
+  actor_key   TEXT NOT NULL,         -- signer (staff) public key (base64url P-256)
+  actor_name  TEXT,                  -- self-declared signer name
+  role        TEXT NOT NULL,         -- carrier / warehouse / exporter / …
+  event_type  TEXT NOT NULL,         -- pickup / in_transit / store / handoff / …
+  company_key TEXT,                  -- company root key (from a valid delegation)
+  lat         REAL,
+  lng         REAL,
+  claimed_at  TEXT,
+  note        TEXT,
+  raw         TEXT NOT NULL,         -- exact signed JSON (re-verifiable)
+  created_at  TEXT NOT NULL          -- server first-seen (trusted)
+);
+CREATE INDEX IF NOT EXISTS idx_trace_custody_capsule ON trace_custody (capsule);
+CREATE INDEX IF NOT EXISTS idx_trace_custody_company ON trace_custody (company_key);
+
+CREATE TABLE IF NOT EXISTS trace_partners (
+  company_key TEXT PRIMARY KEY,      -- company root public key (base64url P-256)
+  name        TEXT NOT NULL,
+  logo        TEXT,
+  region      TEXT,
+  verified    INTEGER NOT NULL DEFAULT 0,  -- operator flips to 1 after vetting
+  raw         TEXT NOT NULL,
+  created_at  TEXT NOT NULL,
+  updated_at  TEXT NOT NULL
+);
+
 -- Grove — the open, decentralized garden-carbon network (/garden). The user's
 -- phone signs each observation on-device (the source of truth); iany.app runs a
 -- reference NODE that re-verifies every signature before storing and serves

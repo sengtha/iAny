@@ -2155,6 +2155,76 @@ progress {
   margin: 0 0 10px;
 }
 
+/* /custody — Trace companion console */
+.custody-badge {
+  margin: 10px 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+.custody-badge.self {
+  background: color-mix(in srgb, var(--fg-muted) 12%, var(--surface));
+  color: var(--fg-muted);
+}
+.custody-badge.company {
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  color: var(--fg);
+}
+.custody-key {
+  width: 100%;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.78rem;
+  word-break: break-all;
+  resize: vertical;
+}
+.custody-timeline {
+  margin-top: 18px;
+}
+.custody-timeline-h {
+  font-size: 1rem;
+  margin: 0 0 8px;
+}
+.custody-row {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: var(--surface);
+}
+.custody-row-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+}
+.custody-row-sub {
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+  margin-top: 3px;
+}
+.custody-row-note {
+  font-size: 0.85rem;
+  margin-top: 4px;
+}
+.custody-tag {
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--fg-muted) 15%, var(--surface));
+  color: var(--fg-muted);
+}
+.custody-tag.ok {
+  background: color-mix(in srgb, var(--accent) 20%, var(--surface));
+  color: var(--fg);
+}
+.custody-tag.self {
+  font-weight: 500;
+}
+
 /* iAny Trace (/trace) — proof of origin trust score */
 /* Two big, plain choices — a maker vs. a buyer — instead of a row of tabs. */
 .trace-modes {

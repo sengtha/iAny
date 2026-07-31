@@ -50,6 +50,9 @@ export function TraceApp({ ocr, stt, matcher }: TraceCaps) {
                'ករណីប្រើប្រាស់ផ្អែកលើ iAny — AI ខ្មែរ ក្រៅបណ្ដាញ លើឧបករណ៍ ជាមួយសហគមន៍ សម្រាប់សហគមន៍។')}
           </p>
           <div className="trace-foot-links">
+            <a href="/custody">🚚 {L('For delivery / warehouse partners', 'សម្រាប់ដៃគូដឹកជញ្ជូន / ឃ្លាំង')}</a>
+          </div>
+          <div className="trace-foot-links">
             <a href={IANY_URL}>iAny</a>
             <a href={GITHUB_URL} target="_blank" rel="noreferrer">GitHub</a>
             <span>Apache-2.0</span>

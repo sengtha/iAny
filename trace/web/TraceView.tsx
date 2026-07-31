@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTraceCaps } from './context'
 import type { SttState } from './adapters'
+import { fetchCustody, type CustodyItem } from './companion'
 import {
   addAttestation,
   capsuleId,
@@ -705,6 +706,8 @@ function ProvenancePage({
           </div>
         )}
 
+        <CustodyChain id={id} L={L} />
+
         <button className="voice-primary big" onClick={() => setVerifying(true)}>
           ✓ {L('Verify this product yourself', 'ផ្ទៀងផ្ទាត់ផលិតផលនេះដោយខ្លួនឯង')}
         </button>
@@ -716,6 +719,44 @@ function ProvenancePage({
              'នេះជារឿងប្រភពដែលបានផ្សាយដោយខ្លួនឯង ព្រងឹងដោយសាក្សីខាងលើ។ សូមផ្ទៀងផ្ទាត់ដោយប៊ូតុង។')}
         </p>
       </div>
+    </div>
+  )
+}
+
+/**
+ * Chain of custody — supply-chain actors (delivery/warehouse/exporter) who
+ * signed handoff events for this capsule. Read-only; each is resolved to its
+ * company (verified badge) or shown as a self-claim. Empty → nothing rendered.
+ */
+function CustodyChain({ id, L }: { id: string; L: LFn }) {
+  const [items, setItems] = useState<CustodyItem[] | null>(null)
+  useEffect(() => {
+    void fetchCustody(id).then(setItems)
+  }, [id])
+  if (!items || items.length === 0) return null
+  return (
+    <div className="custody-timeline">
+      <h3 className="custody-timeline-h">🚚 {L('Chain of custody', 'ខ្សែសង្វាក់ចរាចរណ៍')}</h3>
+      {items.map((it) => (
+        <div className="custody-row" key={it.id}>
+          <div className="custody-row-top">
+            <b>{it.event}</b> · {it.role}
+            {it.company ? (
+              <span className={`custody-tag ${it.company.verified ? 'ok' : ''}`}>
+                {it.company.verified ? '✓ ' : ''}{it.company.name}
+              </span>
+            ) : (
+              <span className="custody-tag self">{L('self-claimed', 'ដោយខ្លួនឯង')}</span>
+            )}
+          </div>
+          <div className="custody-row-sub">
+            {it.actorName ? `${it.actorName} · ` : ''}
+            {new Date(it.createdAt).toLocaleString()}
+            {it.lat != null ? ` · ~${it.lat.toFixed(2)}, ${it.lng?.toFixed(2)}` : ''}
+          </div>
+          {it.note ? <div className="custody-row-note">{it.note}</div> : null}
+        </div>
+      ))}
     </div>
   )
 }

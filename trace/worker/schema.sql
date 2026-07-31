@@ -39,3 +39,40 @@ CREATE TABLE IF NOT EXISTS trace_attestations (
   created_at  TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_trace_attest ON trace_attestations (id);
+
+-- Companion custody layer — supply-chain actors (delivery, warehouse, exporter)
+-- join the proof with device-SIGNED events. Verified on ingest (ECDSA-P256).
+-- See ../core/companion.ts. `company_key` is filled only when a valid, bound
+-- delegation was present (else the event is "self-claimed").
+CREATE TABLE IF NOT EXISTS trace_custody (
+  id          TEXT PRIMARY KEY,      -- SHA-256 of the signed record (dedupe key)
+  capsule     TEXT NOT NULL,         -- product capsule id this event is about
+  actor_key   TEXT NOT NULL,         -- signer (staff) public key (base64url P-256)
+  actor_name  TEXT,                  -- self-declared signer name
+  role        TEXT NOT NULL,         -- carrier / warehouse / exporter / …
+  event_type  TEXT NOT NULL,         -- pickup / in_transit / store / handoff / …
+  company_key TEXT,                  -- company root key (from a valid delegation)
+  lat         REAL,                  -- as-signed GPS (coarsened on the public feed)
+  lng         REAL,
+  claimed_at  TEXT,                  -- signer-claimed time (untrusted)
+  note        TEXT,
+  raw         TEXT NOT NULL,         -- exact signed JSON (re-verifiable / federatable)
+  created_at  TEXT NOT NULL          -- server first-seen (trusted)
+);
+CREATE INDEX IF NOT EXISTS idx_trace_custody_capsule ON trace_custody (capsule);
+CREATE INDEX IF NOT EXISTS idx_trace_custody_company ON trace_custody (company_key);
+
+-- Partner registry — resolves a company ROOT key → public name / logo. Rows are
+-- self-asserted (signed by the root key, so only its owner can claim a name);
+-- `verified` is flipped to 1 by an operator after vetting (the "verify names
+-- later" half of the hybrid). Staff resolve to a company via their delegation.
+CREATE TABLE IF NOT EXISTS trace_partners (
+  company_key TEXT PRIMARY KEY,      -- company root public key (base64url P-256)
+  name        TEXT NOT NULL,
+  logo        TEXT,                  -- data: URI or URL (small)
+  region      TEXT,
+  verified    INTEGER NOT NULL DEFAULT 0,
+  raw         TEXT NOT NULL,         -- the signed registration (re-verifiable)
+  created_at  TEXT NOT NULL,
+  updated_at  TEXT NOT NULL
+);
