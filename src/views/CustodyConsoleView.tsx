@@ -6,6 +6,7 @@ import {
   clearDelegation,
   fetchCustody,
   fetchHandoffOffer,
+  fetchHandoffStatus,
   fetchPartner,
   fetchRevocations,
   getStaffKey,
@@ -102,8 +103,22 @@ function HandoffSend({ km }: { km: boolean }) {
   const [name, setName] = useState('')
   const [gps, setGps] = useState<{ lat: number; lng: number; acc?: number } | null>(null)
   const [code, setCode] = useState('')
+  const [received, setReceived] = useState<{ by: string | null; at: string | null } | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+
+  // Once a code is live, poll until the customer confirms receipt (POD loop).
+  useEffect(() => {
+    if (!code || received) return
+    let stop = false
+    const id = window.setInterval(async () => {
+      const s = await fetchHandoffStatus(code)
+      if (stop) return
+      if (s.status === 'received') { setReceived({ by: s.receivedBy ?? null, at: s.at ?? null }); window.clearInterval(id) }
+      else if (s.status === 'expired' || s.status === 'notfound') window.clearInterval(id)
+    }, 4000)
+    return () => { stop = true; window.clearInterval(id) }
+  }, [code, received])
 
   function locate() {
     navigator.geolocation?.getCurrentPosition(
@@ -126,6 +141,23 @@ function HandoffSend({ km }: { km: boolean }) {
     }
   }
 
+  if (received) {
+    return (
+      <div className="handoff-codebox">
+        <div className="handoff-received">✓ {km ? 'បានទទួល' : 'Received'}</div>
+        <p className="sign-review-note">
+          {received.by ? `${km ? 'ដោយ' : 'by'} ${received.by} · ` : ''}
+          {received.at ? new Date(received.at).toLocaleString() : ''}
+        </p>
+        <p className="voice-minor-note">
+          {km ? 'ភ័ស្តុតាងនៃការប្រគល់ត្រូវបានចុះហត្ថលេខា និងកត់ត្រា។' : 'Proof of delivery is signed and recorded.'}
+        </p>
+        <button className="voice-ghost" onClick={() => { setReceived(null); setCode(''); setCapsule('') }}>
+          ↺ {km ? 'ការប្រគល់ថ្មី' : 'New handoff'}
+        </button>
+      </div>
+    )
+  }
   if (code) {
     const link = `${location.origin}/custody?h=${code}`
     return (
@@ -133,6 +165,9 @@ function HandoffSend({ km }: { km: boolean }) {
         <p>{km ? 'អ្នកទទួលស្កេន QR ឬបញ្ចូលលេខកូដ៖' : 'Receiver scans the QR, or enters the code:'}</p>
         <div className="handoff-qr" dangerouslySetInnerHTML={{ __html: qrSvg(link) }} />
         <div className="handoff-code">{code}</div>
+        <p className="voice-minor-note handoff-waiting">
+          ⏳ {km ? 'កំពុងរង់ចាំការបញ្ជាក់ពីអ្នកទទួល…' : 'Waiting for the receiver to confirm…'}
+        </p>
         <p className="voice-minor-note">{km ? 'មានសុពលភាព ១ ម៉ោង · ប្រើបានតែម្តង' : 'Valid 1 hour · single use'}</p>
         <button className="voice-ghost" onClick={() => { setCode(''); setCapsule('') }}>
           ↺ {km ? 'ការប្រគល់ថ្មី' : 'New handoff'}
@@ -301,7 +336,7 @@ function HandoffReceive({ km, deepCode }: { km: boolean; deepCode: string | null
               📍 {gps ? `${gps.lat.toFixed(3)}, ${gps.lng.toFixed(3)}` : (km ? 'ភ្ជាប់ទីតាំង' : 'Add location')}
             </button>
             <button className="voice-primary big" onClick={accept} disabled={busy}>
-              {busy ? '…' : `✍️ ${km ? 'ចុះហត្ថលេខាទទួល' : 'Sign receipt'}`}
+              {busy ? '…' : `✓ ${km ? 'បញ្ជាក់ថាបានទទួល' : 'Confirm I received this'}`}
             </button>
           </div>
         </>

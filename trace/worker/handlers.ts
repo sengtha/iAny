@@ -100,6 +100,7 @@ export async function serveTrace(url: URL, request: Request, env: TraceEnv): Pro
       const code = slash === -1 ? rest : rest.slice(0, slash)
       const action = slash === -1 ? '' : rest.slice(slash + 1)
       if (action === 'accept' && request.method === 'POST') return await traceHandoffAccept(code, request, env)
+      if (action === 'status' && request.method === 'GET') return await traceHandoffStatus(code, env)
       if (action === '' && request.method === 'GET') return await traceHandoffGet(code, env)
     }
     return json({ error: 'not found' }, 404)
@@ -435,14 +436,27 @@ async function traceHandoffOffer(request: Request, env: TraceEnv): Promise<Respo
 async function traceHandoffGet(code: string, env: TraceEnv): Promise<Response> {
   if (!HANDOFF_CODE_RE.test(code)) return json({ error: 'bad code' }, 400)
   const row = await env.DB.prepare(
-    'SELECT raw_release AS raw, expires_at AS expiresAt FROM trace_handoff_pending WHERE code = ?',
-  ).bind(code).first<{ raw: string; expiresAt: string }>()
+    'SELECT raw_release AS raw, status, expires_at AS expiresAt FROM trace_handoff_pending WHERE code = ?',
+  ).bind(code).first<{ raw: string; status: string; expiresAt: string }>()
   if (!row) return json({ error: 'not found' }, 404)
+  if (row.status === 'received') return json({ error: 'already received' }, 410)
   if (Date.parse(row.expiresAt) < Date.now()) {
     await env.DB.prepare('DELETE FROM trace_handoff_pending WHERE code = ?').bind(code).run()
     return json({ error: 'expired' }, 410)
   }
   return json({ release: JSON.parse(row.raw) })
+}
+
+// Sender polls this to close the proof-of-delivery loop: pending until the
+// receiver signs, then 'received' with who confirmed and when.
+async function traceHandoffStatus(code: string, env: TraceEnv): Promise<Response> {
+  if (!HANDOFF_CODE_RE.test(code)) return json({ error: 'bad code' }, 400)
+  const row = await env.DB.prepare(
+    'SELECT status, to_name AS receivedBy, completed_at AS at, expires_at AS expiresAt FROM trace_handoff_pending WHERE code = ?',
+  ).bind(code).first<{ status: string; receivedBy: string | null; at: string | null; expiresAt: string }>()
+  if (!row) return json({ status: 'notfound' })
+  if (row.status !== 'received' && Date.parse(row.expiresAt) < Date.now()) return json({ status: 'expired' })
+  return json({ status: row.status, receivedBy: row.receivedBy, at: row.at })
 }
 
 // Receiver counter-signs a RECEIPT. We verify the pair, write two custody rows
@@ -459,9 +473,10 @@ async function traceHandoffAccept(code: string, request: Request, env: TraceEnv)
   if (!TRACE_KEY_RE.test(String(rec.to ?? ''))) return json({ error: 'bad receiver key' }, 400)
 
   const row = await env.DB.prepare(
-    'SELECT raw_release AS raw, expires_at AS expiresAt FROM trace_handoff_pending WHERE code = ?',
-  ).bind(code).first<{ raw: string; expiresAt: string }>()
+    'SELECT raw_release AS raw, status, expires_at AS expiresAt FROM trace_handoff_pending WHERE code = ?',
+  ).bind(code).first<{ raw: string; status: string; expiresAt: string }>()
   if (!row) return json({ error: 'not found' }, 404)
+  if (row.status === 'received') return json({ error: 'already received' }, 409)
   if (Date.parse(row.expiresAt) < Date.now()) {
     await env.DB.prepare('DELETE FROM trace_handoff_pending WHERE code = ?').bind(code).run()
     return json({ error: 'expired' }, 410)
@@ -500,7 +515,13 @@ async function traceHandoffAccept(code: string, request: Request, env: TraceEnv)
     cg ? Number(cg.lat) : null, cg ? Number(cg.lng) : null, String(rec.at ?? '').slice(0, 40),
     `↳ received from ${rel.from.slice(0, 8)}…`, recRaw, now,
   ).run()
-  await env.DB.prepare('DELETE FROM trace_handoff_pending WHERE code = ?').bind(code).run()
+  // Keep the row as the sender's proof-of-delivery receipt (24h), not deleted.
+  const keepUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+  await env.DB.prepare(
+    `UPDATE trace_handoff_pending
+        SET status = 'received', to_name = ?, completed_at = ?, expires_at = ?
+      WHERE code = ?`,
+  ).bind(String(rec.toName ?? '').slice(0, 80) || null, now, keepUntil, code).run()
 
   return json({ ok: true, capsule: rel.capsule, fromCompany, toCompany })
 }

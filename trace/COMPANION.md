@@ -83,6 +83,14 @@ asymmetric so **no key pre-exchange** is needed:
 
 Both cover the same `capsule + from + nonce`, so the pair is cryptographically
 bound — a receipt can't be reused for another item, counterparty, or handoff.
+
+**Proof of delivery (POD).** For last-mile delivery the *receiver* is often the
+end customer, not enrolled staff — they just confirm receipt (self-claimed, no
+key setup). The loop is closed for the **sender**: after publishing the code the
+delivery screen polls `GET /handoff/:code/status` and flips to **"✓ Received by
+[name] · [time]"** once the customer confirms. The signed receipt is the durable
+proof; the row is kept 24 h so the driver can show the confirmation. The code is
+single-use — a second accept returns 409.
 On completion the node writes the two custody rows, so the handoff shows up in
 the same `/custody/:capsule` timeline (sender = `handoff`, receiver = `pickup`),
 each attributed to its company via its delegation. Verify a completed pair

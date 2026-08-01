@@ -358,15 +358,22 @@ CREATE TABLE IF NOT EXISTS trace_partners (
 -- code until the receiver counter-signs a RECEIPT; then two trace_custody rows
 -- are written and this row is deleted. Short-lived, single-use.
 CREATE TABLE IF NOT EXISTS trace_handoff_pending (
-  code        TEXT PRIMARY KEY,
-  capsule     TEXT NOT NULL,
-  from_key    TEXT NOT NULL,
-  nonce       TEXT NOT NULL,
-  raw_release TEXT NOT NULL,
-  expires_at  TEXT NOT NULL,
-  created_at  TEXT NOT NULL
+  code         TEXT PRIMARY KEY,
+  capsule      TEXT NOT NULL,
+  from_key     TEXT NOT NULL,
+  nonce        TEXT NOT NULL,
+  raw_release  TEXT NOT NULL,
+  status       TEXT NOT NULL DEFAULT 'pending', -- pending | received (proof of delivery)
+  to_name      TEXT,
+  completed_at TEXT,
+  expires_at   TEXT NOT NULL,
+  created_at   TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_trace_handoff_expires ON trace_handoff_pending (expires_at);
+-- Migration for a DB that already created this table (safe to run once):
+--   ALTER TABLE trace_handoff_pending ADD COLUMN status TEXT NOT NULL DEFAULT 'pending';
+--   ALTER TABLE trace_handoff_pending ADD COLUMN to_name TEXT;
+--   ALTER TABLE trace_handoff_pending ADD COLUMN completed_at TEXT;
 
 -- Revocations (Phase 3): a company root revokes a staff key before its
 -- delegation expires; on ingest the node drops that staff's company attribution.

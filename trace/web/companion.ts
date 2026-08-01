@@ -252,6 +252,23 @@ export async function fetchHandoffOffer(
   }
 }
 
+export interface HandoffStatus {
+  status: 'pending' | 'received' | 'expired' | 'notfound'
+  receivedBy?: string | null
+  at?: string | null
+}
+
+/** Sender: poll whether the handoff has been received yet (proof of delivery). */
+export async function fetchHandoffStatus(code: string): Promise<HandoffStatus> {
+  try {
+    const res = await fetch(`${NODE}/handoff/${code}/status`)
+    if (!res.ok) return { status: 'notfound' }
+    return (await res.json()) as HandoffStatus
+  } catch {
+    return { status: 'notfound' }
+  }
+}
+
 /** Receiver: counter-sign the release and complete the handoff (single-use code). */
 export async function acceptHandoff(
   code: string, release: HandoffRelease,

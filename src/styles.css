@@ -2284,6 +2284,19 @@ progress {
   background: #000;
   border: 2px solid var(--accent);
 }
+.handoff-received {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #16a34a;
+  margin: 8px 0;
+}
+.handoff-waiting {
+  animation: handoff-pulse 1.6s ease-in-out infinite;
+}
+@keyframes handoff-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
 
 /* iAny Trace (/trace) — proof of origin trust score */
 /* Two big, plain choices — a maker vs. a buyer — instead of a row of tabs. */

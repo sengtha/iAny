@@ -82,15 +82,22 @@ CREATE TABLE IF NOT EXISTS trace_partners (
 -- completion the node writes two trace_custody rows (release=handoff,
 -- receipt=pickup) and deletes the pending row. Short-lived (TTL), single-use.
 CREATE TABLE IF NOT EXISTS trace_handoff_pending (
-  code        TEXT PRIMARY KEY,      -- short human code (e.g. K7M4P2)
-  capsule     TEXT NOT NULL,
-  from_key    TEXT NOT NULL,         -- sender public key
-  nonce       TEXT NOT NULL,         -- binds the receipt to this release
-  raw_release TEXT NOT NULL,         -- the signed release (re-verifiable)
-  expires_at  TEXT NOT NULL,
-  created_at  TEXT NOT NULL
+  code         TEXT PRIMARY KEY,     -- short human code (e.g. K7M4P2)
+  capsule      TEXT NOT NULL,
+  from_key     TEXT NOT NULL,        -- sender public key
+  nonce        TEXT NOT NULL,        -- binds the receipt to this release
+  raw_release  TEXT NOT NULL,        -- the signed release (re-verifiable)
+  status       TEXT NOT NULL DEFAULT 'pending', -- pending | received
+  to_name      TEXT,                 -- receiver's name (proof of delivery)
+  completed_at TEXT,                 -- when the receipt was signed
+  expires_at   TEXT NOT NULL,
+  created_at   TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_trace_handoff_expires ON trace_handoff_pending (expires_at);
+-- Migration for a DB that already created this table (safe to run once):
+--   ALTER TABLE trace_handoff_pending ADD COLUMN status TEXT NOT NULL DEFAULT 'pending';
+--   ALTER TABLE trace_handoff_pending ADD COLUMN to_name TEXT;
+--   ALTER TABLE trace_handoff_pending ADD COLUMN completed_at TEXT;
 
 -- Revocations (Phase 3): a company root revokes one of its staff keys before the
 -- delegation's natural expiry. On ingest the node refuses to attribute that
