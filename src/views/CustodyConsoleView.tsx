@@ -46,8 +46,12 @@ const EVENTS: CustodyEvent[] = ['pickup', 'in_transit', 'store', 'handoff', 'del
 export function CustodyConsoleView() {
   const { lang } = useI18n()
   const km = lang === 'km'
-  // Deep link from a scanned handoff QR: /custody?h=CODE → open Receive.
-  const handoffCode = new URLSearchParams(location.search).get('h')
+  // Deep links from /trace: ?h=CODE (a scanned handoff QR → Receive) and
+  // ?c=<capsuleId> (a maker handing a product to a partner → capsule pre-filled).
+  const params = new URLSearchParams(location.search)
+  const handoffCode = params.get('h')
+  const deepCapsule = (params.get('c') ?? '').toLowerCase()
+  const capsuleParam = /^[0-9a-f]{64}$/.test(deepCapsule) ? deepCapsule : ''
   const [tab, setTab] = useState<'event' | 'handoff' | 'identity' | 'company'>(handoffCode ? 'handoff' : 'event')
 
   return (
@@ -67,8 +71,8 @@ export function CustodyConsoleView() {
         </button>
       </div>
 
-      {tab === 'event' ? <AddEvent km={km} />
-        : tab === 'handoff' ? <Handoff km={km} deepCode={handoffCode} />
+      {tab === 'event' ? <AddEvent km={km} deepCapsule={capsuleParam} />
+        : tab === 'handoff' ? <Handoff km={km} deepCode={handoffCode} deepCapsule={capsuleParam} />
           : tab === 'identity' ? <Identity km={km} />
             : <Company km={km} />}
     </div>
@@ -77,7 +81,7 @@ export function CustodyConsoleView() {
 
 /* ------------------------------------------------------------- handoff --- */
 
-function Handoff({ km, deepCode }: { km: boolean; deepCode: string | null }) {
+function Handoff({ km, deepCode, deepCapsule }: { km: boolean; deepCode: string | null; deepCapsule: string }) {
   const [side, setSide] = useState<'send' | 'receive'>(deepCode ? 'receive' : 'send')
   return (
     <>
@@ -94,13 +98,13 @@ function Handoff({ km, deepCode }: { km: boolean; deepCode: string | null }) {
           ? 'ភាគីទាំងពីរចុះហត្ថលេខាលើការប្រគល់តែមួយ — ភ័ស្តុតាងថាទំនិញបានប្តូរដៃ។ អ្នកផ្ញើបង្កើតលេខកូដ អ្នកទទួលបញ្ចូលវា។'
           : 'Both parties sign the same handoff — proof the goods changed hands. The sender creates a code; the receiver enters it.'}
       </p>
-      {side === 'send' ? <HandoffSend km={km} /> : <HandoffReceive km={km} deepCode={deepCode} />}
+      {side === 'send' ? <HandoffSend km={km} deepCapsule={deepCapsule} /> : <HandoffReceive km={km} deepCode={deepCode} />}
     </>
   )
 }
 
-function HandoffSend({ km }: { km: boolean }) {
-  const [capsule, setCapsule] = useState('')
+function HandoffSend({ km, deepCapsule }: { km: boolean; deepCapsule: string }) {
+  const [capsule, setCapsule] = useState(deepCapsule)
   const [name, setName] = useState('')
   const [gps, setGps] = useState<{ lat: number; lng: number; acc?: number } | null>(null)
   const [code, setCode] = useState('')
@@ -403,8 +407,8 @@ function HandoffReceive({ km, deepCode }: { km: boolean; deepCode: string | null
 
 /* ----------------------------------------------------------- add event --- */
 
-function AddEvent({ km }: { km: boolean }) {
-  const [capsule, setCapsule] = useState('')
+function AddEvent({ km, deepCapsule }: { km: boolean; deepCapsule: string }) {
+  const [capsule, setCapsule] = useState(deepCapsule)
   const [actorName, setActorName] = useState('')
   const [role, setRole] = useState<CustodyRole>('carrier')
   const [event, setEvent] = useState<CustodyEvent>('handoff')

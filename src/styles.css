@@ -2706,6 +2706,28 @@ progress {
   margin: 14px 0;
 }
 
+/* /trace → /custody: explains the partner (delivery/warehouse) half */
+.trace-partner-callout {
+  margin: 18px 0 8px;
+  padding: 14px;
+  border: 1px dashed var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.trace-partner-callout h3 {
+  margin: 0 0 6px;
+  font-size: 0.98rem;
+}
+.trace-partner-callout p {
+  margin: 0 0 10px;
+  font-size: 0.88rem;
+  color: var(--fg-muted);
+}
+.trace-partner-callout a {
+  display: inline-block;
+  text-decoration: none;
+}
+
 /* Claiming a short, stable product link */
 .trace-slug {
   margin-top: 10px;
