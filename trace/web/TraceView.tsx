@@ -7,6 +7,8 @@ import { qrSvg } from '../../src/lib/qr'
 import {
   addAttestation,
   capsuleId,
+  claimAlias,
+  resolveAlias,
   checkCapsule,
   complianceReport,
   computeTrust,
@@ -48,15 +50,19 @@ export function TraceView({ lang }: { lang: 'en' | 'km' }) {
   const [pageState, setPageState] = useState<'off' | 'loading' | 'ready' | 'missing'>('off')
 
   useEffect(() => {
-    const id = new URLSearchParams(location.search).get('p')
-    if (!id || !/^[0-9a-f]{64}$/.test(id)) return
-    setPageId(id)
+    const p = new URLSearchParams(location.search).get('p')
+    if (!p) return
     setPageState('loading')
-    void fetchPage(id).then((c) => {
+    void (async () => {
+      // `p` is either a capsule id or a short product slug (kampot-pepper-2026-04).
+      const id = /^[0-9a-f]{64}$/.test(p) ? p : await resolveAlias(p)
+      if (!id) { setPageState('missing'); return }
+      setPageId(id)
+      const c = await fetchPage(id)
       setPageCapsule(c)
       setPageState(c ? 'ready' : 'missing')
-    })
-    void fetchAttestations(id).then(setPageAtt)
+      void fetchAttestations(id).then(setPageAtt)
+    })()
   }, [])
 
   if (pageState !== 'off') {
@@ -259,16 +265,7 @@ function Create({ L }: { L: LFn }) {
           </button>
         )}
         {pageUrl ? (
-          <div className="trace-share">
-            <div className="handoff-qr" dangerouslySetInnerHTML={{ __html: qrSvg(location.origin + pageUrl) }} />
-            <p className="voice-minor-note">
-              {L('Buyer scans to view provenance online', 'អ្នកទិញស្កេនដើម្បីមើលប្រភពលើបណ្ដាញ')}
-            </p>
-            <div className="trace-share-url">{location.origin}{pageUrl}</div>
-            <button className="voice-ghost" onClick={() => void navigator.clipboard?.writeText(location.origin + pageUrl)}>
-              ⧉ {L('Copy public link', 'ចម្លងតំណសាធារណៈ')}
-            </button>
-          </div>
+          <ShareLink capsuleId={capsule.id} pageUrl={pageUrl} L={L} />
         ) : (
           <button className="voice-ghost" onClick={async () => setPageUrl(await publishCapsule(capsule))}>
             🔗 {L('Publish shareable page (for buyers)', 'ផ្សាយទំព័រចែករំលែក (សម្រាប់អ្នកទិញ)')}
@@ -723,6 +720,69 @@ function ProvenancePage({
              'នេះជារឿងប្រភពដែលបានផ្សាយដោយខ្លួនឯង ព្រងឹងដោយសាក្សីខាងលើ។ សូមផ្ទៀងផ្ទាត់ដោយប៊ូតុង។')}
         </p>
       </div>
+    </div>
+  )
+}
+
+/**
+ * The public link for a journey: a QR + URL a buyer can scan. The maker can
+ * claim a short, human-friendly slug (kampot-pepper-2026-04) that stays the SAME
+ * as later steps are added — so a label printed once keeps working, and the link
+ * always opens the full journey.
+ */
+function ShareLink({ capsuleId: id, pageUrl, L }: { capsuleId: string; pageUrl: string; L: LFn }) {
+  const [slug, setSlug] = useState('')
+  const [shortUrl, setShortUrl] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const url = location.origin + (shortUrl ?? pageUrl)
+
+  async function claim() {
+    const s = slug.trim().toLowerCase()
+    if (!s) return
+    setBusy(true); setErr('')
+    const r = await claimAlias(s, id)
+    setBusy(false)
+    if (r.ok) setShortUrl(r.url)
+    else setErr(r.error === 'taken'
+      ? L('That name is already taken — try another.', 'ឈ្មោះនេះមានគេប្រើហើយ — សូមប្តូរ។')
+      : r.error === 'offline'
+        ? L('You are offline.', 'អ្នកនៅក្រៅបណ្ដាញ។')
+        : L('Use 3-40 letters, numbers or dashes.', 'ប្រើ ៣-៤០ តួ អក្សរ លេខ ឬសញ្ញា -។'))
+  }
+
+  return (
+    <div className="trace-share">
+      <div className="handoff-qr" dangerouslySetInnerHTML={{ __html: qrSvg(url) }} />
+      <p className="voice-minor-note">
+        {L('Buyer scans to see the full journey online', 'អ្នកទិញស្កេនដើម្បីមើលដំណើរពេញលើបណ្ដាញ')}
+      </p>
+      <div className="trace-share-url">{url}</div>
+      <button className="voice-ghost" onClick={() => void navigator.clipboard?.writeText(url)}>
+        ⧉ {L('Copy public link', 'ចម្លងតំណសាធារណៈ')}
+      </button>
+
+      {shortUrl ? (
+        <p className="voice-minor-note">
+          ✓ {L('Short link claimed. Print it once — it keeps working as you add steps.',
+                'បានយកតំណខ្លី។ បោះពុម្ពម្តង — វានៅតែដំណើរការពេលបន្ថែមជំហាន។')}
+        </p>
+      ) : (
+        <div className="trace-slug">
+          <label className="voice-field">
+            <span>{L('Short link (optional, stable)', 'តំណខ្លី (ស្រេចចិត្ត ថេរ)')}</span>
+            <div className="trace-slug-row">
+              <span className="trace-slug-pre">/trace?p=</span>
+              <input type="text" value={slug} maxLength={40} placeholder="kampot-pepper-2026-04"
+                onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))} />
+            </div>
+          </label>
+          <button className="voice-ghost" onClick={() => void claim()} disabled={busy || !slug.trim()}>
+            🔖 {busy ? '…' : L('Claim short link', 'យកតំណខ្លី')}
+          </button>
+          {err ? <p className="voice-error">{err}</p> : null}
+        </div>
+      )}
     </div>
   )
 }

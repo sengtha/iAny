@@ -2637,6 +2637,26 @@ progress {
   margin: 14px 0;
 }
 
+/* Claiming a short, stable product link */
+.trace-slug {
+  margin-top: 10px;
+}
+.trace-slug-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.trace-slug-pre {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+  white-space: nowrap;
+}
+.trace-slug-row input {
+  flex: 1;
+  min-width: 0;
+}
+
 /* Public "full journey" — one link shows every step + custody, parcel-style */
 .trace-journey-pub {
   margin: 16px 0;

@@ -514,6 +514,52 @@ export async function fetchAttestations(id: string): Promise<Attestation[]> {
   }
 }
 
+/* --------------------------------------------------- short product links --- */
+
+const ALIAS_TOKENS = 'trace.alias.tokens.v1'
+
+/** Resolve a short slug (e.g. `kampot-pepper-2026-04`) → its capsule id. */
+export async function resolveAlias(slug: string): Promise<string | null> {
+  try {
+    const res = await fetch(`/api/trace/alias/${encodeURIComponent(slug)}`)
+    if (!res.ok) return null
+    return ((await res.json()) as { capsule: string }).capsule ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Claim a short, STABLE link for this journey (or re-point one you own, using
+ * the token kept on this device from the first claim). Returns the public URL,
+ * or an 'taken' error when someone else owns the slug.
+ */
+export async function claimAlias(
+  slug: string, capsule: string,
+): Promise<{ ok: true; url: string } | { ok: false; error: 'taken' | 'invalid' | 'offline' }> {
+  let tokens: Record<string, string> = {}
+  try {
+    tokens = JSON.parse(localStorage.getItem(ALIAS_TOKENS) ?? '{}') as Record<string, string>
+  } catch { /* ignore */ }
+  try {
+    const res = await fetch('/api/trace/alias', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ slug, capsule, token: tokens[slug] }),
+    })
+    if (res.status === 409) return { ok: false, error: 'taken' }
+    if (!res.ok) return { ok: false, error: 'invalid' }
+    const d = (await res.json()) as { url: string; token?: string }
+    if (d.token) {
+      tokens[slug] = d.token
+      localStorage.setItem(ALIAS_TOKENS, JSON.stringify(tokens))
+    }
+    return { ok: true, url: d.url }
+  } catch {
+    return { ok: false, error: 'offline' }
+  }
+}
+
 /** Fetch a whole product journey (chain of linked capsules) from the registry. */
 export async function fetchChain(id: string): Promise<TraceCapsule[] | null> {
   try {

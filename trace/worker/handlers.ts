@@ -79,6 +79,11 @@ export async function serveTrace(url: URL, request: Request, env: TraceEnv): Pro
     if (path.startsWith('chain/') && request.method === 'GET') {
       return await traceChain(path.slice('chain/'.length), env)
     }
+    // Short, stable product links (/trace?p=<slug>).
+    if (path === 'alias' && request.method === 'POST') return await traceAliasClaim(request, env)
+    if (path.startsWith('alias/') && request.method === 'GET') {
+      return await traceAliasGet(path.slice('alias/'.length), env)
+    }
     // Companion custody layer (supply-chain actors join the proof).
     if (path === 'custody' && request.method === 'POST') return await traceCustodyPost(request, env)
     if (path.startsWith('custody/') && request.method === 'GET') {
@@ -382,6 +387,61 @@ async function tracePartnerRegister(request: Request, env: TraceEnv): Promise<Re
     String(p.region ?? '').slice(0, 40) || null, JSON.stringify(p), now, now,
   ).run()
   return json({ ok: true, company: p.company })
+}
+
+/* ------------------------------------------------ short product links --- */
+
+const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/
+
+/**
+ * Claim a short slug for a journey, or re-point one you already own. The first
+ * claim mints a token (only its hash is stored) and returns it once — the maker
+ * keeps it to re-point the same printed link at later steps. Without the token a
+ * claimed slug can't be changed, so a product name can't be hijacked.
+ */
+async function traceAliasClaim(request: Request, env: TraceEnv): Promise<Response> {
+  let body: { slug?: string; capsule?: string; token?: string }
+  try {
+    body = await request.json()
+  } catch {
+    return json({ error: 'expected json' }, 400)
+  }
+  const slug = String(body.slug ?? '').trim().toLowerCase()
+  const capsule = String(body.capsule ?? '').toLowerCase()
+  if (!SLUG_RE.test(slug)) return json({ error: 'bad slug (3-40 chars, a-z 0-9 -)' }, 400)
+  if (!TRACE_ID_RE.test(capsule)) return json({ error: 'bad capsule id' }, 400)
+
+  const now = new Date().toISOString()
+  const existing = await env.DB.prepare('SELECT token_hash AS h FROM trace_aliases WHERE slug = ?')
+    .bind(slug).first<{ h: string }>()
+
+  if (!existing) {
+    const token = crypto.randomUUID().replace(/-/g, '')
+    await env.DB.prepare(
+      `INSERT INTO trace_aliases (slug, capsule, token_hash, created_at, updated_at) VALUES (?,?,?,?,?)`,
+    ).bind(slug, capsule, await sha256Hex(token), now, now).run()
+    return json({ ok: true, slug, url: `/trace?p=${slug}`, token, claimed: true })
+  }
+  // Already claimed → only the token holder may re-point it.
+  const token = String(body.token ?? '')
+  if (!token || (await sha256Hex(token)) !== existing.h) {
+    return json({ error: 'slug already taken' }, 409)
+  }
+  await env.DB.prepare('UPDATE trace_aliases SET capsule = ?, updated_at = ? WHERE slug = ?')
+    .bind(capsule, now, slug).run()
+  return json({ ok: true, slug, url: `/trace?p=${slug}`, claimed: false })
+}
+
+/** Resolve a slug → the journey step it points at. */
+async function traceAliasGet(slug: string, env: TraceEnv): Promise<Response> {
+  slug = slug.toLowerCase()
+  if (!SLUG_RE.test(slug)) return json({ error: 'bad slug' }, 400)
+  const row = await env.DB.prepare('SELECT capsule FROM trace_aliases WHERE slug = ?')
+    .bind(slug).first<{ capsule: string }>()
+  if (!row) return json({ error: 'not found' }, 404)
+  return new Response(JSON.stringify({ slug, capsule: row.capsule }), {
+    headers: { ...JSON_HEADERS, 'cache-control': 'public, max-age=30' },
+  })
 }
 
 /* -------------------------------------------------- two-party handoff --- */

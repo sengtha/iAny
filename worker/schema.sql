@@ -375,6 +375,16 @@ CREATE INDEX IF NOT EXISTS idx_trace_handoff_expires ON trace_handoff_pending (e
 --   ALTER TABLE trace_handoff_pending ADD COLUMN to_name TEXT;
 --   ALTER TABLE trace_handoff_pending ADD COLUMN completed_at TEXT;
 
+-- Short, stable product links: /trace?p=kampot-pepper-2026-04 → a journey step.
+-- First-come-first-served; only the claim-token holder can re-point the alias.
+CREATE TABLE IF NOT EXISTS trace_aliases (
+  slug       TEXT PRIMARY KEY,
+  capsule    TEXT NOT NULL,
+  token_hash TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 -- Revocations (Phase 3): a company root revokes a staff key before its
 -- delegation expires; on ingest the node drops that staff's company attribution.
 CREATE TABLE IF NOT EXISTS trace_revocations (

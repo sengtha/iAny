@@ -40,6 +40,8 @@ This is the "open now, verify names later" hybrid.
 | `POST /handoff/offer` | Sender publishes a signed **release**; node verifies it, holds it under a short code (1 h TTL). → `{ code, expiresAt }`. |
 | `GET /handoff/:code` | Receiver reads the pending release (to verify + show the sender). 410 if expired. |
 | `POST /handoff/:code/accept` | Receiver posts a signed **receipt**; node verifies the pair, writes two custody rows (release=`handoff`, receipt=`pickup`), consumes the code. → `{ ok, fromCompany, toCompany }`. |
+| `POST /alias` | Claim a short, stable product slug → journey step (`/trace?p=kampot-pepper-2026-04`). First claim mints a token (hash stored); only the token holder can re-point it. 409 if taken. |
+| `GET /alias/:slug` | Resolve a slug → its capsule id. |
 | `POST /partner/revoke` | Company revokes a staff key (root-signed). After this, that staff's events drop to self-claimed on ingest. |
 | `GET /partner/:key/revocations` | The staff keys a company has revoked (keys + times). |
 

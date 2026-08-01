@@ -99,6 +99,19 @@ CREATE INDEX IF NOT EXISTS idx_trace_handoff_expires ON trace_handoff_pending (e
 --   ALTER TABLE trace_handoff_pending ADD COLUMN to_name TEXT;
 --   ALTER TABLE trace_handoff_pending ADD COLUMN completed_at TEXT;
 
+-- Short product links: a human-friendly, STABLE alias for a journey, e.g.
+-- /trace?p=kampot-pepper-2026-04 instead of a 64-hex capsule id. Slugs are
+-- first-come-first-served; the claimer gets a token (only its SHA-256 is stored)
+-- and only the token holder can re-point the alias at a later step, so a product
+-- name can't be hijacked and the printed link never changes.
+CREATE TABLE IF NOT EXISTS trace_aliases (
+  slug       TEXT PRIMARY KEY,       -- lowercase [a-z0-9-], 3..40
+  capsule    TEXT NOT NULL,          -- the journey step this resolves to
+  token_hash TEXT NOT NULL,          -- SHA-256 of the claim token
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 -- Revocations (Phase 3): a company root revokes one of its staff keys before the
 -- delegation's natural expiry. On ingest the node refuses to attribute that
 -- staff's events to the company (they drop to self-claimed). Signed by the root.
