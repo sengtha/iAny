@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useTraceCaps } from './context'
 import type { SttState } from './adapters'
 import { fetchCustody, type CustodyItem } from './companion'
+import { shareJson } from '../../src/lib/share'
+import { qrSvg } from '../../src/lib/qr'
 import {
   addAttestation,
   capsuleId,
@@ -222,14 +224,11 @@ function Create({ L }: { L: LFn }) {
     setBusy(false)
   }
 
-  function download() {
+  async function download() {
     if (!capsule) return
-    const blob = new Blob([JSON.stringify(capsule)], { type: 'application/json' })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = `trace-${capsule.id.slice(0, 8)}.json`
-    a.click()
-    URL.revokeObjectURL(a.href)
+    // Share the signed proof file to any channel (Bluetooth / Nearby / AirDrop /
+    // messenger); falls back to a download. The receiver verifies it offline.
+    await shareJson(`trace-${capsule.id.slice(0, 8)}.json`, capsule)
   }
 
   if (capsule) {
@@ -244,12 +243,12 @@ function Create({ L }: { L: LFn }) {
             <img key={i} src={p.thumb} alt="" />
           ))}
         </div>
-        <button className="voice-primary big" onClick={download}>
-          ⬇ {L('Save proof file', 'រក្សាទុកឯកសារភស្តុតាង')}
+        <button className="voice-primary big" onClick={() => void download()}>
+          📤 {L('Share proof file', 'ចែករំលែកឯកសារភស្តុតាង')}
         </button>
         <p className="voice-tip">
-          {L('Send this file with the product (share, Bluetooth, upload). The receiver verifies it offline.',
-             'ផ្ញើឯកសារនេះជាមួយផលិតផល (ចែករំលែក ប៊្លូធូស អាប់ឡូត)។ អ្នកទទួលអាចផ្ទៀងផ្ទាត់ក្រៅបណ្ដាញ។')}
+          {L('Send this file with the product (Bluetooth, Nearby/AirDrop, any app). The receiver verifies it offline — no internet needed.',
+             'ផ្ញើឯកសារនេះជាមួយផលិតផល (ប៊្លូធូស Nearby/AirDrop កម្មវិធីណាមួយ)។ អ្នកទទួលផ្ទៀងផ្ទាត់ក្រៅបណ្ដាញ — មិនត្រូវការអ៊ីនធឺណិត។')}
         </p>
         {reg?.firstSeen ? (
           <p className="voice-tip">✓ {L('Registered online', 'ចុះបញ្ជីលើបណ្ដាញ')}: {new Date(reg.firstSeen).toLocaleString()}</p>
@@ -260,6 +259,10 @@ function Create({ L }: { L: LFn }) {
         )}
         {pageUrl ? (
           <div className="trace-share">
+            <div className="handoff-qr" dangerouslySetInnerHTML={{ __html: qrSvg(location.origin + pageUrl) }} />
+            <p className="voice-minor-note">
+              {L('Buyer scans to view provenance online', 'អ្នកទិញស្កេនដើម្បីមើលប្រភពលើបណ្ដាញ')}
+            </p>
             <div className="trace-share-url">{location.origin}{pageUrl}</div>
             <button className="voice-ghost" onClick={() => void navigator.clipboard?.writeText(location.origin + pageUrl)}>
               ⧉ {L('Copy public link', 'ចម្លងតំណសាធារណៈ')}

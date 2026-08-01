@@ -103,6 +103,39 @@ export function exportBundle(): string {
   return JSON.stringify({ v: 1, kind: 'grove-bundle', observations: loadObservations() }, null, 1)
 }
 
+/**
+ * Import a `grove-bundle` (or a bare observations array) received offline — QR,
+ * Bluetooth/Nearby/AirDrop, file. Every record is **re-verified** (content hash +
+ * signature) before it's merged; forged/corrupt ones are dropped and duplicates
+ * skipped. The transport is untrusted; the proof is in each record.
+ */
+export async function importBundle(
+  input: string | unknown,
+): Promise<{ added: number; invalid: number; duplicate: number; total: number }> {
+  const parsed = typeof input === 'string' ? (JSON.parse(input) as unknown) : input
+  const list = Array.isArray(parsed)
+    ? (parsed as GardenObservation[])
+    : parsed && typeof parsed === 'object' && Array.isArray((parsed as { observations?: unknown }).observations)
+      ? ((parsed as { observations: GardenObservation[] }).observations)
+      : null
+  if (!list) throw new Error('not a grove bundle')
+
+  const existing = loadObservations()
+  const seen = new Set(existing.map((o) => o.id))
+  let added = 0, invalid = 0, duplicate = 0
+  for (const o of list) {
+    const v = await verifyObservation(o)
+    if (!v.ok) { invalid++; continue }
+    if (seen.has(o.id)) { duplicate++; continue }
+    existing.push(o)
+    seen.add(o.id)
+    if (o.plot) addPlot(o.plot)
+    added++
+  }
+  localStorage.setItem(OBS_KEY, JSON.stringify(existing))
+  return { added, invalid, duplicate, total: list.length }
+}
+
 /** The set of observation ids already accepted by a node (for UI state). */
 export function publishedIds(): Set<string> {
   try {
