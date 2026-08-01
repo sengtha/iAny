@@ -272,7 +272,10 @@ export async function fetchHandoffStatus(code: string): Promise<HandoffStatus> {
 /** Receiver: counter-sign the release and complete the handoff (single-use code). */
 export async function acceptHandoff(
   code: string, release: HandoffRelease,
-  input: { actorName?: string; gps?: { lat: number; lng: number; acc?: number } | null },
+  input: {
+    actorName?: string; gps?: { lat: number; lng: number; acc?: number } | null
+    photoHash?: string | null; match?: number | null
+  },
 ): Promise<{ fromCompany: string | null; toCompany: string | null }> {
   const staff = await getStaffKey()
   const del = loadDelegation()
@@ -280,6 +283,7 @@ export async function acceptHandoff(
     {
       capsule: release.capsule, from: release.from, to: staff.pub, at: new Date().toISOString(),
       gps: input.gps ?? null, nonce: release.nonce,
+      photoHash: input.photoHash ?? null, match: input.match ?? null,
       toName: input.actorName || del?.staffName, toDelegation: del,
     },
     staff.keyPair,

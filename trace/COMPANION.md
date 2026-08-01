@@ -91,6 +91,14 @@ delivery screen polls `GET /handoff/:code/status` and flips to **"✓ Received b
 [name] · [time]"** once the customer confirms. The signed receipt is the durable
 proof; the row is kept 24 h so the driver can show the confirmation. The code is
 single-use — a second accept returns 409.
+
+**Photo of the item (optional).** At receipt the customer can snap the delivered
+product. Its **SHA-256 is bound into the signed receipt** (`photoHash`), and if
+the product has a published Trace page the app re-matches the photo against the
+origin capsule's perceptual signatures and shows a score (reusing `computeTrust`).
+That upgrades POD from "someone confirmed" to "the **right item** arrived" — the
+timeline marks the receipt with `📷 N%`. The match score is client-computed
+(advisory); the photo hash is the cryptographic commitment.
 On completion the node writes the two custody rows, so the handoff shows up in
 the same `/custody/:capsule` timeline (sender = `handoff`, receiver = `pickup`),
 each attributed to its company via its delegation. Verify a completed pair

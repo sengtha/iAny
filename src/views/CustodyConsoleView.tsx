@@ -28,6 +28,7 @@ import {
 import { qrSvg } from '../lib/qr'
 import { isBarcodeSupported } from '../lib/barcode'
 import { QrScanner } from './QrScanner'
+import { computeTrust, fetchPage, photoSignature } from '../../trace/core/trace'
 
 /**
  * 🚚 Trace companion console (/custody) — the B2B tool for supply-chain actors
@@ -200,6 +201,11 @@ function HandoffSend({ km }: { km: boolean }) {
   )
 }
 
+async function sha256Blob(blob: Blob): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer())
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
 /** Pull a handoff code out of a scanned QR: a /custody?h=CODE URL, or a bare code. */
 function codeFromScan(value: string): string | null {
   try {
@@ -220,6 +226,12 @@ function HandoffReceive({ km, deepCode }: { km: boolean; deepCode: string | null
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState('')
+  // Optional photo-of-item check: hash (committed in the receipt) + a match vs
+  // the origin capsule (advisory — only when the product has a published page).
+  const [photoHash, setPhotoHash] = useState<string | null>(null)
+  const [photoThumb, setPhotoThumb] = useState('')
+  const [match, setMatch] = useState<{ score: number; band: string } | null>(null)
+  const [photoBusy, setPhotoBusy] = useState(false)
 
   function locate() {
     navigator.geolocation?.getCurrentPosition(
@@ -227,6 +239,26 @@ function HandoffReceive({ km, deepCode }: { km: boolean; deepCode: string | null
       () => setError(km ? 'មិនអាចទាញទីតាំង' : 'Could not get location'),
       { enableHighAccuracy: true, timeout: 8000 },
     )
+  }
+
+  async function onPhoto(file: File | null) {
+    if (!file || !offer) return
+    setPhotoBusy(true); setError(''); setMatch(null)
+    try {
+      const [hash, sig] = await Promise.all([sha256Blob(file), photoSignature(file)])
+      setPhotoHash(hash)
+      setPhotoThumb(sig.thumb)
+      // Re-match against the origin capsule's published signatures, if any.
+      const capsule = await fetchPage(offer.capsule)
+      if (capsule) {
+        const r = computeTrust(capsule, { photos: [sig], boxText: '' }, true)
+        setMatch({ score: r.score, band: r.band })
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setPhotoBusy(false)
+    }
   }
   async function lookup(codeArg?: string) {
     const c = (codeArg ?? code).trim().toUpperCase()
@@ -251,7 +283,9 @@ function HandoffReceive({ km, deepCode }: { km: boolean; deepCode: string | null
     if (!offer) return
     setBusy(true); setError('')
     try {
-      const r = await acceptHandoff(code.trim().toUpperCase(), offer, { actorName: name.trim(), gps })
+      const r = await acceptHandoff(code.trim().toUpperCase(), offer, {
+        actorName: name.trim(), gps, photoHash, match: match?.score ?? null,
+      })
       setDone(r.toCompany
         ? (km ? '✓ បានទទួល ជាមួយក្រុមហ៊ុន' : '✓ Received, attributed to your company')
         : (km ? '✓ បានទទួល (ដោយខ្លួនឯង)' : '✓ Received (self-claimed)'))
@@ -325,6 +359,26 @@ function HandoffReceive({ km, deepCode }: { km: boolean; deepCode: string | null
 
       {offer ? (
         <>
+          <label className="sign-filepick" style={{ marginTop: 12 }}>
+            <input type="file" accept="image/*" capture="environment"
+              onChange={(e) => void onPhoto(e.target.files?.[0] ?? null)} />
+            <span>{photoBusy ? '…' : photoThumb ? `📷 ${km ? 'រូបភាពបានបន្ថែម' : 'Photo added'}` : `📷 ${km ? 'ថតរូបទំនិញ (ស្រេចចិត្ត)' : 'Photo of the item (optional)'}`}</span>
+          </label>
+          {photoThumb ? (
+            <div className="handoff-photo">
+              <img src={photoThumb} alt="" />
+              {match ? (
+                <span className={`custody-tag ${match.band === 'strong' || match.band === 'good' ? 'ok' : ''}`}>
+                  {match.band === 'strong' || match.band === 'good'
+                    ? `✓ ${km ? 'ត្រូវនឹងទំនិញ' : 'Matches the product'} · ${match.score}%`
+                    : `⚠ ${km ? 'ផ្គូផ្គងខ្សោយ' : 'Weak match'} · ${match.score}%`}
+                </span>
+              ) : (
+                <span className="custody-tag self">{km ? 'គ្មានប្រភពផ្សព្វផ្សាយ ដើម្បីផ្គូផ្គង' : 'no published origin to match'}</span>
+              )}
+            </div>
+          ) : null}
+
           <fieldset className="voice-fields" style={{ marginTop: 10 }}>
             <label className="voice-field">
               <span>{km ? 'ឈ្មោះរបស់អ្នក (ស្រេចចិត្ត)' : 'Your name (optional)'}</span>

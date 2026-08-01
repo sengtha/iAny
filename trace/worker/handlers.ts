@@ -509,11 +509,14 @@ async function traceHandoffAccept(code: string, request: Request, env: TraceEnv)
     rg ? Number(rg.lat) : null, rg ? Number(rg.lng) : null, String(rel.at ?? '').slice(0, 40),
     `→ handoff to ${rec.to.slice(0, 8)}…`, relRaw, now,
   ).run()
+  const photoNote = rec.photoHash
+    ? ` · 📷${typeof rec.match === 'number' ? ` ${rec.match}%` : ''}`
+    : ''
   await env.DB.prepare(put).bind(
     await sha256Hex(recRaw), rec.capsule, rec.to, String(rec.toName ?? '').slice(0, 80),
     rec.toDelegation?.role ?? 'other', 'pickup', toCompany,
     cg ? Number(cg.lat) : null, cg ? Number(cg.lng) : null, String(rec.at ?? '').slice(0, 40),
-    `↳ received from ${rel.from.slice(0, 8)}…`, recRaw, now,
+    `↳ received from ${rel.from.slice(0, 8)}…${photoNote}`, recRaw, now,
   ).run()
   // Keep the row as the sender's proof-of-delivery receipt (24h), not deleted.
   const keepUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()

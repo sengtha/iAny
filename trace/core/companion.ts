@@ -270,6 +270,10 @@ export interface HandoffReceipt {
   at: string
   gps: Gps | null
   nonce: string
+  /** SHA-256 of the photo the receiver took of the delivered item (or null). */
+  photoHash: string | null
+  /** Client-computed match vs the origin capsule (0–100), advisory (or null). */
+  match: number | null
   sig: string
   toName?: string
   toDelegation?: Delegation | null
@@ -295,6 +299,7 @@ export async function signRelease(input: ReleaseInput, senderKey: CryptoKeyPair)
 
 export interface ReceiptInput {
   capsule: string; from: string; to: string; at: string; gps?: Gps | null; nonce: string
+  photoHash?: string | null; match?: number | null
   toName?: string; toDelegation?: Delegation | null
 }
 
@@ -304,6 +309,8 @@ export async function signReceipt(input: ReceiptInput, receiverKey: CryptoKeyPai
     v: 1 as const, kind: 'trace-handoff-receipt' as const,
     capsule: input.capsule.toLowerCase(), from: input.from, to: input.to,
     at: input.at, gps: input.gps ?? null, nonce: input.nonce,
+    photoHash: input.photoHash ?? null,
+    match: typeof input.match === 'number' ? Math.round(input.match) : null,
   }
   return {
     ...core, sig: await signDigest(core, receiverKey),

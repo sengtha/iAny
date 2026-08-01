@@ -2290,6 +2290,18 @@ progress {
   color: #16a34a;
   margin: 8px 0;
 }
+.handoff-photo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0;
+}
+.handoff-photo img {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 10px;
+}
 .handoff-waiting {
   animation: handoff-pulse 1.6s ease-in-out infinite;
 }

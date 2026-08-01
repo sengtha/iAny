@@ -169,6 +169,15 @@ console.log('\n8. Two-party handoff (release + receipt)')
   const recSelf = await signReceipt({ capsule: CAPSULE, from: staffA.pub, to: staffB.pub, at: NOW, nonce: 'n2' }, staffB.keyPair)
   const vs = await verifyHandoff(relSelf, recSelf, LATER_OK)
   ok('self-claimed handoff ok, no companies', vs.ok && vs.fromCompany === null && vs.toCompany === null)
+
+  // proof-of-delivery photo is bound into the receipt signature
+  const relPod = await signRelease({ capsule: CAPSULE, from: staffA.pub, at: NOW, nonce: 'n3' }, staffA.keyPair)
+  const recPod = await signReceipt(
+    { capsule: CAPSULE, from: staffA.pub, to: staffB.pub, at: NOW, nonce: 'n3', photoHash: 'deadbeef', match: 87 },
+    staffB.keyPair,
+  )
+  ok('receipt with photo verifies', (await verifyHandoff(relPod, recPod, LATER_OK)).ok)
+  ok('tampered photoHash → receipt sig invalid', !(await verifyHandoff(relPod, { ...recPod, photoHash: 'cafe' }, LATER_OK)).receiptSigOk)
 }
 
 console.log('\n9. Revocation (company revokes a staff key)')
