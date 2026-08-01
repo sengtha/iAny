@@ -12,6 +12,7 @@ import {
   computeTrust,
   EVENT_TYPES,
   fetchAttestations,
+  fetchChain,
   fetchPage,
   photoSignature,
   proofTier,
@@ -709,7 +710,7 @@ function ProvenancePage({
           </div>
         )}
 
-        <CustodyChain id={id} L={L} />
+        <FullJourney id={id} L={L} />
 
         <button className="voice-primary big" onClick={() => setVerifying(true)}>
           ✓ {L('Verify this product yourself', 'ផ្ទៀងផ្ទាត់ផលិតផលនេះដោយខ្លួនឯង')}
@@ -726,40 +727,93 @@ function ProvenancePage({
   )
 }
 
-/**
- * Chain of custody — supply-chain actors (delivery/warehouse/exporter) who
- * signed handoff events for this capsule. Read-only; each is resolved to its
- * company (verified badge) or shown as a self-claim. Empty → nothing rendered.
- */
-function CustodyChain({ id, L }: { id: string; L: LFn }) {
-  const [items, setItems] = useState<CustodyItem[] | null>(null)
-  useEffect(() => {
-    void fetchCustody(id).then(setItems)
-  }, [id])
-  if (!items || items.length === 0) return null
+/** One custody/handoff event row (shared by the single view and the journey). */
+function CustodyRow({ it, L }: { it: CustodyItem; L: LFn }) {
   return (
-    <div className="custody-timeline">
-      <h3 className="custody-timeline-h">🚚 {L('Chain of custody', 'ខ្សែសង្វាក់ចរាចរណ៍')}</h3>
-      {items.map((it) => (
-        <div className="custody-row" key={it.id}>
-          <div className="custody-row-top">
-            <b>{it.event}</b> · {it.role}
-            {it.company ? (
-              <span className={`custody-tag ${it.company.verified ? 'ok' : ''}`}>
-                {it.company.verified ? '✓ ' : ''}{it.company.name}
-              </span>
-            ) : (
-              <span className="custody-tag self">{L('self-claimed', 'ដោយខ្លួនឯង')}</span>
-            )}
-          </div>
-          <div className="custody-row-sub">
-            {it.actorName ? `${it.actorName} · ` : ''}
-            {new Date(it.createdAt).toLocaleString()}
-            {it.lat != null ? ` · ~${it.lat.toFixed(2)}, ${it.lng?.toFixed(2)}` : ''}
-          </div>
-          {it.note ? <div className="custody-row-note">{it.note}</div> : null}
-        </div>
-      ))}
+    <div className="custody-row">
+      <div className="custody-row-top">
+        <b>{it.event}</b> · {it.role}
+        {it.company ? (
+          <span className={`custody-tag ${it.company.verified ? 'ok' : ''}`}>
+            {it.company.verified ? '✓ ' : ''}{it.company.name}
+          </span>
+        ) : (
+          <span className="custody-tag self">{L('self-claimed', 'ដោយខ្លួនឯង')}</span>
+        )}
+      </div>
+      <div className="custody-row-sub">
+        {it.actorName ? `${it.actorName} · ` : ''}
+        {new Date(it.createdAt).toLocaleString()}
+        {it.lat != null ? ` · ~${it.lat.toFixed(2)}, ${it.lng?.toFixed(2)}` : ''}
+      </div>
+      {it.note ? <div className="custody-row-note">{it.note}</div> : null}
+    </div>
+  )
+}
+
+/**
+ * The **whole journey in one view** — the point of a single shareable link.
+ * Walks the hash-linked chain (any step's id resolves the full story), then
+ * renders every production step in order with its custody/handoff events nested,
+ * plus a tamper-evident ✓/⚠ from re-hashing the chain. Falls back to a plain
+ * custody list when a product has no multi-step journey.
+ */
+function FullJourney({ id, L }: { id: string; L: LFn }) {
+  const [chain, setChain] = useState<TraceCapsule[] | null>(null)
+  const [custody, setCustody] = useState<Record<string, CustodyItem[]>>({})
+  const [check, setCheck] = useState<ChainResult | null>(null)
+
+  useEffect(() => {
+    void (async () => {
+      const caps = await fetchChain(id)
+      // Aggregate custody across every capsule id in the journey.
+      const ids = caps && caps.length ? caps.map((c) => c.id) : [id]
+      const pairs = await Promise.all(ids.map(async (cid) => [cid, await fetchCustody(cid)] as const))
+      setCustody(Object.fromEntries(pairs.filter(([, v]) => v.length)))
+      if (caps && caps.length) { setChain(caps); setCheck(await verifyChain(caps)) }
+    })()
+  }, [id])
+
+  const flatCustody = Object.values(custody).flat()
+
+  // No multi-step journey → just the custody list (or nothing).
+  if (!chain || chain.length <= 1) {
+    if (flatCustody.length === 0) return null
+    return (
+      <div className="custody-timeline">
+        <h3 className="custody-timeline-h">🚚 {L('Chain of custody', 'ខ្សែសង្វាក់ចរាចរណ៍')}</h3>
+        {flatCustody.map((it) => <CustodyRow key={it.id} it={it} L={L} />)}
+      </div>
+    )
+  }
+
+  const ordered = [...chain].sort((a, b) => (a.event?.step ?? 0) - (b.event?.step ?? 0))
+  return (
+    <div className="trace-journey-pub">
+      <h3 className="custody-timeline-h">
+        🧭 {L('Full journey', 'ដំណើរពេញ')}
+        {check ? (
+          <span className={`custody-tag ${check.ok ? 'ok' : 'self'}`}>
+            {check.ok ? `✓ ${L('verified', 'បានផ្ទៀងផ្ទាត់')}` : `⚠ ${L('altered', 'បានកែ')}`}
+          </span>
+        ) : null}
+      </h3>
+      <ol className="journey-steps">
+        {ordered.map((cap, i) => (
+          <li key={cap.id} className={`journey-step ${cap.id === id ? 'here' : ''}`}>
+            <div className="journey-step-head">
+              <b>{i + 1}. {cap.event?.type ?? 'event'}</b>
+              {cap.context.producer ? <span> · {cap.context.producer}</span> : null}
+            </div>
+            <div className="journey-step-sub">
+              {cap.context.product ? `${cap.context.product} · ` : ''}
+              {cap.context.capturedAt ? new Date(cap.context.capturedAt).toLocaleDateString() : ''}
+              {cap.context.gps ? ` · 📍 ${cap.context.gps.lat}, ${cap.context.gps.lng}` : ''}
+            </div>
+            {(custody[cap.id] ?? []).map((it) => <CustodyRow key={it.id} it={it} L={L} />)}
+          </li>
+        ))}
+      </ol>
     </div>
   )
 }

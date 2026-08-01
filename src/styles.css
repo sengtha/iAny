@@ -2636,6 +2636,48 @@ progress {
   padding: 12px 14px;
   margin: 14px 0;
 }
+
+/* Public "full journey" — one link shows every step + custody, parcel-style */
+.trace-journey-pub {
+  margin: 16px 0;
+}
+.journey-steps {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0 0 0 18px;
+  border-left: 2px solid var(--border);
+}
+.journey-step {
+  position: relative;
+  padding: 0 0 14px 12px;
+}
+.journey-step::before {
+  content: "";
+  position: absolute;
+  left: -25px;
+  top: 3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--border);
+}
+.journey-step.here::before {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.journey-step.here {
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  border-radius: 10px;
+}
+.journey-step-head {
+  font-size: 0.98rem;
+}
+.journey-step-sub {
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+  margin: 2px 0 6px;
+}
 .trace-page-witness h3 {
   margin: 0 0 8px;
   font-size: 1rem;
