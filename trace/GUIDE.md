@@ -67,8 +67,12 @@ Capture into a capsule:
 - Capsule **ID = SHA-256(contents)**. Saved as a small `.json`.
 
 ### 2. Transfer (P2P or online)
-The capsule is just a file — send it **with the goods**: share sheet, Bluetooth/
-Nearby, a chat app, or upload. No printing. (Reuses iAny's pack-file pattern.)
+The capsule is just a file — send it **with the goods** via the OS share sheet:
+Bluetooth, Android Nearby/Quick Share, AirDrop, or any chat app. No printing, no
+pairing, no account. Because every record is content-addressed (and companion
+records are signed), **the transport is untrusted** — the receiver re-verifies on
+import, so it doesn't matter how the file arrived. Online, share the public link
+instead; it also renders as a QR a buyer can scan.
 
 ### 3. Verify proof (100% offline, or online)
 - **Integrity:** re-hash the capsule; if it ≠ its ID, it was modified → flagged
@@ -100,6 +104,36 @@ journey's proof files into **🧭 Journey** to verify the chain and export an
 **export-compliance report** (JSON/CSV: geolocation + chain of custody, for
 due-diligence rules like the EU EUDR). Online, `/api/trace/chain/:id` returns a
 published journey for the provenance page.
+
+### 6. Companions — everyone who touched it signs (`/custody`)
+A maker creates the proof and a buyer checks it, but in between a product passes
+through **delivery companies, warehouses and exporters**. They join the same
+chain from a separate console at **`/custody`**, adding *signed* custody events
+over the same capsule id — so their steps appear on the product's one public
+page. A maker hands a driver a QR (`/custody?c=<id>`) and the console opens with
+the product already filled in.
+
+Two parties can also **co-sign a handoff**: the sender signs a release and gets a
+short code (shown as a QR), the receiver scans it and counter-signs a receipt
+over the same item and nonce. That pair is proof a specific item changed hands
+between two identified parties, at a place and time — and for last-mile delivery
+the customer's receipt is a **proof of delivery**, optionally with a photo of the
+delivered item matched back to the origin capsule.
+
+Staff are linked to a company by a **delegation** their company signs; that same
+delegation doubles as a **staff badge** anyone can verify (signature and expiry
+offline; revocation and the company's own ✓ when online). A company earns its ✓
+by proving a domain, being vouched for by another company, or having an operator
+record an official registration — the badge always shows *which*, so it can be
+audited rather than trusted. Full detail: [`COMPANION.md`](./COMPANION.md).
+
+### 7. Farm plot for EU export (optional)
+For EUDR due diligence, a grower can **walk the plot boundary** — stand at each
+corner and tap *Add corner*. Trace computes the area live, warns as soon as a
+point-only plot crosses **4 ha** (where EUDR requires the full perimeter), stores
+coordinates at 6 decimals, and puts GeoJSON into the compliance export. It does
+**not** assess deforestation-free status or legality — those remain the
+operator's due diligence.
 
 ## What it CAN do
 
@@ -216,6 +250,25 @@ Khmer OCR label scan; witness/GPS/story context; optional registry (trusted time
     (NTAG 424 DNA, or the v2 fingerprint at higher fidelity) for makers who want
     it. Same capsule format; needs hardware, so it's an opt-in tier.
 
+**v5 (now) — companions & EU readiness.** ✅
+- **Signed custody layer** (`/custody`) — delivery, warehouse and exporter staff
+  add device-signed events to a product's chain, with a company identity built
+  from root-key **delegations**, an **auditable ✓** (domain / peer vouch /
+  registry), and **revocation**.
+- **Two-party handoff + proof of delivery** — both parties co-sign one item at a
+  place and time; the last-mile receipt is the customer's confirmation, with an
+  optional photo matched back to the origin capsule.
+- **Staff badge** — the same delegation works as a free, offline-first employee
+  ID, verifiable by anyone with no account and no blockchain.
+- **One link, whole journey** + **short stable product links**, so a label
+  printed once keeps resolving to the complete, verified story.
+- **EUDR plot geolocation** — walk the boundary, 6-decimal coordinates, GeoJSON
+  Point/Polygon at the 4 ha threshold, in the due-diligence export.
+- *Still external:* Merkle anchoring and NFC tiers (below). **DPP/ESPR** is
+  tracked, not built: Trace's static-id-resolving-to-the-maker's-page shape
+  already matches the Digital Product Passport model, but nothing is mandatory
+  for Khmer food exports yet.
+
 **Non-goals (kept honest):** we do not claim to defeat determined counterfeiters,
 and we won't market Trace as "unfakeable." The mission is to **help honest makers
 be believed** — cheaply, offline, on a phone.
@@ -224,6 +277,8 @@ be believed** — cheaply, offline, on a phone.
 
 Part of [iAny](https://iany.app) · Apache-2.0 · E-KHMER Technology Co., Ltd.
 Code (self-contained in this folder): `core/trace.ts` (engine),
-`web/TraceView.tsx` (UI), `worker/handlers.ts` + `worker/schema.sql` (registry).
-See [`SPEC.md`](./SPEC.md) for the capsule format and [`README.md`](./README.md)
-for embedding Trace in your own app.
+`core/companion.ts` (companion identity), `web/TraceView.tsx` (UI),
+`worker/handlers.ts` + `worker/schema.sql` (registry).
+See [`SPEC.md`](./SPEC.md) for the capsule format, [`COMPANION.md`](./COMPANION.md)
+for the custody/identity layer, and [`README.md`](./README.md) for embedding
+Trace in your own app.

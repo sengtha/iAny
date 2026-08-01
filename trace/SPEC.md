@@ -28,6 +28,11 @@ revisions; the `id` always pins the exact contents present.
     "note": "First harvest of the season.",
     "witness": "Kampot Pepper Co-op"                      // optional, "" if none
   },
+  "plot": {                                                // optional (EUDR, §8)
+    "points": [ { "lat": 11.556678, "lng": 104.923456 } ],  // 1 point, or 3+ = polygon
+    "areaHa": 0,                                            // computed from the polygon
+    "ref": "Plot A"                                         // optional grower reference
+  },
   "event": { "type": "harvest", "step": 1 },              // optional (journey)
   "prev": null,                                            // optional (journey)
   "id": "9f2c…64 hex chars…"
@@ -147,10 +152,44 @@ and double-use transparency. All endpoints are public and keyless; `:id` is the
 | `POST /api/trace/attest` | Add a witness confirmation. Body: `{id, name, role?, note?}` |
 | `GET /api/trace/attest/:id` | List a capsule's witness confirmations |
 | `GET /api/trace/chain/:id` | Return a published journey (root → … → leaf) |
+| `POST /api/trace/alias` | Claim a short, stable product slug → journey step (`/trace?p=kampot-pepper-2026-04`). First claim mints a token; only its holder can re-point it. 409 if taken. |
+| `GET /api/trace/alias/:slug` | Resolve a slug → capsule id |
 
 The reference server ([`worker/handlers.ts`](./worker/handlers.ts)) stores only
 the origin summary + timestamps in D1 and published page capsules in R2 — **no
 images and no personal data** beyond what a maker chose to publish.
+
+The **companion layer** (signed custody events, partner registry + proofs,
+two-party handoffs, staff badges, revocations) shares the same mount and schema
+and is specified separately in [`COMPANION.md`](./COMPANION.md). It is additive:
+a capsule never references it, and a consumer that ignores it loses nothing.
+
+## 8. Plot geometry (EUDR)
+
+`plot` is **optional** and omitted entirely when unused, so a capsule without it
+serializes exactly as before and existing ids stay valid.
+
+It exists for EU Deforestation Regulation (2023/1115) due diligence, which asks
+for the production plot's geolocation:
+
+| Plot size | Required | Encoded as |
+|---|---|---|
+| under 4 ha | a single point | `points` with 1 entry → GeoJSON `Point` |
+| 4 ha and above | the perimeter | `points` with 3+ entries → closed GeoJSON `Polygon` |
+
+- Coordinates are stored at **6 decimals** (≈0.11 m), the EUDR minimum.
+- `areaHa` is computed from the polygon (equirectangular projection + shoelace)
+  and is `0` for a point.
+- GeoJSON is emitted **lng, lat** with the ring closed, inside the `eudr` block
+  of `complianceReport()`, alongside an explicit `geolocation_sufficient` flag
+  that is `false` when a ≥4 ha plot carries only a point.
+
+The geometry helpers (`buildPlot`, `polygonAreaHa`, `eudrNeedsPolygon`,
+`plotGeoJson`) live in `core/trace.ts` and are covered by `npm run test:eudr`.
+
+Out of scope: EUDR also requires deforestation-free evidence (land cover against
+the 31 Dec 2020 cut-off) and legality of production. Trace records geolocation
+and custody; it does not assess either.
 
 ---
 

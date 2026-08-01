@@ -16,7 +16,20 @@ needs lives in this folder.
 
 - **What it can and cannot do, and the roadmap →** [`GUIDE.md`](./GUIDE.md)
 - **The capsule format (open protocol) →** [`SPEC.md`](./SPEC.md)
+- **Delivery / warehouse / exporter companions →** [`COMPANION.md`](./COMPANION.md)
 - **License →** [`LICENSE`](./LICENSE) (Apache-2.0)
+
+## Two surfaces
+
+| Page | Who it's for | What they do |
+|---|---|---|
+| **`/trace`** | maker · buyer | create a proof from a product; check one; view a product's full journey from one link |
+| **`/custody`** | delivery · warehouse · exporter · anyone | add **signed** custody events to a product, co-sign handoffs, carry a staff badge, verify someone else's |
+
+`/trace` is the entry point. The two are joined by the **capsule id**: a custody
+event is signed *over the same id* the maker created, so both appear on one
+public journey page. A maker hands a driver a QR (`/custody?c=<id>`) and the
+console opens with the product already filled in.
 
 ---
 
@@ -33,7 +46,12 @@ timestamp and double-use transparency.
 ```
 trace/
   core/trace.ts        Zero-dependency engine: signatures, trust score, chains,
-                       compliance report, registry client. No React, no iAny.
+                       EUDR plot geometry, compliance report, registry client.
+                       No React, no iAny.
+  core/companion.ts    Companion identity: ECDSA-P256 keys, staff delegations,
+                       custody records, two-party handoffs, partner proofs,
+                       revocations, vouches. Verifiable offline.
+  core/*.test.ts       Regression suites — `npm test` (41 crypto + 11 geometry).
   web/
     TraceView.tsx        The full UI (Create / Verify / Journey / provenance page).
     TraceApp.tsx         Self-contained shell (header + EN/ខ្មែរ toggle).
@@ -42,11 +60,13 @@ trace/
     mediapipeMatcher.ts  Optional "better matching" via MediaPipe Image Embedder
                          (lazy-loaded; a host that doesn't want the dependency just
                          doesn't import this file).
+    companion.ts         Companion web client: on-device key storage, register a
+                         company, enroll staff, sign custody/handoffs, verify badges.
   worker/
     handlers.ts        Optional registry backend (Cloudflare D1 + R2). Self-
                        contained: `serveTrace(url, request, env)`.
-    schema.sql         D1 tables for the registry.
-  GUIDE.md  SPEC.md  CHANGELOG.md  LICENSE
+    schema.sql         D1 tables for the registry + companion layer.
+  GUIDE.md  SPEC.md  COMPANION.md  CHANGELOG.md  LICENSE
 ```
 
 The engine (`core/trace.ts`) has **no dependencies** and knows nothing about
@@ -100,6 +120,20 @@ npx wrangler d1 execute <your-db> --remote --file trace/worker/schema.sql
 All endpoints are public and keyless; they store only the origin summary +
 timestamps (and any capsule a maker chose to publish) — **no images, no personal
 data**. Endpoint list is in [`SPEC.md §7`](./SPEC.md).
+
+The **companion layer** (custody events, partners, handoffs, staff badges) adds
+signed records on top and uses the same mount + schema — see
+[`COMPANION.md`](./COMPANION.md).
+
+## EU readiness
+
+- **EUDR** (Reg. 2023/1115) — `/trace` can map a farm plot by walking its
+  boundary, stores coordinates at 6 decimals, and exports GeoJSON (Point under
+  4 ha, Polygon at 4 ha+) inside the due-diligence report. It does **not** assess
+  deforestation-free status or legality. Details in [`COMPANION.md`](./COMPANION.md).
+- **DPP / ESPR** — Trace's shape (a static content-addressed id resolving to the
+  maker's own page) already matches the Digital Product Passport model; nothing
+  is mandatory for Khmer food exports yet, so it's tracked, not built against.
 
 ---
 
