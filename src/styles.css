@@ -2367,6 +2367,16 @@ progress {
   gap: 8px;
   justify-content: center;
 }
+.trace-plot {
+  margin: 8px 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  border: 1px solid var(--border);
+}
+.trace-plot.ok { border-color: #16a34a; background: rgba(22, 163, 74, 0.08); }
+.trace-plot.warn { border-color: #f59e0b; background: rgba(245, 158, 11, 0.10); }
+
 .badge-result {
   margin: 14px 0;
   padding: 16px;

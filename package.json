@@ -15,6 +15,8 @@
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
     "test:companion": "esbuild trace/core/companion.test.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/companion.test.mjs --log-level=warning && node node_modules/.cache/companion.test.mjs",
+    "test:eudr": "esbuild trace/core/eudr.test.ts --bundle --platform=node --format=esm --outfile=node_modules/.cache/eudr.test.mjs --log-level=warning && node node_modules/.cache/eudr.test.mjs",
+    "test": "npm run test:companion && npm run test:eudr",
     "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {

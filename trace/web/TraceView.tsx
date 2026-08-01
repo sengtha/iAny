@@ -11,7 +11,10 @@ import {
   resolveAlias,
   checkCapsule,
   complianceReport,
+  buildPlot,
   computeTrust,
+  eudrCoord,
+  eudrNeedsPolygon,
   EVENT_TYPES,
   fetchAttestations,
   fetchChain,
@@ -28,6 +31,7 @@ import {
   type Tier,
   type FreshCapture,
   type PhotoSig,
+  type PlotGeometry,
   type RegistryInfo,
   type TraceCapsule,
   type VerifyResult,
@@ -184,6 +188,7 @@ function Create({ L }: { L: LFn }) {
   const [witness, setWitness] = useState('')
   const [note, setNote] = useState('')
   const [gps, setGps] = useState<{ lat: number; lng: number; acc: number } | null>(null)
+  const [plot, setPlot] = useState<PlotGeometry | null>(null)
   const [busy, setBusy] = useState(false)
   const [capsule, setCapsule] = useState<TraceCapsule | null>(null)
   const [reg, setReg] = useState<RegistryInfo | null>(null)
@@ -209,7 +214,7 @@ function Create({ L }: { L: LFn }) {
 
   function locate() {
     navigator.geolocation?.getCurrentPosition(
-      (p) => setGps({ lat: +p.coords.latitude.toFixed(5), lng: +p.coords.longitude.toFixed(5), acc: Math.round(p.coords.accuracy) }),
+      (p) => setGps({ lat: eudrCoord(p.coords.latitude), lng: eudrCoord(p.coords.longitude), acc: Math.round(p.coords.accuracy) }),
       () => setGps(null),
       { enableHighAccuracy: true, timeout: 8000 },
     )
@@ -225,6 +230,7 @@ function Create({ L }: { L: LFn }) {
         capturedAt: new Date().toISOString(),
         producer, product, note, witness,
       },
+      ...(plot && plot.points.length ? { plot } : {}),
       event: { type: eventType, step: (prev?.step ?? 0) + 1 },
       prev: prev?.id ?? null,
     }
@@ -379,6 +385,14 @@ function Create({ L }: { L: LFn }) {
             <button className="voice-ghost" onClick={locate}>📍 {L('Add location', 'បញ្ចូលទីតាំង')}</button>
             {gps && <span>{gps.lat}, {gps.lng} (±{gps.acc}m)</span>}
           </div>
+        </div>
+      </details>
+
+      {/* Exporting to the EU? EUDR wants the farm plot mapped, not just a pin. */}
+      <details className="trace-more">
+        <summary>🌍 {L('Farm plot for EU export', 'ដីចម្ការសម្រាប់នាំចេញទៅ EU')} <span>EUDR</span></summary>
+        <div className="trace-more-body">
+          <PlotWalker plot={plot} onPlot={setPlot} L={L} />
         </div>
       </details>
 
@@ -973,6 +987,75 @@ function FullJourney({ id, L }: { id: string; L: LFn }) {
         ))}
       </ol>
     </div>
+  )
+}
+
+/**
+ * Walk the farm boundary, one corner at a time — the EUDR geolocation the EU
+ * asks of exporters, captured by a grower with nothing but a phone.
+ *
+ * Under 4 ha a single point is accepted; at 4 ha and above a polygon of the
+ * perimeter is required, so the control keeps showing the running area and warns
+ * as soon as a point-only plot crosses the threshold.
+ */
+function PlotWalker({
+  plot, onPlot, L,
+}: { plot: PlotGeometry | null; onPlot: (p: PlotGeometry | null) => void; L: LFn }) {
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const points = plot?.points ?? []
+
+  function addCorner() {
+    setBusy(true); setErr('')
+    navigator.geolocation?.getCurrentPosition(
+      (pos) => {
+        const next = [...points, { lat: pos.coords.latitude, lng: pos.coords.longitude }]
+        onPlot(buildPlot(next, plot?.ref))
+        setBusy(false)
+      },
+      () => { setErr(L('Could not get location', 'មិនអាចទាញទីតាំង')); setBusy(false) },
+      { enableHighAccuracy: true, timeout: 10000 },
+    )
+  }
+
+  const needPolygon = eudrNeedsPolygon(plot?.areaHa ?? 0)
+  const isPolygon = points.length >= 3
+  return (
+    <>
+      <p className="voice-minor-note">
+        {L('Stand at each corner of the plot and tap "Add corner" as you walk around it. Under 4 ha one point is enough; 4 ha and above needs the full boundary.',
+           'ឈរនៅជ្រុងនីមួយៗនៃដី ហើយចុច «បន្ថែមជ្រុង» ពេលដើរជុំវិញ។ តិចជាង ៤ ហិកតា ត្រូវការតែចំណុចមួយ; ចាប់ពី ៤ ហិកតា ត្រូវការព្រំដែនពេញ។')}
+      </p>
+
+      <div className="trace-gps">
+        <button className="voice-ghost" onClick={addCorner} disabled={busy}>
+          📍 {busy ? '…' : L('Add corner', 'បន្ថែមជ្រុង')} {points.length ? `(${points.length})` : ''}
+        </button>
+        {points.length > 0 ? (
+          <button className="voice-ghost" onClick={() => onPlot(null)}>
+            ↺ {L('Clear', 'សម្អាត')}
+          </button>
+        ) : null}
+      </div>
+
+      {points.length > 0 ? (
+        <div className={`trace-plot ${needPolygon && !isPolygon ? 'warn' : 'ok'}`}>
+          <b>
+            {isPolygon
+              ? `${plot!.areaHa} ha · ${points.length} ${L('corners', 'ជ្រុង')}`
+              : `${points.length} ${L('point', 'ចំណុច')}`}
+          </b>
+          <div>
+            {needPolygon && !isPolygon
+              ? `⚠ ${L('4 ha or more needs the full boundary — keep walking the corners.', 'ចាប់ពី ៤ ហិកតា ត្រូវការព្រំដែនពេញ — សូមដើរបន្តជុំវិញ។')}`
+              : isPolygon
+                ? `✓ ${L('Boundary recorded (EUDR polygon)', 'បានកត់ត្រាព្រំដែន (EUDR polygon)')}`
+                : `✓ ${L('Point recorded — fine for a plot under 4 ha', 'បានកត់ត្រាចំណុច — គ្រប់គ្រាន់សម្រាប់ដីតិចជាង ៤ ហិកតា')}`}
+          </div>
+        </div>
+      ) : null}
+      {err ? <p className="voice-error">{err}</p> : null}
+    </>
   )
 }
 

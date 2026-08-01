@@ -57,12 +57,84 @@ export interface TraceCapsule {
      *  people, not matching. Self-reported unless registered online. */
     witness: string
   }
+  /** Optional production-plot boundary for EUDR due diligence (see §EUDR below).
+   *  Omitted entirely on capsules that don't need it, so older proofs are
+   *  unaffected — JSON.stringify drops undefined, so the content id is stable. */
+  plot?: PlotGeometry
   /** EPCIS-style event in a product journey (harvest → process → ship → …). */
   event?: { type: string; step: number }
   /** Previous event's capsule id — hash-links the chain (tamper-evident). */
   prev?: string | null
   /** Content id = SHA-256 of everything above (keyless integrity). */
   id: string
+}
+
+/* --------------------------------------------------------------- EUDR --- */
+
+/**
+ * A production plot, in the shape the EU Deforestation Regulation asks for.
+ *
+ * EUDR (Reg. 2023/1115) requires geolocation of every plot a commodity came
+ * from: a single point for plots **under 4 ha**, and a **polygon** of the
+ * perimeter for 4 ha and above, with coordinates to at least six decimals.
+ * Cambodian pepper/cashew/rubber/coffee are in scope — large and medium
+ * operators from 30 Dec 2026, SMEs from 30 Jun 2027.
+ */
+export interface PlotGeometry {
+  /** Perimeter, walked corner by corner. 1 point = a point plot; 3+ = polygon. */
+  points: { lat: number; lng: number }[]
+  /** Estimated area in hectares (computed from the polygon; 0 for a point). */
+  areaHa: number
+  /** Optional grower-supplied plot name / land-tenure reference. */
+  ref?: string
+}
+
+/** Round to EUDR's minimum precision (6 decimals ≈ 0.11 m). */
+export function eudrCoord(n: number): number {
+  return Math.round(n * 1e6) / 1e6
+}
+
+/**
+ * Polygon area in hectares. Equirectangular projection about the centroid then
+ * the shoelace formula — accurate well past the size of any smallholder plot.
+ */
+export function polygonAreaHa(points: { lat: number; lng: number }[]): number {
+  if (points.length < 3) return 0
+  const R = 6378137 // metres
+  const lat0 = (points.reduce((s, p) => s + p.lat, 0) / points.length) * (Math.PI / 180)
+  const xy = points.map((p) => ({
+    x: (p.lng * (Math.PI / 180)) * R * Math.cos(lat0),
+    y: (p.lat * (Math.PI / 180)) * R,
+  }))
+  let a = 0
+  for (let i = 0; i < xy.length; i++) {
+    const j = (i + 1) % xy.length
+    a += xy[i]!.x * xy[j]!.y - xy[j]!.x * xy[i]!.y
+  }
+  return Math.round((Math.abs(a / 2) / 10000) * 1000) / 1000 // m² → ha, 3 dp
+}
+
+/** Does EUDR require a polygon (rather than a point) for this plot? */
+export function eudrNeedsPolygon(areaHa: number): boolean {
+  return areaHa >= 4
+}
+
+/** Build a plot from walked points (computes area + rounds to 6 decimals). */
+export function buildPlot(points: { lat: number; lng: number }[], ref?: string): PlotGeometry {
+  const pts = points.map((p) => ({ lat: eudrCoord(p.lat), lng: eudrCoord(p.lng) }))
+  return { points: pts, areaHa: polygonAreaHa(pts), ...(ref ? { ref } : {}) }
+}
+
+/** The plot as GeoJSON — a Point under 4 ha, else a closed Polygon. */
+export function plotGeoJson(plot: PlotGeometry): Record<string, unknown> | null {
+  const p = plot.points
+  if (p.length === 0) return null
+  if (p.length < 3) {
+    return { type: 'Point', coordinates: [p[0]!.lng, p[0]!.lat] } // GeoJSON is lng,lat
+  }
+  const ring = p.map((q) => [q.lng, q.lat])
+  ring.push(ring[0]!) // GeoJSON polygons must close
+  return { type: 'Polygon', coordinates: [ring] }
 }
 
 /** Journey event types (EPCIS-style). Labels are localized in the UI. */
@@ -640,8 +712,44 @@ export function complianceReport(ordered: ChainNode[]): { json: string; csv: str
     integrityOk: n.integrityOk,
     linkOk: n.linkOk,
   }))
+  // EUDR asks for the production plot's geolocation: a point under 4 ha, a
+  // polygon at 4 ha and above, at >= 6 decimals. Emit it as GeoJSON so it can be
+  // lifted straight into a Due Diligence Statement.
+  const plot = first?.plot ?? null
+  const geometry = plot ? plotGeoJson(plot) : first?.context.gps
+    ? { type: 'Point', coordinates: [eudrCoord(first.context.gps.lng), eudrCoord(first.context.gps.lat)] }
+    : null
+  const areaHa = plot?.areaHa ?? 0
+  const polygonRequired = eudrNeedsPolygon(areaHa)
+  const geojson = geometry
+    ? {
+        type: 'FeatureCollection',
+        features: [{
+          type: 'Feature',
+          properties: {
+            ProducerName: first?.context.producer || null,
+            ProducerCountry: 'KH',
+            ProductionPlace: plot?.ref ?? null,
+            Area: areaHa || null,
+          },
+          geometry,
+        }],
+      }
+    : null
+
   const report = {
     standard: 'iAny Trace journey (EPCIS-style) — due-diligence export',
+    eudr: {
+      regulation: 'EU 2023/1115 (EUDR)',
+      geolocation: geojson,
+      plot_area_ha: areaHa || null,
+      polygon_required: polygonRequired,
+      polygon_provided: (plot?.points.length ?? 0) >= 3,
+      /** Honest flag: a >=4 ha plot recorded as a point is NOT DDS-ready. */
+      geolocation_sufficient: !polygonRequired || (plot?.points.length ?? 0) >= 3,
+      note:
+        'Geolocation is captured on-device by the grower and is self-reported. EUDR also requires deforestation-free evidence (e.g. cut-off-date land-cover checks) and legality of production, which this export does not assess.',
+    },
     product: first?.context.product || null,
     origin_producer: first?.context.producer || null,
     origin_geolocation: first?.context.gps ?? null,

@@ -191,3 +191,40 @@ npx wrangler d1 execute iany-radio --remote --file trace/worker/schema.sql
 
 Idempotent (`CREATE TABLE IF NOT EXISTS`). Until it's run, `/api/trace/custody`
 returns the "trace registry not initialised" hint.
+
+## EU readiness (EUDR today, DPP next)
+
+**EUDR — EU Deforestation Regulation 2023/1115.** In scope for Cambodian pepper,
+cashew, rubber and coffee. Large/medium operators must comply from **30 Dec 2026**,
+SMEs from **30 Jun 2027**. It asks for the **production plot's geolocation**:
+
+- a **point** for plots under 4 ha, a **polygon** of the perimeter at 4 ha and above,
+- coordinates to **at least six decimals**,
+- plus a chain of custody for the goods.
+
+Trace covers the geolocation + custody half:
+
+- `/trace` → *Farm plot for EU export* walks the boundary corner by corner
+  (`PlotWalker`), showing the running area and warning the moment a point-only
+  plot crosses 4 ha.
+- `buildPlot` / `polygonAreaHa` / `plotGeoJson` (in `core/trace.ts`) compute the
+  area and emit GeoJSON — a `Point` under 4 ha, a closed `Polygon` above.
+  Verified by `npm run test:eudr`.
+- GPS is stored at 6 decimals (it was 5 before — below the EUDR minimum).
+- `complianceReport()` emits an `eudr` block with the GeoJSON FeatureCollection,
+  the plot area, and an explicit **`geolocation_sufficient`** flag that is `false`
+  when a ≥4 ha plot only has a point.
+
+Honest scope: EUDR also requires **deforestation-free evidence** (land-cover
+against the 31 Dec 2020 cut-off) and **legality of production**. Trace does not
+assess either — it produces the geolocation and traceability trail an operator
+files, not the risk assessment.
+
+**DPP — Digital Product Passport (ESPR).** The CEN/CENELEC standards landed in
+May 2026 (**EN 18219** identifiers, **EN 18220** data carriers) and the EU registry
+opened **19 July 2026**; sectors phase in from batteries (Feb 2027) to
+construction (2030). Its architecture — a static identifier in the carrier that
+resolves to the maker's own data host — is already how Trace works (content
+addressed id → public journey page), and ESPR Art. 10's "open, interoperable, no
+vendor lock-in" is the design. Nothing is mandatory for Khmer food exports yet, so
+this is the direction to track, not to build against.
