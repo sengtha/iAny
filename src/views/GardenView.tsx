@@ -15,6 +15,7 @@ import {
   type Measure,
 } from '../../grove/web/store'
 import { readJsonFile, shareJson } from '../lib/share'
+import { anchorCall, plotLiveCount, readPlotStatus, type CsbPlotStatus } from '../../grove/core/csb'
 
 /**
  * 🌳 Garden (/garden) — create **signed, verifiable** garden/tree observations on
@@ -22,10 +23,75 @@ import { readJsonFile, shareJson } from '../lib/share'
  * with your device key. Records are stored locally and exportable to any node /
  * dashboard / CamboVerse. See grove/SPEC.md. Estimates, not certified credits.
  */
-const SPECIES = ['mango', 'coconut', 'jackfruit', 'longan', 'guava', 'tamarind', 'teak', 'banana', 'other']
-const SP_KM: Record<string, string> = {
-  mango: 'ស្វាយ', coconut: 'ដូង', jackfruit: 'ខ្នុរ', longan: 'មៀន', guava: 'ត្របែក',
-  tamarind: 'អំពិល', teak: 'ម៉ៃសាក់', banana: 'ចេក', other: 'ផ្សេង',
+interface SpeciesInfo {
+  id: string
+  en: string
+  km: string
+  /** Binomial name, shown alongside the common name so a verifier can confirm the pick. */
+  scientific?: string
+}
+const SPECIES_LIST: SpeciesInfo[] = [
+  { id: 'mango', en: 'Mango', km: 'ស្វាយ', scientific: 'Mangifera indica' },
+  { id: 'coconut', en: 'Coconut', km: 'ដូង', scientific: 'Cocos nucifera' },
+  { id: 'jackfruit', en: 'Jackfruit', km: 'ខ្នុរ', scientific: 'Artocarpus heterophyllus' },
+  { id: 'longan', en: 'Longan', km: 'មៀន', scientific: 'Dimocarpus longan' },
+  { id: 'guava', en: 'Guava', km: 'ត្របែក', scientific: 'Psidium guajava' },
+  { id: 'tamarind', en: 'Tamarind', km: 'អំពិល', scientific: 'Tamarindus indica' },
+  { id: 'teak', en: 'Teak', km: 'ម៉ៃសាក់', scientific: 'Tectona grandis' },
+  { id: 'banana', en: 'Banana', km: 'ចេក', scientific: 'Musa spp.' },
+  { id: 'rambutan', en: 'Rambutan', km: 'សាវម៉ាវ', scientific: 'Nephelium lappaceum' },
+  { id: 'durian', en: 'Durian', km: 'ធូរេន', scientific: 'Durio zibethinus' },
+  { id: 'papaya', en: 'Papaya', km: 'ល្ហុង', scientific: 'Carica papaya' },
+  { id: 'pomelo', en: 'Pomelo', km: 'ក្រូចថ្លុង', scientific: 'Citrus maxima' },
+  { id: 'lime', en: 'Lime', km: 'ក្រូចឆ្មារ', scientific: 'Citrus aurantiifolia' },
+  { id: 'star-fruit', en: 'Star fruit', km: 'ស្ពឺ', scientific: 'Averrhoa carambola' },
+  { id: 'sugar-apple', en: 'Sugar apple', km: 'ទៀប', scientific: 'Annona squamosa' },
+  { id: 'soursop', en: 'Soursop', km: 'ទៀបបារាំង', scientific: 'Annona muricata' },
+  { id: 'sapodilla', en: 'Sapodilla', km: 'ល្មុត', scientific: 'Manilkara zapota' },
+  { id: 'mangosteen', en: 'Mangosteen', km: 'មង្ឃុត', scientific: 'Garcinia mangostana' },
+  { id: 'avocado', en: 'Avocado', km: 'ប័រ', scientific: 'Persea americana' },
+  { id: 'neem', en: 'Neem', km: 'ស្តៅ', scientific: 'Azadirachta indica' },
+  { id: 'banyan', en: 'Banyan', km: 'ជ្រៃ', scientific: 'Ficus benghalensis' },
+  { id: 'bodhi', en: 'Bodhi (Sacred fig)', km: 'ដើមពោធិ៍', scientific: 'Ficus religiosa' },
+  { id: 'sugar-palm', en: 'Sugar palm (Palmyra)', km: 'ត្នោត', scientific: 'Borassus flabellifer' },
+  { id: 'areca-palm', en: 'Areca palm (Betel)', km: 'ស្លា', scientific: 'Areca catechu' },
+  { id: 'rubber', en: 'Rubber tree', km: 'កៅស៊ូ', scientific: 'Hevea brasiliensis' },
+  { id: 'lychee', en: 'Lychee', km: 'គូឡែន', scientific: 'Litchi chinensis' },
+  { id: 'cashew', en: 'Cashew', km: 'ស្វាយចន្ទី', scientific: 'Anacardium occidentale' },
+]
+/** Where the optional CSB read endpoint is remembered. Empty = chain off. */
+const CSB_KEY = 'grove.csb.base.v1'
+
+/** Full combobox label: common name + scientific name, e.g. "Mango (Mangifera indica)".
+ *  Falls back to the raw value for a typed species not in the list. */
+function speciesLabel(idOrText: string, km: boolean): string {
+  const found = SPECIES_LIST.find((s) => s.id === idOrText)
+  if (!found) return idOrText
+  const name = km ? found.km : found.en
+  return found.scientific ? `${name} (${found.scientific})` : name
+}
+/** Compact label for the records list — common name only, no scientific name. */
+function speciesShortLabel(idOrText: string, km: boolean): string {
+  const found = SPECIES_LIST.find((s) => s.id === idOrText)
+  return found ? (km ? found.km : found.en) : idOrText
+}
+/** Species matching a search term against common (either language) or scientific name. */
+function matchSpecies(query: string): SpeciesInfo[] {
+  const q = query.trim()
+  if (!q) return SPECIES_LIST
+  const qLower = q.toLowerCase()
+  return SPECIES_LIST
+    .map((s) => {
+      const enLower = s.en.toLowerCase()
+      const sciLower = (s.scientific ?? '').toLowerCase()
+      let score = 0
+      if (enLower.startsWith(qLower) || s.km.startsWith(q)) score = 2
+      else if (enLower.includes(qLower) || s.km.includes(q) || sciLower.includes(qLower)) score = 1
+      return { s, score }
+    })
+    .filter((x) => x.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .map((x) => x.s)
 }
 
 export function GardenView() {
@@ -34,6 +100,9 @@ export function GardenView() {
   const [obs, setObs] = useState<GardenObservation[]>(() => loadObservations())
   const [plot, setPlot] = useState(() => loadPlots()[0] ?? 'home-garden-01')
   const [species, setSpecies] = useState('mango')
+  const [speciesQuery, setSpeciesQuery] = useState(() => speciesLabel('mango', km))
+  const [speciesOpen, setSpeciesOpen] = useState(false)
+  const [speciesHighlight, setSpeciesHighlight] = useState(0)
   const [count, setCount] = useState(1)
   const [dbh, setDbh] = useState('')
   const [height, setHeight] = useState('')
@@ -51,6 +120,56 @@ export function GardenView() {
 
   const unpublished = useMemo(() => obs.filter((o) => !published.has(o.id)).length, [obs, published])
 
+  // ---- optional: the chain's half (see grove/ANCHORING.md) ----------------
+  // Everything below is additive. The garden works, signs, exports and publishes
+  // with no chain at all; anchoring only adds a date somebody else agrees with
+  // and a place a licensed verifier can put their name.
+  const [csbBase, setCsbBase] = useState(() => localStorage.getItem(CSB_KEY) ?? '')
+  const [chain, setChain] = useState<CsbPlotStatus | null>(null)
+  const [copied, setCopied] = useState(false)
+
+  const plotId = plot.trim() || 'home-garden-01'
+  /** Newest record for the plot being edited — the one an anchor would commit. */
+  const newest = useMemo(
+    () => [...obs].reverse().find((o) => o.plot === plotId) ?? null,
+    [obs, plotId],
+  )
+
+  useEffect(() => {
+    if (!csbBase.trim()) { setChain(null); return }
+    let stale = false
+    void readPlotStatus(csbBase, plotId).then((s) => { if (!stale) setChain(s) })
+    return () => { stale = true }
+  }, [csbBase, plotId, obs.length])
+
+  /**
+   * Living plants in this plot — what the chain means by `liveCount`.
+   *
+   * The plot's total, NOT the newest record's own count. A record covers one
+   * planting; a plot usually holds several, so anchoring the newest record's
+   * count alone would tell the chain a three-tree garden has one tree — and
+   * that number is what a title's supply and a pledge's survival threshold
+   * are read from.
+   */
+  const liveCount = useMemo(() => plotLiveCount(obs, plotId), [obs, plotId])
+
+  /** Calldata for anchoring `newest`, chained onto whatever the chain holds now. */
+  const anchor = useMemo(() => {
+    if (!newest) return null
+    // `prev` must be the chain's CURRENT head, not this phone's idea of it — the
+    // plot may have been anchored from another device, and CSB refuses an anchor
+    // that would fork a plot's history.
+    const head = chain?.anchored ? chain.head?.observationId ?? null : null
+    try {
+      return anchorCall({ ...newest, prev: head ? head.replace(/^0x/, '') : null }, { liveCount })
+    } catch {
+      return null
+    }
+  }, [newest, chain, liveCount])
+
+  const alreadyAnchored =
+    !!newest && !!chain?.head && chain.head.observationId.replace(/^0x/, '') === newest.id
+
   useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl) }, [previewUrl])
 
   const measure: Measure = useMemo(() => {
@@ -60,6 +179,47 @@ export function GardenView() {
     if (h > 0) return { method: 'height', height_m: h }
     return { method: 'manual', biomassKg: 0 }
   }, [dbh, height])
+
+  // Re-label the box on a language toggle — but only for a recognized species;
+  // a custom typed name has no translation to switch to.
+  useEffect(() => {
+    if (SPECIES_LIST.some((s) => s.id === species)) setSpeciesQuery(speciesLabel(species, km))
+  }, [km, species])
+
+  // While the box still shows the selected species' own label untouched, browsing
+  // should surface the full list — matching that literal "Name (Scientific)" string
+  // against the bare names would otherwise return no results.
+  const speciesMatches = useMemo(
+    () => matchSpecies(speciesQuery === speciesLabel(species, km) ? '' : speciesQuery),
+    [speciesQuery, species, km],
+  )
+
+  function selectSpecies(id: string) {
+    setSpecies(id)
+    setSpeciesQuery(speciesLabel(id, km))
+    setSpeciesOpen(false)
+  }
+
+  /** Resolve free-typed text on blur/Enter: snap to an exact name match, else keep it as a custom species. */
+  function commitSpeciesQuery() {
+    const q = speciesQuery.trim()
+    if (!q) { setSpeciesQuery(speciesLabel(species, km)); return }
+    // Already showing the selected species' own label (either language) — nothing to resolve.
+    // Without this check, re-committing on a stray blur (e.g. clicking the language
+    // toggle while the field still has focus) would treat "Guava (Psidium guajava)"
+    // as unrecognized free text and overwrite a valid `guava` pick with that whole string.
+    if (q === speciesLabel(species, km) || q === speciesLabel(species, !km)) return
+    const qLower = q.toLowerCase()
+    const exact = SPECIES_LIST.find(
+      (s) =>
+        s.en.toLowerCase() === qLower ||
+        s.km === q ||
+        speciesLabel(s.id, true) === q ||
+        speciesLabel(s.id, false).toLowerCase() === qLower,
+    )
+    if (exact) selectSpecies(exact.id)
+    else setSpecies(q)
+  }
 
   const est = useMemo(() => {
     const per = estimateCarbon(measure, species)
@@ -172,15 +332,58 @@ export function GardenView() {
         <>
           <img className="ocr-preview" src={previewUrl} alt="" />
 
-          <label className="voice-field">
+          <label className="voice-field species-combo">
             <span>{km ? 'ប្រភេទ' : 'Species'}</span>
-            <div className="crop-chips">
-              {SPECIES.map((s) => (
-                <button key={s} type="button" className={species === s ? 'active' : ''} onClick={() => setSpecies(s)}>
-                  {km ? SP_KM[s] : s}
-                </button>
-              ))}
-            </div>
+            <input
+              type="text" value={speciesQuery} maxLength={60} spellCheck={false}
+              placeholder={km ? 'ស្វែងរក ឬវាយបញ្ចូលប្រភេទ…' : 'Search or type a species…'}
+              onFocus={() => setSpeciesOpen(true)}
+              onChange={(e) => { setSpeciesQuery(e.target.value); setSpeciesOpen(true); setSpeciesHighlight(0) }}
+              onKeyDown={(e) => {
+                if (e.key === 'ArrowDown') {
+                  e.preventDefault()
+                  setSpeciesOpen(true)
+                  setSpeciesHighlight((h) => Math.min(h + 1, speciesMatches.length - 1))
+                } else if (e.key === 'ArrowUp') {
+                  e.preventDefault()
+                  setSpeciesHighlight((h) => Math.max(h - 1, 0))
+                } else if (e.key === 'Enter') {
+                  e.preventDefault()
+                  if (speciesOpen && speciesMatches[speciesHighlight]) selectSpecies(speciesMatches[speciesHighlight].id)
+                  else commitSpeciesQuery()
+                  setSpeciesOpen(false)
+                } else if (e.key === 'Escape') {
+                  setSpeciesOpen(false)
+                }
+              }}
+              onBlur={() => { commitSpeciesQuery(); setSpeciesOpen(false) }}
+              role="combobox"
+              aria-expanded={speciesOpen}
+            />
+            {speciesOpen ? (
+              <div className="species-combo-panel" role="listbox">
+                {speciesMatches.map((s, i) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    role="option"
+                    aria-selected={species === s.id}
+                    className={i === speciesHighlight ? 'active' : ''}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onMouseEnter={() => setSpeciesHighlight(i)}
+                    onClick={() => selectSpecies(s.id)}
+                  >
+                    <span>{km ? s.km : s.en}</span>
+                    {s.scientific ? <small>({s.scientific})</small> : null}
+                  </button>
+                ))}
+                {speciesMatches.length === 0 && speciesQuery.trim() ? (
+                  <div className="species-combo-empty">
+                    {km ? `ប្រើ “${speciesQuery.trim()}” ជាប្រភេទផ្ទាល់ខ្លួន` : `Use “${speciesQuery.trim()}” as a custom species`}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </label>
 
           <div className="garden-measure">
@@ -245,7 +448,7 @@ export function GardenView() {
           {publishMsg ? <p className="garden-publish-msg">{publishMsg}</p> : null}
           {[...obs].reverse().slice(0, 30).map((o) => (
             <div key={o.id} className="garden-row">
-              <span className="garden-row-sp">{km ? SP_KM[o.species] ?? o.species : o.species}{o.count > 1 ? ` ×${o.count}` : ''}</span>
+              <span className="garden-row-sp">{speciesShortLabel(o.species, km)}{o.count > 1 ? ` ×${o.count}` : ''}</span>
               <span className="garden-row-co2">{o.co2Kg} kg CO₂</span>
               <span className="garden-row-id" title={o.id}>
                 {published.has(o.id) ? '🌐' : '✅'} {o.id.slice(0, 8)}
@@ -254,6 +457,113 @@ export function GardenView() {
           ))}
         </div>
       ) : null}
+
+      <div className="garden-chain">
+        <div className="garden-chain-head">
+          <b>⛓ {km ? 'ចងភ្ជាប់លើ CSB' : 'Anchor on CSB'}</b>
+          <small>{km ? 'ស្រេចចិត្ត' : 'optional'}</small>
+        </div>
+        <p className="garden-chain-lead">
+          {km
+            ? 'ហត្ថលេខាបញ្ជាក់ថា “នរណានិយាយ” មិនមែន “ពិតឬអត់”។ ការចងភ្ជាប់បន្ថែមកាលបរិច្ឆេទដែលអ្នកដទៃយល់ព្រម និងកន្លែងឲ្យអ្នកផ្ទៀងផ្ទាត់មានអាជ្ញាបណ្ណដាក់ឈ្មោះ។ មានតែ hash ទេដែលចេញទៅ។'
+            : 'A signature proves who said something, never that it is true. Anchoring adds a date somebody else agrees with, and a place a licensed field verifier can put their name. Only the hash leaves this phone — never the plot name, the photo, or your location.'}
+        </p>
+
+        <label className="voice-field">
+          <span>{km ? 'អាសយដ្ឋាន CSB' : 'CSB read endpoint'}</span>
+          <input
+            type="text" value={csbBase} spellCheck={false} placeholder="https://csb.example"
+            onChange={(e) => {
+              setCsbBase(e.target.value)
+              localStorage.setItem(CSB_KEY, e.target.value)
+            }}
+          />
+        </label>
+
+        {!csbBase.trim() ? null : !chain?.available ? (
+          <p className="garden-chain-note">
+            {km ? 'មិនអាចទាក់ទង CSB បានទេ — សួនរបស់អ្នកនៅតែដំណើរការធម្មតា។' : 'CSB not reachable — your garden works exactly as before.'}
+            {chain?.reason ? <> <small>({chain.reason})</small></> : null}
+          </p>
+        ) : !chain.anchored ? (
+          <p className="garden-chain-note">
+            {km ? 'សួននេះមិនទាន់ចងភ្ជាប់ទេ។' : 'This plot has never been anchored.'}
+          </p>
+        ) : (
+          <div className="garden-chain-status">
+            <div><span>{km ? 'កំណត់ត្រាបានចង' : 'Anchored records'}</span><b>{chain.records}</b></div>
+            <div>
+              <span>{km ? 'ដើមឈើបានផ្ទៀងផ្ទាត់' : 'Verified trees'}</span>
+              <b>{chain.verifiedCount ? chain.verifiedCount : (km ? 'រង់ចាំ' : 'awaiting a verifier')}</b>
+            </div>
+            {chain.verifier ? (
+              <div>
+                <span>{km ? 'ផ្ទៀងផ្ទាត់ដោយ' : 'Verified by'}</span>
+                <b>{chain.verifier.label || chain.verifier.classes.join(', ')}</b>
+              </div>
+            ) : null}
+            {chain.title ? (
+              <div>
+                <span>{km ? 'ប័ណ្ណសួន' : 'Grove title'}</span>
+                <b>{chain.title.supply} {chain.title.symbol}</b>
+              </div>
+            ) : null}
+          </div>
+        )}
+
+        {anchor && !alreadyAnchored ? (
+          <>
+            <p className="garden-chain-note">
+              {km
+                ? 'បើកនៅ CSB ដើម្បីពិនិត្យ និងចុះហត្ថលេខាដោយកាបូបផ្ទាល់ខ្លួន។ Gas ឥតគិតថ្លៃ។'
+                : 'Open it on CSB to read what it commits and sign with your own wallet. Gas on CSB is free, so anchoring costs a signature.'}
+            </p>
+            {/* Copying 330 characters of hex on a phone is a bad time, so the
+                primary path is a link that carries it. The calldata is not a
+                secret — it is the same public hash anyone can recompute from
+                the record — so putting it in a URL discloses nothing. */}
+            <a
+              className="voice-primary big garden-chain-sign"
+              href={`${csbBase.replace(/\/+$/, '')}/anchor.html?data=${anchor.data}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              ⛓ {km ? 'ចុះហត្ថលេខានៅ CSB' : 'Sign on CSB'}
+            </a>
+            <div className="garden-chain-call">
+              <code title={anchor.data}>{anchor.data.slice(0, 42)}…</code>
+              <button
+                className="voice-ghost small"
+                onClick={() => {
+                  void navigator.clipboard?.writeText(anchor.data)
+                  setCopied(true)
+                  setTimeout(() => setCopied(false), 1500)
+                }}
+              >
+                {copied ? '✓' : (km ? '⧉ ចម្លង' : '⧉ Copy')}
+              </button>
+            </div>
+            <p className="garden-chain-note">
+              <small>
+                {km ? 'ដើម' : 'trees'}: {anchor.liveCount} · plot {anchor.plotId.slice(0, 10)}… ·{' '}
+                {anchor.prevId.startsWith('0x0000') ? (km ? 'កំណត់ត្រាដំបូង' : 'first record') : `prev ${anchor.prevId.slice(0, 10)}…`}
+              </small>
+            </p>
+          </>
+        ) : alreadyAnchored ? (
+          <p className="garden-chain-note">
+            ✓ {km ? 'កំណត់ត្រាចុងក្រោយបានចងរួចហើយ។' : 'Your newest record for this plot is already anchored.'}
+          </p>
+        ) : null}
+
+        <p className="garden-chain-note">
+          <small>
+            {km
+              ? 'CSB កត់ត្រា ដើមឈើ មិនមែនកាបូន។ គ្មានអ្វីនៅទីនេះជាក្រេឌីតកាបូនទេ។'
+              : 'CSB records trees, not carbon. Nothing here is a carbon credit — it is a count somebody can walk out and check.'}
+          </small>
+        </p>
+      </div>
 
       <p className="voice-tip">
         {km
