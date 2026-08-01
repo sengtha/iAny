@@ -2271,6 +2271,19 @@ progress {
   width: 100%;
   height: auto;
 }
+.qr-scanner {
+  text-align: center;
+  margin: 10px 0;
+}
+.qr-scanner-video {
+  width: 100%;
+  max-width: 360px;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 14px;
+  background: #000;
+  border: 2px solid var(--accent);
+}
 
 /* iAny Trace (/trace) — proof of origin trust score */
 /* Two big, plain choices — a maker vs. a buyer — instead of a row of tabs. */

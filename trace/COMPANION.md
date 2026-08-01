@@ -88,9 +88,12 @@ the same `/custody/:capsule` timeline (sender = `handoff`, receiver = `pickup`),
 each attributed to its company via its delegation. Verify a completed pair
 offline with `verifyHandoff(release, receipt, now)`.
 
-The code is shown both as text and as a **QR** (encoding `/custody?h=<code>`), so
-the receiver can scan it with any phone camera — the link opens the console
-straight into *Receive* with the code pre-filled. Typing still works everywhere.
+The code is shown both as text and as a **QR** (encoding `/custody?h=<code>`).
+The receiver can either scan it **in-app** (the *Receive* tab has a live camera
+scanner using the native `BarcodeDetector`), or scan it with their phone's normal
+camera — the link opens the console straight into *Receive* with the code
+pre-filled. Where `BarcodeDetector` is absent (iOS Safari / Firefox) the scan
+button hides and typing still works everywhere.
 
 ## Roster & revocation (Phase 3)
 

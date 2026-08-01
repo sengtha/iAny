@@ -25,6 +25,8 @@ import {
   type RosterEntry,
 } from '../../trace/web/companion'
 import { qrSvg } from '../lib/qr'
+import { isBarcodeSupported } from '../lib/barcode'
+import { QrScanner } from './QrScanner'
 
 /**
  * 🚚 Trace companion console (/custody) — the B2B tool for supply-chain actors
@@ -163,8 +165,19 @@ function HandoffSend({ km }: { km: boolean }) {
   )
 }
 
+/** Pull a handoff code out of a scanned QR: a /custody?h=CODE URL, or a bare code. */
+function codeFromScan(value: string): string | null {
+  try {
+    const h = new URL(value).searchParams.get('h')
+    if (h) return h.toUpperCase()
+  } catch { /* not a URL */ }
+  const t = value.trim().toUpperCase()
+  return /^[A-Z2-9]{4,12}$/.test(t) ? t : null
+}
+
 function HandoffReceive({ km, deepCode }: { km: boolean; deepCode: string | null }) {
   const [code, setCode] = useState((deepCode ?? '').toUpperCase())
+  const [scanning, setScanning] = useState(false)
   const [offer, setOffer] = useState<HandoffRelease | null>(null)
   const [senderCo, setSenderCo] = useState<{ name: string; verified: boolean } | null>(null)
   const [name, setName] = useState('')
@@ -225,9 +238,29 @@ function HandoffReceive({ km, deepCode }: { km: boolean; deepCode: string | null
   }
   return (
     <>
+      {scanning ? (
+        <QrScanner
+          hint={km ? 'តម្រង់ QR ចូលក្នុងស៊ុម' : 'Point the camera at the QR code'}
+          unsupported={km ? 'ឧបករណ៍នេះស្កេនមិនបាន — សូមវាយលេខកូដ' : 'This device can’t scan — type the code instead'}
+          closeLabel={km ? 'បិទ' : 'Close'}
+          onClose={() => setScanning(false)}
+          onScan={(value) => {
+            setScanning(false)
+            const c = codeFromScan(value)
+            if (c) { setCode(c); void lookup(c) }
+            else setError(km ? 'QR នេះមិនមែនជាលេខកូដប្រគល់' : 'That QR is not a handoff code')
+          }}
+        />
+      ) : null}
+
       <div className="voice-controls">
         <input className="handoff-codein" value={code} placeholder={km ? 'លេខកូដ' : 'Handoff code'}
           maxLength={12} onChange={(e) => setCode(e.target.value.toUpperCase())} />
+        {isBarcodeSupported() ? (
+          <button className="voice-ghost" onClick={() => { setError(''); setScanning(true) }}>
+            📷 {km ? 'ស្កេន' : 'Scan'}
+          </button>
+        ) : null}
         <button className="voice-primary" onClick={() => lookup()} disabled={busy || !code.trim()}>
           🔎 {km ? 'រក' : 'Look up'}
         </button>
