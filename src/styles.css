@@ -2341,6 +2341,10 @@ progress {
   background: #fff; /* QR needs a light quiet zone to scan reliably */
   border-radius: 12px;
 }
+.handoff-qr.lg {
+  width: 340px;
+  max-width: 92vw;
+}
 .handoff-qr svg {
   display: block;
   width: 100%;
@@ -2349,6 +2353,23 @@ progress {
 .qr-scanner {
   text-align: center;
   margin: 10px 0;
+}
+/* Show-a-QR block + the row of small actions beside a field */
+.qr-show {
+  text-align: center;
+  margin: 8px 0;
+}
+.qr-show-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+.qr-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 6px 0;
 }
 .qr-scanner-video {
   width: 100%;

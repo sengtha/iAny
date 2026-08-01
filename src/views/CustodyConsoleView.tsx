@@ -32,6 +32,7 @@ import {
 import { qrSvg } from '../lib/qr'
 import { isBarcodeSupported } from '../lib/barcode'
 import { QrScanner } from './QrScanner'
+import { QrShow, ScanButton } from './QrField'
 import { computeTrust, fetchPage, photoSignature } from '../../trace/core/trace'
 
 /**
@@ -190,6 +191,7 @@ function HandoffSend({ km, deepCapsule }: { km: boolean; deepCapsule: string }) 
         <label className="voice-field">
           <span>{km ? 'លេខសម្គាល់កាបសែល' : 'Capsule id'}</span>
           <input type="text" value={capsule} placeholder="64 hex…" onChange={(e) => setCapsule(e.target.value)} />
+          <ScanButton km={km} onScan={setCapsule} label={km ? 'ស្កេនផលិតផល' : 'Scan product'} />
         </label>
         <label className="voice-field">
           <span>{km ? 'ឈ្មោះរបស់អ្នក (ស្រេចចិត្ត)' : 'Your name (optional)'}</span>
@@ -478,6 +480,7 @@ function AddEvent({ km, deepCapsule }: { km: boolean; deepCapsule: string }) {
         <label className="voice-field">
           <span>{km ? 'លេខសម្គាល់កាបសែល (Capsule id)' : 'Capsule id'}</span>
           <input type="text" value={capsule} placeholder="64 hex…" onChange={(e) => setCapsule(e.target.value)} />
+          <ScanButton km={km} onScan={setCapsule} label={km ? 'ស្កេនផលិតផល' : 'Scan product'} />
         </label>
         <label className="voice-field">
           <span>{km ? 'ឈ្មោះរបស់អ្នក' : 'Your name'}</span>
@@ -599,9 +602,12 @@ function Identity({ km }: { km: boolean }) {
         <span>{km ? 'កូនសោសាធារណៈរបស់អ្នក (បញ្ជូនទៅអ្នកគ្រប់គ្រង)' : 'Your public key (send to your admin)'}</span>
         <textarea className="custody-key" readOnly value={pub} rows={2} onFocus={(e) => e.target.select()} />
       </label>
-      <button className="voice-ghost" onClick={() => void navigator.clipboard?.writeText(pub)}>
-        📋 {km ? 'ចម្លងកូនសោ' : 'Copy key'}
-      </button>
+      <div className="qr-row">
+        <QrShow value={pub} km={km} label={km ? 'បង្ហាញ QR កូនសោ' : 'Show key QR'} />
+        <button className="voice-ghost small" onClick={() => void navigator.clipboard?.writeText(pub)}>
+          ⧉ {km ? 'ចម្លងកូនសោ' : 'Copy key'}
+        </button>
+      </div>
 
       <div className={`custody-badge ${del ? 'company' : 'self'}`} style={{ marginTop: 14 }}>
         {del
@@ -619,9 +625,12 @@ function Identity({ km }: { km: boolean }) {
         <textarea className="custody-key" value={paste} rows={4} placeholder='{"kind":"trace-delegation",…}'
           onChange={(e) => setPaste(e.target.value)} />
       </label>
-      <button className="voice-primary" onClick={doImport} disabled={!paste.trim()}>
-        ⬇️ {km ? 'នាំចូល' : 'Import delegation'}
-      </button>
+      <div className="qr-row">
+        <ScanButton km={km} onScan={setPaste} label={km ? 'ស្កេន delegation' : 'Scan delegation'} />
+        <button className="voice-primary" onClick={doImport} disabled={!paste.trim()}>
+          ⬇️ {km ? 'នាំចូល' : 'Import delegation'}
+        </button>
+      </div>
       {error ? <p className="voice-error">{error}</p> : null}
       {msg ? <p className="sign-review-note">{msg}</p> : null}
     </>
@@ -713,6 +722,7 @@ function Verification({ km, companyPub }: { km: boolean; companyPub: string | nu
         <textarea className="custody-key" value={subject} rows={2}
           placeholder={km ? 'កូនសោ root របស់ក្រុមហ៊ុននោះ' : "their company root key"}
           onChange={(e) => setSubject(e.target.value)} />
+        <ScanButton km={km} onScan={setSubject} label={km ? 'ស្កេនកូនសោក្រុមហ៊ុន' : 'Scan company key'} />
         <input type="text" value={ourName} maxLength={80}
           placeholder={km ? 'ឈ្មោះរបស់អ្នក (បង្ហាញជាអ្នកធានា)' : 'your name (shown as the voucher)'}
           onChange={(e) => setOurName(e.target.value)} />
@@ -825,6 +835,7 @@ function Company({ km }: { km: boolean }) {
         <label className="voice-field" style={{ marginTop: 10 }}>
           <span>{km ? 'កូនសោ root ក្រុមហ៊ុន' : 'Company root key'}</span>
           <textarea className="custody-key" readOnly value={companyPub} rows={2} onFocus={(e) => e.target.select()} />
+          <QrShow value={companyPub} km={km} label={km ? 'បង្ហាញ QR កូនសោ root' : 'Show root-key QR'} />
         </label>
       ) : null}
       {regMsg ? <p className="sign-review-note">{regMsg}</p> : null}
@@ -839,6 +850,7 @@ function Company({ km }: { km: boolean }) {
         <label className="voice-field">
           <span>{km ? 'កូនសោសាធារណៈបុគ្គលិក' : 'Staff public key'}</span>
           <textarea className="custody-key" value={staffKey} rows={2} onChange={(e) => setStaffKey(e.target.value)} />
+          <ScanButton km={km} onScan={setStaffKey} label={km ? 'ស្កេនកូនសោបុគ្គលិក' : 'Scan staff key'} />
         </label>
         <label className="voice-field">
           <span>{km ? 'ឈ្មោះបុគ្គលិក' : 'Staff name'}</span>
@@ -862,9 +874,12 @@ function Company({ km }: { km: boolean }) {
         <label className="voice-field" style={{ marginTop: 10 }}>
           <span>{km ? 'ផ្ញើអត្ថបទនេះទៅបុគ្គលិក' : 'Send this to the staffer'}</span>
           <textarea className="custody-key" readOnly value={delOut} rows={5} onFocus={(e) => e.target.select()} />
-          <button className="voice-ghost" onClick={() => void navigator.clipboard?.writeText(delOut)}>
-            📋 {km ? 'ចម្លង' : 'Copy delegation'}
-          </button>
+          <div className="qr-row">
+            <QrShow value={delOut} km={km} size={4} label={km ? 'បង្ហាញ QR ឲ្យបុគ្គលិកស្កេន' : 'Show QR for the staffer'} />
+            <button className="voice-ghost small" onClick={() => void navigator.clipboard?.writeText(delOut)}>
+              ⧉ {km ? 'ចម្លង' : 'Copy'}
+            </button>
+          </div>
         </label>
       ) : null}
 

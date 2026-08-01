@@ -247,6 +247,7 @@ function Create({ L }: { L: LFn }) {
         <h3>{L('Proof created', 'បង្កើតភស្តុតាងរួចរាល់')}</h3>
         <TierBadge tier={tierFromCapsule(capsule)} L={L} />
         <p className="trace-id">ID: {capsule.id.slice(0, 16)}…</p>
+        <CapsuleIdQr id={capsule.id} L={L} />
         <div className="trace-thumbs">
           {capsule.match.photos.map((p, i) => (
             <img key={i} src={p.thumb} alt="" />
@@ -735,6 +736,32 @@ function ProvenancePage({
  * links to the same chain in the companion console (/custody). One product, one
  * journey; this is the door to the partner half of it.
  */
+/** The raw capsule id as a QR — for any tool/partner that wants the id itself
+ *  (the partner link below is the friendlier route for delivery staff). */
+function CapsuleIdQr({ id, L }: { id: string; L: LFn }) {
+  const [open, setOpen] = useState(false)
+  if (!open) {
+    return (
+      <button className="voice-ghost small" onClick={() => setOpen(true)}>
+        ▦ {L('Show product ID as QR', 'បង្ហាញលេខសម្គាល់ជា QR')}
+      </button>
+    )
+  }
+  return (
+    <div className="qr-show">
+      <div className="handoff-qr" dangerouslySetInnerHTML={{ __html: qrSvg(id) }} />
+      <div className="qr-show-actions">
+        <button className="voice-ghost small" onClick={() => void navigator.clipboard?.writeText(id)}>
+          ⧉ {L('Copy ID', 'ចម្លងលេខសម្គាល់')}
+        </button>
+        <button className="voice-ghost small" onClick={() => setOpen(false)}>
+          ✕ {L('Hide', 'បិទ')}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 /**
  * The concrete Trace → Custody link: hand the driver/warehouse a QR that opens
  * the partner console with **this capsule already filled in**, so they never have
