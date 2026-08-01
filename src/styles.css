@@ -2293,6 +2293,12 @@ progress {
 .custody-tag.self {
   font-weight: 500;
 }
+/* How a company earned its tick — shown inline so the badge is auditable */
+.custody-how {
+  font-style: normal;
+  font-weight: 500;
+  opacity: 0.85;
+}
 
 /* /custody — handoff (two-party co-sign) */
 .voice-lead-sm {

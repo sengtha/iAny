@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTraceCaps } from './context'
 import type { SttState } from './adapters'
-import { fetchCustody, type CustodyItem } from './companion'
+import { fetchCustody, fetchPartner, type CustodyItem, type PartnerProof } from './companion'
 import { shareJson } from '../../src/lib/share'
 import { qrSvg } from '../../src/lib/qr'
 import {
@@ -844,6 +844,15 @@ function ShareLink({ capsuleId: id, pageUrl, L }: { capsuleId: string; pageUrl: 
 
 /** One custody/handoff event row (shared by the single view and the journey). */
 function CustodyRow({ it, L }: { it: CustodyItem; L: LFn }) {
+  // A tick alone is unearned authority — show HOW the company was verified, and
+  // let the reader open the partner page to audit the evidence themselves.
+  const [proofs, setProofs] = useState<PartnerProof[] | null>(null)
+  useEffect(() => {
+    if (it.companyKey && it.company?.verified) {
+      void fetchPartner(it.companyKey).then((p) => setProofs(p?.proofs ?? []))
+    }
+  }, [it.companyKey, it.company?.verified])
+  const how = proofs?.[0]
   return (
     <div className="custody-row">
       <div className="custody-row-top">
@@ -851,6 +860,13 @@ function CustodyRow({ it, L }: { it: CustodyItem; L: LFn }) {
         {it.company ? (
           <span className={`custody-tag ${it.company.verified ? 'ok' : ''}`}>
             {it.company.verified ? '✓ ' : ''}{it.company.name}
+            {how ? (
+              <em className="custody-how">
+                {how.method === 'domain' ? ` · 🌐 ${how.evidence}`
+                  : how.method === 'peer' ? ` · 🤝 ${how.detail || L('vouched', 'បានធានា')}`
+                    : ` · 🏛️ ${how.evidence}`}
+              </em>
+            ) : null}
           </span>
         ) : (
           <span className="custody-tag self">{L('self-claimed', 'ដោយខ្លួនឯង')}</span>

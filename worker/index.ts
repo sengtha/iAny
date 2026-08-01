@@ -169,7 +169,8 @@ export default {
       return serveApk(request, env)
     }
     if (url.pathname.startsWith('/api/trace/')) {
-      return serveTrace(url, request, env)
+      // Trace's operator-only action (registry verification) reuses iAny's admin token.
+      return serveTrace(url, request, { ...env, ADMIN_TOKEN: env.RADIO_ADMIN_TOKEN })
     }
     // Grove node — the decentralized garden-carbon network (/garden). Devices
     // POST signed observations; the node re-verifies every signature before

@@ -16,6 +16,7 @@ import {
   signRelease,
   signReceipt,
   signRevocation,
+  signVouch,
   verifyDelegation,
   type ActorKey,
   type CustodyEvent,
@@ -172,6 +173,49 @@ export async function revokeStaff(staffKey: string): Promise<void> {
   await postJson('/partner/revoke', rev)
 }
 
+/* ------------------------------------------------ earning a ✓ badge --- */
+
+/** How a company proved itself. The badge shows the method, never a bare tick. */
+export interface PartnerProof {
+  method: 'domain' | 'registry' | 'peer'
+  evidence: string
+  detail: string | null
+  verifier: string | null
+  createdAt: string
+}
+
+/** Where a company must publish its root key for domain proof. */
+export const WELL_KNOWN_PATH = '/.well-known/trace-partner.txt'
+
+/**
+ * Domain proof — ask the node to fetch `https://<domain>/.well-known/trace-partner.txt`
+ * and confirm it contains our root key. No gatekeeper; anyone can re-check it.
+ */
+export async function verifyDomain(domain: string): Promise<{ ok: boolean; error?: string }> {
+  const key = await getCompanyKey()
+  try {
+    const res = await fetch(`${NODE}/partner/verify-domain`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ company: key.pub, domain }),
+    })
+    if (res.ok) return { ok: true }
+    const d = (await res.json().catch(() => ({}))) as { error?: string }
+    return { ok: false, error: d.error ?? `failed (${res.status})` }
+  } catch {
+    return { ok: false, error: 'offline' }
+  }
+}
+
+/** Vouch for another company with our root key (the decentralized path to a ✓). */
+export async function vouchFor(subject: string, voucherName: string, note?: string): Promise<void> {
+  const key = await getCompanyKey()
+  const v = await signVouch(
+    { subject, voucher: key.pub, voucherName, note, at: new Date().toISOString() },
+    key.keyPair,
+  )
+  await postJson('/partner/vouch', v)
+}
+
 /** The set of staff keys this company has revoked (for the roster's status). */
 export async function fetchRevocations(companyKey: string): Promise<Set<string>> {
   try {
@@ -311,12 +355,18 @@ export interface CustodyItem {
 }
 
 /** Resolve a company root key → its public name/verified (or null if unknown). */
-export async function fetchPartner(companyKey: string): Promise<{ name: string; verified: boolean } | null> {
+export async function fetchPartner(
+  companyKey: string,
+): Promise<{ name: string; verified: boolean; region: string | null; proofs: PartnerProof[] } | null> {
   try {
     const res = await fetch(`${NODE}/partner/${companyKey}`)
     if (!res.ok) return null
-    const d = (await res.json()) as { registered?: boolean; name?: string; verified?: boolean }
-    return d.registered ? { name: d.name ?? '', verified: Boolean(d.verified) } : null
+    const d = (await res.json()) as {
+      registered?: boolean; name?: string; verified?: boolean; region?: string | null; proofs?: PartnerProof[]
+    }
+    return d.registered
+      ? { name: d.name ?? '', verified: Boolean(d.verified), region: d.region ?? null, proofs: d.proofs ?? [] }
+      : null
   } catch {
     return null
   }

@@ -409,6 +409,48 @@ export async function verifyPartner(p: PartnerRegistration): Promise<boolean> {
   return p?.kind === 'trace-partner' && (await verifyDigest(unsigned, sig, p.company))
 }
 
+/* ------------------------------------------------------- vouching --- */
+
+/**
+ * One company vouching for another ("I know this is really Kampot Pepper Co-op").
+ * Signed by the VOUCHER's root key, so anyone can check who said it — and judge
+ * the claim by how much they trust the voucher. This is the decentralized third
+ * path to a ✓, alongside domain proof (automatic) and registry (operator-checked).
+ */
+export interface PartnerVouch {
+  v: 1
+  kind: 'trace-vouch'
+  /** The company being vouched for. */
+  subject: string
+  /** The company root key making the claim. */
+  voucher: string
+  voucherName: string
+  note: string
+  at: string
+  sig: string
+}
+
+export async function signVouch(
+  input: { subject: string; voucher: string; voucherName: string; note?: string; at: string },
+  rootKey: CryptoKeyPair,
+): Promise<PartnerVouch> {
+  const unsigned = {
+    v: 1 as const, kind: 'trace-vouch' as const,
+    subject: input.subject, voucher: input.voucher,
+    voucherName: input.voucherName.slice(0, 80), note: (input.note ?? '').slice(0, 200),
+    at: input.at,
+  }
+  return { ...unsigned, sig: await signDigest(unsigned, rootKey) }
+}
+
+/** Verify a vouch is signed by the voucher key it names (and isn't self-vouching). */
+export async function verifyVouch(v: PartnerVouch): Promise<boolean> {
+  const { sig, ...unsigned } = v
+  if (v?.kind !== 'trace-vouch') return false
+  if (v.subject === v.voucher) return false // a company can't vouch for itself
+  return verifyDigest(unsigned, sig, v.voucher)
+}
+
 /* ------------------------------------------------------- revocation --- */
 
 /**

@@ -77,6 +77,28 @@ CREATE TABLE IF NOT EXISTS trace_partners (
   updated_at  TEXT NOT NULL
 );
 
+-- How a company earned its ✓ — the badge is a METHOD + EVIDENCE, never a bare
+-- boolean, so a buyer can see who checked what and re-check it themselves.
+-- A company may hold several proofs; the strongest is shown.
+--   domain   — the company published its key at https://<domain>/.well-known/
+--              trace-partner.txt; the node fetched and confirmed it. No gatekeeper,
+--              re-checkable by anyone.
+--   registry — an operator recorded an official record (e.g. MoC #12345) after
+--              checking it. Evidence + who checked is stored.
+--   peer     — another company (co-op / association / verified partner) SIGNED a
+--              vouch with its root key. Decentralized; strength = the voucher's.
+CREATE TABLE IF NOT EXISTS trace_partner_proofs (
+  company_key TEXT NOT NULL,         -- the company being verified
+  method      TEXT NOT NULL,         -- domain | registry | peer
+  evidence    TEXT NOT NULL,         -- domain name / record no. / voucher key
+  detail      TEXT,                  -- free-text note (e.g. voucher's name)
+  verifier    TEXT,                  -- who established it ('node', operator, voucher key)
+  raw         TEXT,                  -- signed vouch, when method = peer
+  created_at  TEXT NOT NULL,
+  PRIMARY KEY (company_key, method, evidence)
+);
+CREATE INDEX IF NOT EXISTS idx_trace_proofs_company ON trace_partner_proofs (company_key);
+
 -- Two-party handoff transport (Phase 2). A sender publishes a signed RELEASE
 -- under a short code; the receiver reads it and counter-signs a RECEIPT. On
 -- completion the node writes two trace_custody rows (release=handoff,

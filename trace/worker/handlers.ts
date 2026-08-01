@@ -28,10 +28,12 @@ import {
   verifyPartner,
   verifyRelease,
   verifyRevocation,
+  verifyVouch,
   type CustodyRecord,
   type HandoffReceipt,
   type HandoffRelease,
   type PartnerRegistration,
+  type PartnerVouch,
   type Revocation,
 } from '../core/companion'
 import { sha256Hex } from '../../grove/core/grove'
@@ -42,6 +44,8 @@ export interface TraceEnv {
   DB: D1Database
   /** R2 bucket for published page capsules, under the `trace/pages/` prefix. */
   MODELS: R2Bucket
+  /** Optional bearer token gating operator-only actions (registry verification). */
+  ADMIN_TOKEN?: string
 }
 
 const JSON_HEADERS = { 'content-type': 'application/json', 'access-control-allow-origin': '*' }
@@ -91,6 +95,10 @@ export async function serveTrace(url: URL, request: Request, env: TraceEnv): Pro
     }
     if (path === 'partner' && request.method === 'POST') return await tracePartnerRegister(request, env)
     if (path === 'partner/revoke' && request.method === 'POST') return await tracePartnerRevoke(request, env)
+    // Earning a ✓: domain proof (automatic), peer vouch (signed), registry (operator).
+    if (path === 'partner/verify-domain' && request.method === 'POST') return await traceVerifyDomain(request, env)
+    if (path === 'partner/vouch' && request.method === 'POST') return await traceVouch(request, env)
+    if (path === 'partner/verify-registry' && request.method === 'POST') return await traceVerifyRegistry(request, env)
     if (path.startsWith('partner/') && path.endsWith('/revocations') && request.method === 'GET') {
       return await tracePartnerRevocations(path.slice('partner/'.length, -'/revocations'.length), env)
     }
@@ -589,6 +597,128 @@ async function traceHandoffAccept(code: string, request: Request, env: TraceEnv)
   return json({ ok: true, capsule: rel.capsule, fromCompany, toCompany })
 }
 
+/* ------------------------------------------- earning a ✓ (three paths) --- */
+
+// Where a company publishes its key to prove it owns a domain.
+const WELL_KNOWN = '/.well-known/trace-partner.txt'
+const DOMAIN_RE = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/
+
+async function addProof(
+  env: TraceEnv,
+  p: { company: string; method: string; evidence: string; detail?: string | null; verifier?: string | null; raw?: string | null },
+): Promise<void> {
+  await env.DB.prepare(
+    `INSERT INTO trace_partner_proofs (company_key, method, evidence, detail, verifier, raw, created_at)
+     VALUES (?,?,?,?,?,?,?)
+     ON CONFLICT(company_key, method, evidence) DO UPDATE SET
+       detail = excluded.detail, verifier = excluded.verifier, raw = excluded.raw`,
+  ).bind(p.company, p.method, p.evidence, p.detail ?? null, p.verifier ?? null, p.raw ?? null,
+    new Date().toISOString()).run()
+  // Any proof lights the badge; the partner page shows which one(s).
+  await env.DB.prepare('UPDATE trace_partners SET verified = 1 WHERE company_key = ?')
+    .bind(p.company).run()
+}
+
+/**
+ * Domain proof — no gatekeeper. The company publishes its root key at
+ * `https://<domain>/.well-known/trace-partner.txt`; we fetch it and confirm.
+ * Anyone can repeat this check independently, which is the point.
+ */
+async function traceVerifyDomain(request: Request, env: TraceEnv): Promise<Response> {
+  let body: { company?: string; domain?: string }
+  try {
+    body = await request.json()
+  } catch {
+    return json({ error: 'expected json' }, 400)
+  }
+  const company = String(body.company ?? '')
+  const domain = String(body.domain ?? '').trim().toLowerCase()
+    .replace(/^https?:\/\//, '').replace(/\/.*$/, '')
+  if (!TRACE_KEY_RE.test(company)) return json({ error: 'bad company key' }, 400)
+  // Guard against pointing the node at internal hosts (SSRF).
+  if (!DOMAIN_RE.test(domain) || domain.endsWith('.local') || domain === 'localhost') {
+    return json({ error: 'bad domain' }, 400)
+  }
+
+  let text = ''
+  try {
+    const res = await fetch(`https://${domain}${WELL_KNOWN}`, {
+      redirect: 'follow', headers: { accept: 'text/plain' },
+      signal: AbortSignal.timeout(8000),
+    })
+    if (!res.ok) return json({ error: `could not read https://${domain}${WELL_KNOWN}`, status: res.status }, 400)
+    text = (await res.text()).slice(0, 4096)
+  } catch (e) {
+    return json({ error: 'could not reach the domain', detail: e instanceof Error ? e.message : String(e) }, 400)
+  }
+  if (!text.includes(company)) {
+    return json({ error: 'the file does not contain this company key', expected: company }, 400)
+  }
+  await addProof(env, { company, method: 'domain', evidence: domain, verifier: 'node' })
+  return json({ ok: true, method: 'domain', evidence: domain })
+}
+
+/** Peer vouch — another company signs for this one. Strength = the voucher's. */
+async function traceVouch(request: Request, env: TraceEnv): Promise<Response> {
+  let v: PartnerVouch
+  try {
+    v = (await request.json()) as PartnerVouch
+  } catch {
+    return json({ error: 'expected json' }, 400)
+  }
+  if (!v || v.kind !== 'trace-vouch') return json({ error: 'not a vouch' }, 400)
+  if (!TRACE_KEY_RE.test(String(v.subject ?? '')) || !TRACE_KEY_RE.test(String(v.voucher ?? ''))) {
+    return json({ error: 'bad key' }, 400)
+  }
+  if (!(await verifyVouch(v))) return json({ error: 'bad signature (or self-vouch)' }, 400)
+  await addProof(env, {
+    company: v.subject, method: 'peer', evidence: v.voucher,
+    detail: String(v.voucherName ?? '').slice(0, 80), verifier: v.voucher, raw: JSON.stringify(v),
+  })
+  return json({ ok: true, method: 'peer', evidence: v.voucher })
+}
+
+/** Registry — an operator records an official record (MoC no.) after checking it. */
+async function traceVerifyRegistry(request: Request, env: TraceEnv): Promise<Response> {
+  if (!env.ADMIN_TOKEN || bearerToken(request) !== env.ADMIN_TOKEN) {
+    return json({ error: 'unauthorized' }, 401)
+  }
+  let body: { company?: string; record?: string; detail?: string; verifier?: string }
+  try {
+    body = await request.json()
+  } catch {
+    return json({ error: 'expected json' }, 400)
+  }
+  const company = String(body.company ?? '')
+  const record = String(body.record ?? '').trim()
+  if (!TRACE_KEY_RE.test(company)) return json({ error: 'bad company key' }, 400)
+  if (!record || record.length > 80) return json({ error: 'record required' }, 400)
+  await addProof(env, {
+    company, method: 'registry', evidence: record.slice(0, 80),
+    detail: String(body.detail ?? '').slice(0, 200) || null,
+    verifier: String(body.verifier ?? 'operator').slice(0, 80),
+  })
+  return json({ ok: true, method: 'registry', evidence: record })
+}
+
+function bearerToken(request: Request): string {
+  const h = request.headers.get('authorization') ?? ''
+  return h.startsWith('Bearer ') ? h.slice(7) : ''
+}
+
+/** All proofs a company holds (public — the badge must be auditable). */
+async function proofsFor(company: string, env: TraceEnv): Promise<Record<string, unknown>[]> {
+  try {
+    const { results } = await env.DB.prepare(
+      `SELECT method, evidence, detail, verifier, created_at AS createdAt
+         FROM trace_partner_proofs WHERE company_key = ? ORDER BY created_at ASC LIMIT 50`,
+    ).bind(company).all()
+    return (results ?? []) as Record<string, unknown>[]
+  } catch {
+    return [] // table not migrated yet — degrade to no proofs
+  }
+}
+
 // True if this company has revoked this staff key.
 async function isRevoked(company: string, staff: string, env: TraceEnv): Promise<boolean> {
   const r = await env.DB.prepare(
@@ -636,10 +766,11 @@ async function tracePartnerGet(key: string, env: TraceEnv): Promise<Response> {
     'SELECT name, logo, region, verified, created_at AS createdAt FROM trace_partners WHERE company_key = ?',
   ).bind(key).first<{ name: string; logo: string | null; region: string | null; verified: number; createdAt: string }>()
   if (!p) return json({ registered: false })
+  const proofs = await proofsFor(key, env)
   return new Response(
     JSON.stringify({
       registered: true, company: key, name: p.name, logo: p.logo,
-      region: p.region, verified: p.verified === 1, createdAt: p.createdAt,
+      region: p.region, verified: proofs.length > 0, proofs, createdAt: p.createdAt,
     }),
     { headers: { ...JSON_HEADERS, 'cache-control': 'public, max-age=60' } },
   )

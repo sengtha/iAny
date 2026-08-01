@@ -18,11 +18,15 @@ import {
   registerCompany,
   revokeStaff,
   startHandoff,
+  verifyDomain,
+  vouchFor,
+  WELL_KNOWN_PATH,
   type CustodyEvent,
   type CustodyItem,
   type CustodyRole,
   type Delegation,
   type HandoffRelease,
+  type PartnerProof,
   type RosterEntry,
 } from '../../trace/web/companion'
 import { qrSvg } from '../lib/qr'
@@ -624,6 +628,112 @@ function Identity({ km }: { km: boolean }) {
   )
 }
 
+/**
+ * How this company earns its ✓ — three layered paths, each recorded with its
+ * evidence so a buyer can audit (and re-check) the badge instead of trusting it:
+ *   • domain   — publish the key on your own website; the node fetches it. Free,
+ *                instant, no gatekeeper, re-checkable by anyone.
+ *   • peer     — a co-op/association signs a vouch for you (done from THEIR device).
+ *   • registry — an operator records an official record (MoC no.) after checking.
+ */
+function Verification({ km, companyPub }: { km: boolean; companyPub: string | null }) {
+  const [proofs, setProofs] = useState<PartnerProof[]>([])
+  const [domain, setDomain] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+  const [err, setErr] = useState('')
+  // Vouching for someone ELSE (associations / co-ops use this).
+  const [subject, setSubject] = useState('')
+  const [ourName, setOurName] = useState('')
+
+  useEffect(() => {
+    if (companyPub) void fetchPartner(companyPub).then((p) => setProofs(p?.proofs ?? []))
+  }, [companyPub])
+
+  if (!companyPub) return null
+
+  async function check() {
+    setBusy(true); setErr(''); setMsg('')
+    const r = await verifyDomain(domain.trim())
+    setBusy(false)
+    if (r.ok) {
+      setMsg(km ? '✓ បានផ្ទៀងផ្ទាត់ដោយដែន' : '✓ Verified by domain')
+      const p = await fetchPartner(companyPub!)
+      setProofs(p?.proofs ?? [])
+    } else setErr(r.error ?? 'failed')
+  }
+
+  return (
+    <div className="custody-timeline">
+      <h3 className="custody-timeline-h" style={{ marginTop: 20 }}>
+        ✅ {km ? 'ការផ្ទៀងផ្ទាត់ក្រុមហ៊ុន' : 'Company verification'}
+      </h3>
+
+      {proofs.length > 0 ? (
+        proofs.map((p) => (
+          <div className="custody-row" key={`${p.method}-${p.evidence}`}>
+            <div className="custody-row-top">
+              <b>{p.method === 'domain' ? '🌐' : p.method === 'peer' ? '🤝' : '🏛️'} {p.method}</b>
+              <span className="custody-tag ok">✓ {p.evidence.slice(0, 40)}</span>
+            </div>
+            <div className="custody-row-sub">
+              {p.detail ? `${p.detail} · ` : ''}{new Date(p.createdAt).toLocaleDateString()}
+            </div>
+          </div>
+        ))
+      ) : (
+        <p className="voice-minor-note">
+          {km ? 'មិនទាន់មានការផ្ទៀងផ្ទាត់ — បង្ហាញជា «ដោយខ្លួនឯង»។' : 'Not verified yet — you show as self-claimed.'}
+        </p>
+      )}
+
+      <label className="voice-field" style={{ marginTop: 12 }}>
+        <span>{km ? 'ផ្ទៀងផ្ទាត់ដោយគេហទំព័ររបស់អ្នក' : 'Verify with your own website'}</span>
+        <input type="text" value={domain} placeholder="kampotpepper.com"
+          onChange={(e) => setDomain(e.target.value)} />
+        <small>
+          {km ? 'ដាក់កូនសោ root របស់អ្នកក្នុងឯកសារ ' : 'Put your root key in a file at '}
+          <b>{WELL_KNOWN_PATH}</b>
+          {km ? ' នៅលើគេហទំព័ររបស់អ្នក រួចចុចពិនិត្យ។' : ' on your site, then press check.'}
+        </small>
+      </label>
+      <button className="voice-ghost" onClick={() => void check()} disabled={busy || !domain.trim()}>
+        🌐 {busy ? '…' : (km ? 'ពិនិត្យដែន' : 'Check domain')}
+      </button>
+      {msg ? <p className="sign-review-note">{msg}</p> : null}
+      {err ? <p className="voice-error">{err}</p> : null}
+      <p className="voice-minor-note">
+        {km
+          ? 'ផ្លូវទី៣៖ ប្រតិបត្តិករកត់ត្រាលេខចុះបញ្ជីពាណិជ្ជកម្ម (ក្រោយពិនិត្យ)។'
+          : 'Third path: an operator records your business-registration number after checking it.'}
+      </p>
+
+      <label className="voice-field" style={{ marginTop: 14 }}>
+        <span>🤝 {km ? 'ធានាឲ្យក្រុមហ៊ុនផ្សេង (សម្រាប់សមាគម/សហករណ៍)' : 'Vouch for another company (associations / co-ops)'}</span>
+        <textarea className="custody-key" value={subject} rows={2}
+          placeholder={km ? 'កូនសោ root របស់ក្រុមហ៊ុននោះ' : "their company root key"}
+          onChange={(e) => setSubject(e.target.value)} />
+        <input type="text" value={ourName} maxLength={80}
+          placeholder={km ? 'ឈ្មោះរបស់អ្នក (បង្ហាញជាអ្នកធានា)' : 'your name (shown as the voucher)'}
+          onChange={(e) => setOurName(e.target.value)} />
+      </label>
+      <button className="voice-ghost" disabled={busy || !subject.trim() || !ourName.trim()}
+        onClick={() => void (async () => {
+          setBusy(true); setErr(''); setMsg('')
+          try {
+            await vouchFor(subject.trim(), ourName.trim())
+            setMsg(km ? '✓ បានធានា' : '✓ Vouch signed and sent')
+            setSubject('')
+          } catch (e) {
+            setErr(e instanceof Error ? e.message : String(e))
+          } finally { setBusy(false) }
+        })()}>
+        ✍️ {km ? 'ចុះហត្ថលេខាធានា' : 'Sign vouch'}
+      </button>
+    </div>
+  )
+}
+
 /* ------------------------------------------------------------- company --- */
 
 function Company({ km }: { km: boolean }) {
@@ -757,6 +867,8 @@ function Company({ km }: { km: boolean }) {
           </button>
         </label>
       ) : null}
+
+      <Verification km={km} companyPub={companyPub} />
 
       {roster.length > 0 ? (
         <div className="custody-timeline">

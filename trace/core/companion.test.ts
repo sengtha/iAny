@@ -14,6 +14,7 @@ import {
   signCustody, verifyCustody,
   signRelease, signReceipt, verifyHandoff,
   signRevocation, verifyRevocation,
+  signVouch, verifyVouch,
   type CustodyRecord,
 } from './companion'
 
@@ -188,6 +189,22 @@ console.log('\n9. Revocation (company revokes a staff key)')
   // an attacker can't revoke another company's staff without the root key
   const forged = await signRevocation({ company: company.pub, staff: staffA.pub, at: NOW }, other.keyPair)
   ok('revocation signed by wrong key rejected', !(await verifyRevocation(forged)))
+}
+
+console.log('\n10. Peer vouch (one company vouches for another)')
+{
+  const subject = other.pub
+  const v = await signVouch(
+    { subject, voucher: company.pub, voucherName: 'Kampot Pepper Association', note: 'known member', at: NOW },
+    company.keyPair,
+  )
+  ok('valid vouch verifies', await verifyVouch(v))
+  ok('tampered subject rejected', !(await verifyVouch({ ...v, subject: staffA.pub })))
+  ok('vouch signed by wrong key rejected', !(await verifyVouch({ ...v, voucher: other.pub })))
+  const self = await signVouch(
+    { subject: company.pub, voucher: company.pub, voucherName: 'Me', at: NOW }, company.keyPair,
+  )
+  ok('self-vouch rejected', !(await verifyVouch(self)))
 }
 
 console.log(`\n${fails.length === 0 ? '✅ ALL PASS' : '❌ FAILURES'}: ${pass} passed, ${fails.length} failed`)

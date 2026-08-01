@@ -354,6 +354,21 @@ CREATE TABLE IF NOT EXISTS trace_partners (
   updated_at  TEXT NOT NULL
 );
 
+-- How a company earned its ✓ — method + evidence, not a bare boolean, so a buyer
+-- can see who checked what. domain (node-fetched .well-known proof) / registry
+-- (operator recorded an official record) / peer (another company signed a vouch).
+CREATE TABLE IF NOT EXISTS trace_partner_proofs (
+  company_key TEXT NOT NULL,
+  method      TEXT NOT NULL,         -- domain | registry | peer
+  evidence    TEXT NOT NULL,
+  detail      TEXT,
+  verifier    TEXT,
+  raw         TEXT,
+  created_at  TEXT NOT NULL,
+  PRIMARY KEY (company_key, method, evidence)
+);
+CREATE INDEX IF NOT EXISTS idx_trace_proofs_company ON trace_partner_proofs (company_key);
+
 -- Two-party handoff transport (Phase 2): a signed RELEASE held under a short
 -- code until the receiver counter-signs a RECEIPT; then two trace_custody rows
 -- are written and this row is deleted. Short-lived, single-use.

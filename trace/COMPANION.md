@@ -36,7 +36,10 @@ This is the "open now, verify names later" hybrid.
 | `POST /custody` | Submit a signed `CustodyRecord`. Verify-on-ingest: bad signature → 400; a *broken/expired/unbound* delegation → 400 (rather than silently downgrading). → `{ ok, id, company, selfClaimed }`. |
 | `GET /custody/:capsuleId` | The custody timeline for a capsule; each event resolved to its company (name/logo/verified). GPS coarsened to ~1 km. |
 | `POST /partner` | Register/refresh a company root key → name/logo/region. **Signed by the root key** (only the owner can claim a name). `verified` is never set here. |
-| `GET /partner/:key` | Resolve a company root key → `{ name, logo, region, verified }`. |
+| `GET /partner/:key` | Resolve a company root key → `{ name, logo, region, verified, proofs[] }` — the proof list is how a reader audits the ✓. |
+| `POST /partner/verify-domain` | `{company, domain}` → node fetches `https://<domain>/.well-known/trace-partner.txt` and confirms the key. No gatekeeper. |
+| `POST /partner/vouch` | A signed `trace-vouch` from another company (self-vouch rejected). |
+| `POST /partner/verify-registry` | Operator only (admin bearer): record an official registration + who checked it. |
 | `POST /handoff/offer` | Sender publishes a signed **release**; node verifies it, holds it under a short code (1 h TTL). → `{ code, expiresAt }`. |
 | `GET /handoff/:code` | Receiver reads the pending release (to verify + show the sender). 410 if expired. |
 | `POST /handoff/:code/accept` | Receiver posts a signed **receipt**; node verifies the pair, writes two custody rows (release=`handoff`, receipt=`pickup`), consumes the code. → `{ ok, fromCompany, toCompany }`. |
@@ -63,14 +66,35 @@ Crypto + types: [`core/companion.ts`](./core/companion.ts). Node verify-on-inges
   then *Enroll staff*: paste a staffer's public key → mint a delegation → send the
   text back to them to import.
 
-## Verifying a partner (operator)
+## Who verifies a company — and where you can check
 
-Self-registration sets `verified = 0`. After vetting a company, flip it:
+Registering only proves **key ownership**, not identity, so registration alone
+never earns a ✓. A tick that just says "trust us" is unearned authority — the one
+thing the rest of Trace avoids — so a badge is always a **method + evidence**,
+stored in `trace_partner_proofs` and shown publicly. Three layered paths:
 
-```bash
-npx wrangler d1 execute iany-radio --remote \
-  --command "UPDATE trace_partners SET verified = 1 WHERE company_key = '<key>';"
-```
+| Method | Who establishes it | What it proves | Re-checkable by |
+|---|---|---|---|
+| **domain** | **nobody** — the node fetches it | the same people who run `kampotpepper.com` control this key | **anyone**, independently |
+| **peer** | another company (co-op / association) signs a vouch | that voucher stands behind this company | anyone (signature + who signed) |
+| **registry** | an operator, after checking an official record | an official record (e.g. MoC no.) was seen | the reader, against the registry |
+
+**Domain proof (recommended, no gatekeeper).** The company publishes its root key
+at `https://<domain>/.well-known/trace-partner.txt`, then `POST /partner/verify-domain`
+`{company, domain}` — the node fetches the file, confirms the key, records the
+proof. Free, instant, and *anyone* can repeat the same fetch to check it.
+
+**Peer vouch.** From the **voucher's** device: `POST /partner/vouch` with a
+`trace-vouch` signed by their root key. Self-vouching is rejected. A reader judges
+it by how much they trust the voucher, whose name is shown.
+
+**Registry (operator).** `POST /partner/verify-registry` with the admin bearer
+token and `{company, record, detail, verifier}` — records e.g. `MoC #12345` plus
+who checked it. This is the only path that requires the node operator.
+
+**Where to check:** every custody row shows the method inline (`✓ Name · 🌐
+kampotpepper.com`), and `GET /api/trace/partner/<key>` returns the full proof list
+— method, evidence, who verified, when. The badge is auditable, not a promise.
 
 ## Two-party handoff (Phase 2)
 
