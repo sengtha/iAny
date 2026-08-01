@@ -354,6 +354,20 @@ CREATE TABLE IF NOT EXISTS trace_partners (
   updated_at  TEXT NOT NULL
 );
 
+-- Two-party handoff transport (Phase 2): a signed RELEASE held under a short
+-- code until the receiver counter-signs a RECEIPT; then two trace_custody rows
+-- are written and this row is deleted. Short-lived, single-use.
+CREATE TABLE IF NOT EXISTS trace_handoff_pending (
+  code        TEXT PRIMARY KEY,
+  capsule     TEXT NOT NULL,
+  from_key    TEXT NOT NULL,
+  nonce       TEXT NOT NULL,
+  raw_release TEXT NOT NULL,
+  expires_at  TEXT NOT NULL,
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_trace_handoff_expires ON trace_handoff_pending (expires_at);
+
 -- Grove — the open, decentralized garden-carbon network (/garden). The user's
 -- phone signs each observation on-device (the source of truth); iany.app runs a
 -- reference NODE that re-verifies every signature before storing and serves

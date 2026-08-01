@@ -76,3 +76,18 @@ CREATE TABLE IF NOT EXISTS trace_partners (
   created_at  TEXT NOT NULL,
   updated_at  TEXT NOT NULL
 );
+
+-- Two-party handoff transport (Phase 2). A sender publishes a signed RELEASE
+-- under a short code; the receiver reads it and counter-signs a RECEIPT. On
+-- completion the node writes two trace_custody rows (release=handoff,
+-- receipt=pickup) and deletes the pending row. Short-lived (TTL), single-use.
+CREATE TABLE IF NOT EXISTS trace_handoff_pending (
+  code        TEXT PRIMARY KEY,      -- short human code (e.g. K7M4P2)
+  capsule     TEXT NOT NULL,
+  from_key    TEXT NOT NULL,         -- sender public key
+  nonce       TEXT NOT NULL,         -- binds the receipt to this release
+  raw_release TEXT NOT NULL,         -- the signed release (re-verifiable)
+  expires_at  TEXT NOT NULL,
+  created_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_trace_handoff_expires ON trace_handoff_pending (expires_at);

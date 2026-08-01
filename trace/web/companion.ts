@@ -13,15 +13,18 @@ import {
   signCustody,
   signDelegation,
   signPartner,
+  signRelease,
+  signReceipt,
   verifyDelegation,
   type ActorKey,
   type CustodyEvent,
   type CustodyRecord,
   type CustodyRole,
   type Delegation,
+  type HandoffRelease,
 } from '../core/companion'
 
-export type { CustodyEvent, CustodyRole, Delegation }
+export type { CustodyEvent, CustodyRole, Delegation, HandoffRelease }
 
 const NODE = '/api/trace'
 const STAFF_SLOT = 'iany.trace.staffKey'
@@ -160,6 +163,66 @@ export async function addCustody(input: {
   return { company: (out.company as string) ?? null, selfClaimed: Boolean(out.selfClaimed) }
 }
 
+/* --------------------------------------------------- two-party handoff --- */
+
+function makeNonce(): string {
+  const b = new Uint8Array(12)
+  crypto.getRandomValues(b)
+  let s = ''
+  for (const x of b) s += String.fromCharCode(x)
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+/** Sender: sign a release and publish it under a short handoff code. */
+export async function startHandoff(input: {
+  capsule: string; actorName?: string; gps?: { lat: number; lng: number; acc?: number } | null
+}): Promise<{ code: string; expiresAt: string }> {
+  const staff = await getStaffKey()
+  const del = loadDelegation()
+  const rel = await signRelease(
+    {
+      capsule: input.capsule.toLowerCase(), from: staff.pub, at: new Date().toISOString(),
+      gps: input.gps ?? null, nonce: makeNonce(),
+      fromName: input.actorName || del?.staffName, fromDelegation: del,
+    },
+    staff.keyPair,
+  )
+  const out = await postJson('/handoff/offer', rel)
+  return { code: out.code as string, expiresAt: out.expiresAt as string }
+}
+
+/** Receiver: fetch the pending release for a code (to verify + display sender). */
+export async function fetchHandoffOffer(
+  code: string,
+): Promise<{ ok: true; release: HandoffRelease } | { ok: false; error: 'expired' | 'notfound' }> {
+  try {
+    const res = await fetch(`${NODE}/handoff/${code}`)
+    if (res.ok) return { ok: true, release: ((await res.json()) as { release: HandoffRelease }).release }
+    return { ok: false, error: res.status === 410 ? 'expired' : 'notfound' }
+  } catch {
+    return { ok: false, error: 'notfound' }
+  }
+}
+
+/** Receiver: counter-sign the release and complete the handoff (single-use code). */
+export async function acceptHandoff(
+  code: string, release: HandoffRelease,
+  input: { actorName?: string; gps?: { lat: number; lng: number; acc?: number } | null },
+): Promise<{ fromCompany: string | null; toCompany: string | null }> {
+  const staff = await getStaffKey()
+  const del = loadDelegation()
+  const receipt = await signReceipt(
+    {
+      capsule: release.capsule, from: release.from, to: staff.pub, at: new Date().toISOString(),
+      gps: input.gps ?? null, nonce: release.nonce,
+      toName: input.actorName || del?.staffName, toDelegation: del,
+    },
+    staff.keyPair,
+  )
+  const out = await postJson(`/handoff/${code}/accept`, receipt)
+  return { fromCompany: (out.fromCompany as string) ?? null, toCompany: (out.toCompany as string) ?? null }
+}
+
 /* -------------------------------------------------------- read side --- */
 
 export interface CustodyItem {
@@ -176,6 +239,18 @@ export interface CustodyItem {
   createdAt: string
   selfClaimed: boolean
   company: { name: string; logo: string | null; region: string | null; verified: boolean } | null
+}
+
+/** Resolve a company root key → its public name/verified (or null if unknown). */
+export async function fetchPartner(companyKey: string): Promise<{ name: string; verified: boolean } | null> {
+  try {
+    const res = await fetch(`${NODE}/partner/${companyKey}`)
+    if (!res.ok) return null
+    const d = (await res.json()) as { registered?: boolean; name?: string; verified?: boolean }
+    return d.registered ? { name: d.name ?? '', verified: Boolean(d.verified) } : null
+  } catch {
+    return null
+  }
 }
 
 /** Public: the custody timeline for a capsule (companies resolved, GPS coarsened). */

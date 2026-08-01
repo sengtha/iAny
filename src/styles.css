@@ -2225,6 +2225,40 @@ progress {
   font-weight: 500;
 }
 
+/* /custody — handoff (two-party co-sign) */
+.voice-lead-sm {
+  font-size: 0.9rem;
+  color: var(--fg-muted);
+  margin: 10px 0;
+}
+.handoff-codebox {
+  text-align: center;
+  padding: 18px 12px;
+}
+.handoff-code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 2.4rem;
+  font-weight: 700;
+  letter-spacing: 0.25em;
+  margin: 10px 0;
+  padding: 14px;
+  border: 2px dashed var(--accent);
+  border-radius: 14px;
+  color: var(--fg);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+}
+.handoff-codein {
+  flex: 1;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 1.3rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  text-align: center;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
 /* iAny Trace (/trace) — proof of origin trust score */
 /* Two big, plain choices — a maker vs. a buyer — instead of a row of tabs. */
 .trace-modes {

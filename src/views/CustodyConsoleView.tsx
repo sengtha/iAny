@@ -1,19 +1,24 @@
 import { useEffect, useState } from 'react'
 import { useI18n } from '../i18n'
 import {
+  acceptHandoff,
   addCustody,
   clearDelegation,
   fetchCustody,
+  fetchHandoffOffer,
+  fetchPartner,
   getStaffKey,
   importDelegation,
   loadDelegation,
   mintDelegation,
   peekPub,
   registerCompany,
+  startHandoff,
   type CustodyEvent,
   type CustodyItem,
   type CustodyRole,
   type Delegation,
+  type HandoffRelease,
 } from '../../trace/web/companion'
 
 /**
@@ -32,24 +37,230 @@ const EVENTS: CustodyEvent[] = ['pickup', 'in_transit', 'store', 'handoff', 'del
 export function CustodyConsoleView() {
   const { lang } = useI18n()
   const km = lang === 'km'
-  const [tab, setTab] = useState<'event' | 'identity' | 'company'>('event')
+  const [tab, setTab] = useState<'event' | 'handoff' | 'identity' | 'company'>('event')
 
   return (
     <div className="contribute">
       <div className="sign-modetabs" role="tablist">
         <button className={`sign-modetab ${tab === 'event' ? 'active' : ''}`} onClick={() => setTab('event')}>
-          📦 {km ? 'បន្ថែមព្រឹត្តិការណ៍' : 'Add event'}
+          📦 {km ? 'ព្រឹត្តិការណ៍' : 'Add event'}
+        </button>
+        <button className={`sign-modetab ${tab === 'handoff' ? 'active' : ''}`} onClick={() => setTab('handoff')}>
+          🤝 {km ? 'ប្រគល់' : 'Handoff'}
         </button>
         <button className={`sign-modetab ${tab === 'identity' ? 'active' : ''}`} onClick={() => setTab('identity')}>
-          🪪 {km ? 'អត្តសញ្ញាណ' : 'My identity'}
+          🪪 {km ? 'អត្តសញ្ញាណ' : 'Identity'}
         </button>
         <button className={`sign-modetab ${tab === 'company' ? 'active' : ''}`} onClick={() => setTab('company')}>
           🏢 {km ? 'ក្រុមហ៊ុន' : 'Company'}
         </button>
       </div>
 
-      {tab === 'event' ? <AddEvent km={km} /> : tab === 'identity' ? <Identity km={km} /> : <Company km={km} />}
+      {tab === 'event' ? <AddEvent km={km} />
+        : tab === 'handoff' ? <Handoff km={km} />
+          : tab === 'identity' ? <Identity km={km} />
+            : <Company km={km} />}
     </div>
+  )
+}
+
+/* ------------------------------------------------------------- handoff --- */
+
+function Handoff({ km }: { km: boolean }) {
+  const [side, setSide] = useState<'send' | 'receive'>('send')
+  return (
+    <>
+      <div className="sign-modetabs" role="tablist" style={{ marginTop: 4 }}>
+        <button className={`sign-modetab ${side === 'send' ? 'active' : ''}`} onClick={() => setSide('send')}>
+          📤 {km ? 'ប្រគល់ (អ្នកផ្ញើ)' : 'Give (sender)'}
+        </button>
+        <button className={`sign-modetab ${side === 'receive' ? 'active' : ''}`} onClick={() => setSide('receive')}>
+          📥 {km ? 'ទទួល (អ្នកទទួល)' : 'Receive'}
+        </button>
+      </div>
+      <p className="voice-lead-sm">
+        {km
+          ? 'ភាគីទាំងពីរចុះហត្ថលេខាលើការប្រគល់តែមួយ — ភ័ស្តុតាងថាទំនិញបានប្តូរដៃ។ អ្នកផ្ញើបង្កើតលេខកូដ អ្នកទទួលបញ្ចូលវា។'
+          : 'Both parties sign the same handoff — proof the goods changed hands. The sender creates a code; the receiver enters it.'}
+      </p>
+      {side === 'send' ? <HandoffSend km={km} /> : <HandoffReceive km={km} />}
+    </>
+  )
+}
+
+function HandoffSend({ km }: { km: boolean }) {
+  const [capsule, setCapsule] = useState('')
+  const [name, setName] = useState('')
+  const [gps, setGps] = useState<{ lat: number; lng: number; acc?: number } | null>(null)
+  const [code, setCode] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  function locate() {
+    navigator.geolocation?.getCurrentPosition(
+      (p) => setGps({ lat: p.coords.latitude, lng: p.coords.longitude, acc: Math.round(p.coords.accuracy) }),
+      () => setError(km ? 'មិនអាចទាញទីតាំង' : 'Could not get location'),
+      { enableHighAccuracy: true, timeout: 8000 },
+    )
+  }
+  async function go() {
+    const id = capsule.trim().toLowerCase()
+    if (!/^[0-9a-f]{64}$/.test(id)) { setError(km ? 'លេខសម្គាល់មិនត្រឹមត្រូវ (៦៤ តួ)' : 'Capsule id must be 64 hex'); return }
+    setBusy(true); setError('')
+    try {
+      const r = await startHandoff({ capsule: id, actorName: name.trim(), gps })
+      setCode(r.code)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (code) {
+    return (
+      <div className="handoff-codebox">
+        <p>{km ? 'ប្រាប់លេខកូដនេះទៅអ្នកទទួល៖' : 'Give this code to the receiver:'}</p>
+        <div className="handoff-code">{code}</div>
+        <p className="voice-minor-note">{km ? 'មានសុពលភាព ១ ម៉ោង · ប្រើបានតែម្តង' : 'Valid 1 hour · single use'}</p>
+        <button className="voice-ghost" onClick={() => { setCode(''); setCapsule('') }}>
+          ↺ {km ? 'ការប្រគល់ថ្មី' : 'New handoff'}
+        </button>
+      </div>
+    )
+  }
+  return (
+    <>
+      <fieldset className="voice-fields">
+        <label className="voice-field">
+          <span>{km ? 'លេខសម្គាល់កាបសែល' : 'Capsule id'}</span>
+          <input type="text" value={capsule} placeholder="64 hex…" onChange={(e) => setCapsule(e.target.value)} />
+        </label>
+        <label className="voice-field">
+          <span>{km ? 'ឈ្មោះរបស់អ្នក (ស្រេចចិត្ត)' : 'Your name (optional)'}</span>
+          <input type="text" value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
+        </label>
+      </fieldset>
+      <div className="voice-controls">
+        <button className="voice-ghost" onClick={locate}>
+          📍 {gps ? `${gps.lat.toFixed(3)}, ${gps.lng.toFixed(3)}` : (km ? 'ភ្ជាប់ទីតាំង' : 'Add location')}
+        </button>
+        <button className="voice-primary big" onClick={go} disabled={busy}>
+          {busy ? '…' : `🤝 ${km ? 'បង្កើតលេខកូដ' : 'Create handoff code'}`}
+        </button>
+      </div>
+      {error ? <p className="voice-error">{error}</p> : null}
+    </>
+  )
+}
+
+function HandoffReceive({ km }: { km: boolean }) {
+  const [code, setCode] = useState('')
+  const [offer, setOffer] = useState<HandoffRelease | null>(null)
+  const [senderCo, setSenderCo] = useState<{ name: string; verified: boolean } | null>(null)
+  const [name, setName] = useState('')
+  const [gps, setGps] = useState<{ lat: number; lng: number; acc?: number } | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [done, setDone] = useState('')
+
+  function locate() {
+    navigator.geolocation?.getCurrentPosition(
+      (p) => setGps({ lat: p.coords.latitude, lng: p.coords.longitude, acc: Math.round(p.coords.accuracy) }),
+      () => setError(km ? 'មិនអាចទាញទីតាំង' : 'Could not get location'),
+      { enableHighAccuracy: true, timeout: 8000 },
+    )
+  }
+  async function lookup() {
+    const c = code.trim().toUpperCase()
+    if (!c) return
+    setBusy(true); setError(''); setOffer(null); setSenderCo(null)
+    const r = await fetchHandoffOffer(c)
+    setBusy(false)
+    if (!r.ok) {
+      setError(r.error === 'expired' ? (km ? 'លេខកូដផុតកំណត់' : 'This code has expired') : (km ? 'រកមិនឃើញលេខកូដ' : 'Code not found'))
+      return
+    }
+    setOffer(r.release)
+    if (r.release.fromDelegation) setSenderCo(await fetchPartner(r.release.fromDelegation.company))
+  }
+  async function accept() {
+    if (!offer) return
+    setBusy(true); setError('')
+    try {
+      const r = await acceptHandoff(code.trim().toUpperCase(), offer, { actorName: name.trim(), gps })
+      setDone(r.toCompany
+        ? (km ? '✓ បានទទួល ជាមួយក្រុមហ៊ុន' : '✓ Received, attributed to your company')
+        : (km ? '✓ បានទទួល (ដោយខ្លួនឯង)' : '✓ Received (self-claimed)'))
+      setOffer(null); setCode('')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (done) {
+    return (
+      <div className="handoff-codebox">
+        <p className="sign-review-note">{done}</p>
+        <button className="voice-ghost" onClick={() => setDone('')}>↺ {km ? 'ទទួលមួយទៀត' : 'Receive another'}</button>
+      </div>
+    )
+  }
+  return (
+    <>
+      <div className="voice-controls">
+        <input className="handoff-codein" value={code} placeholder={km ? 'លេខកូដ' : 'Handoff code'}
+          maxLength={12} onChange={(e) => setCode(e.target.value.toUpperCase())} />
+        <button className="voice-primary" onClick={lookup} disabled={busy || !code.trim()}>
+          🔎 {km ? 'រក' : 'Look up'}
+        </button>
+      </div>
+
+      {offer ? (
+        <div className="custody-row" style={{ marginTop: 12 }}>
+          <div className="custody-row-top">
+            <b>{km ? 'ការប្រគល់ពី' : 'Handoff from'}</b>
+            {senderCo ? (
+              <span className={`custody-tag ${senderCo.verified ? 'ok' : ''}`}>
+                {senderCo.verified ? '✓ ' : ''}{senderCo.name}
+              </span>
+            ) : offer.fromDelegation ? (
+              <span className="custody-tag">{km ? 'ក្រុមហ៊ុន' : 'a company'}</span>
+            ) : (
+              <span className="custody-tag self">{km ? 'ដោយខ្លួនឯង' : 'self-claimed'}</span>
+            )}
+          </div>
+          <div className="custody-row-sub">
+            {offer.fromName ? `${offer.fromName} · ` : ''}
+            {km ? 'កាបសែល' : 'capsule'} {offer.capsule.slice(0, 10)}…
+            {offer.gps ? ` · ~${offer.gps.lat.toFixed(2)}, ${offer.gps.lng.toFixed(2)}` : ''}
+          </div>
+        </div>
+      ) : null}
+
+      {offer ? (
+        <>
+          <fieldset className="voice-fields" style={{ marginTop: 10 }}>
+            <label className="voice-field">
+              <span>{km ? 'ឈ្មោះរបស់អ្នក (ស្រេចចិត្ត)' : 'Your name (optional)'}</span>
+              <input type="text" value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
+            </label>
+          </fieldset>
+          <div className="voice-controls">
+            <button className="voice-ghost" onClick={locate}>
+              📍 {gps ? `${gps.lat.toFixed(3)}, ${gps.lng.toFixed(3)}` : (km ? 'ភ្ជាប់ទីតាំង' : 'Add location')}
+            </button>
+            <button className="voice-primary big" onClick={accept} disabled={busy}>
+              {busy ? '…' : `✍️ ${km ? 'ចុះហត្ថលេខាទទួល' : 'Sign receipt'}`}
+            </button>
+          </div>
+        </>
+      ) : null}
+
+      {error ? <p className="voice-error">{error}</p> : null}
+    </>
   )
 }
 

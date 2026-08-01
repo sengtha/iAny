@@ -37,6 +37,9 @@ This is the "open now, verify names later" hybrid.
 | `GET /custody/:capsuleId` | The custody timeline for a capsule; each event resolved to its company (name/logo/verified). GPS coarsened to ~1 km. |
 | `POST /partner` | Register/refresh a company root key → name/logo/region. **Signed by the root key** (only the owner can claim a name). `verified` is never set here. |
 | `GET /partner/:key` | Resolve a company root key → `{ name, logo, region, verified }`. |
+| `POST /handoff/offer` | Sender publishes a signed **release**; node verifies it, holds it under a short code (1 h TTL). → `{ code, expiresAt }`. |
+| `GET /handoff/:code` | Receiver reads the pending release (to verify + show the sender). 410 if expired. |
+| `POST /handoff/:code/accept` | Receiver posts a signed **receipt**; node verifies the pair, writes two custody rows (release=`handoff`, receipt=`pickup`), consumes the code. → `{ ok, fromCompany, toCompany }`. |
 
 Crypto + types: [`core/companion.ts`](./core/companion.ts). Node verify-on-ingest:
 [`worker/handlers.ts`](./worker/handlers.ts). Web client + key storage:
@@ -65,8 +68,27 @@ npx wrangler d1 execute iany-radio --remote \
   --command "UPDATE trace_partners SET verified = 1 WHERE company_key = '<key>';"
 ```
 
-A polished admin/roster dashboard and a two-party QR handoff (both parties
-co-sign one capsule id) are the planned Phase 2/3.
+## Two-party handoff (Phase 2)
+
+Proof that a specific item changed hands between two identified parties. It's
+asymmetric so **no key pre-exchange** is needed:
+
+1. **Sender** (*Handoff → Give*): signs a **release** over `{capsule, from, at,
+   gps, nonce}` and publishes it → gets a short **code** (e.g. `K7M4P2`).
+2. Sender reads the code to the receiver (voice, or show it).
+3. **Receiver** (*Handoff → Receive*): enters the code, sees + verifies the
+   sender, then signs a **receipt** over `{capsule, from, to, at, gps, nonce}`.
+
+Both cover the same `capsule + from + nonce`, so the pair is cryptographically
+bound — a receipt can't be reused for another item, counterparty, or handoff.
+On completion the node writes the two custody rows, so the handoff shows up in
+the same `/custody/:capsule` timeline (sender = `handoff`, receiver = `pickup`),
+each attributed to its company via its delegation. Verify a completed pair
+offline with `verifyHandoff(release, receipt, now)`.
+
+The transport is a typed code (works on every browser). Rendering it as a
+scannable QR, and a polished admin/roster dashboard, are the remaining Phase 3
+niceties.
 
 ## Setup
 

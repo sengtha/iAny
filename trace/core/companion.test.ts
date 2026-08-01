@@ -12,6 +12,7 @@ import {
   signPartner, verifyPartner,
   signDelegation, verifyDelegation,
   signCustody, verifyCustody,
+  signRelease, signReceipt, verifyHandoff,
   type CustodyRecord,
 } from './companion'
 
@@ -115,6 +116,58 @@ console.log('\n7. Expired delegation on an otherwise-valid event')
   ok('sig valid but delegation expired', v.sigOk && v.delegation?.expired === true)
   ok('company=null when expired', v.company === null)
   ok('overall ok=false when expired', v.ok === false)
+}
+
+console.log('\n8. Two-party handoff (release + receipt)')
+{
+  // a delegation for staffB so the receiver side can be company-attributed too
+  const delB = await signDelegation(
+    { company: company.pub, staff: staffB.pub, staffName: 'Chan Thida', role: 'warehouse', days: 365, now: NOW },
+    company.keyPair,
+  )
+  const NONCE = 'nonce-xyz-123'
+  const release = await signRelease(
+    { capsule: CAPSULE, from: staffA.pub, at: NOW, nonce: NONCE, fromName: 'Sok Dara', fromDelegation: delA },
+    staffA.keyPair,
+  )
+  const receipt = await signReceipt(
+    { capsule: CAPSULE, from: staffA.pub, to: staffB.pub, at: NOW, nonce: NONCE, toName: 'Chan Thida', toDelegation: delB },
+    staffB.keyPair,
+  )
+  const v = await verifyHandoff(release, receipt, LATER_OK)
+  ok('both sigs valid', v.releaseSigOk && v.receiptSigOk)
+  ok('release+receipt matched (capsule/from/nonce)', v.matched)
+  ok('sender attributed to company', v.fromCompany === company.pub)
+  ok('receiver attributed to company', v.toCompany === company.pub)
+  ok('handoff ok=true', v.ok)
+
+  // receiver signs for a DIFFERENT capsule → not matched
+  const wrongCap = await signReceipt(
+    { capsule: 'b'.repeat(64), from: staffA.pub, to: staffB.pub, at: NOW, nonce: NONCE }, staffB.keyPair,
+  )
+  ok('mismatched capsule → not matched', !(await verifyHandoff(release, wrongCap, LATER_OK)).matched)
+
+  // receiver reuses a receipt with a different nonce than the release → not matched
+  const wrongNonce = await signReceipt(
+    { capsule: CAPSULE, from: staffA.pub, to: staffB.pub, at: NOW, nonce: 'other-nonce' }, staffB.keyPair,
+  )
+  ok('replayed/wrong nonce → not matched', !(await verifyHandoff(release, wrongNonce, LATER_OK)).matched)
+
+  // tamper the release core after signing → release sig invalid
+  const tampered = { ...release, capsule: 'c'.repeat(64) }
+  ok('tampered release → sig invalid', !(await verifyHandoff(tampered, receipt, LATER_OK)).releaseSigOk)
+
+  // receipt "signed" by the wrong key (claims to=staffB but staffA signed) → invalid
+  const forgedReceipt = await signReceipt(
+    { capsule: CAPSULE, from: staffA.pub, to: staffB.pub, at: NOW, nonce: NONCE }, staffA.keyPair,
+  )
+  ok('receipt signed by wrong key → receiptSig invalid', !(await verifyHandoff(release, forgedReceipt, LATER_OK)).receiptSigOk)
+
+  // self-claimed handoff (no delegations) is still valid, just no companies
+  const relSelf = await signRelease({ capsule: CAPSULE, from: staffA.pub, at: NOW, nonce: 'n2' }, staffA.keyPair)
+  const recSelf = await signReceipt({ capsule: CAPSULE, from: staffA.pub, to: staffB.pub, at: NOW, nonce: 'n2' }, staffB.keyPair)
+  const vs = await verifyHandoff(relSelf, recSelf, LATER_OK)
+  ok('self-claimed handoff ok, no companies', vs.ok && vs.fromCompany === null && vs.toCompany === null)
 }
 
 console.log(`\n${fails.length === 0 ? '✅ ALL PASS' : '❌ FAILURES'}: ${pass} passed, ${fails.length} failed`)

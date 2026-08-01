@@ -24,8 +24,12 @@
 
 import {
   verifyCustody,
+  verifyHandoff,
   verifyPartner,
+  verifyRelease,
   type CustodyRecord,
+  type HandoffReceipt,
+  type HandoffRelease,
   type PartnerRegistration,
 } from '../core/companion'
 import { sha256Hex } from '../../grove/core/grove'
@@ -81,6 +85,16 @@ export async function serveTrace(url: URL, request: Request, env: TraceEnv): Pro
     if (path === 'partner' && request.method === 'POST') return await tracePartnerRegister(request, env)
     if (path.startsWith('partner/') && request.method === 'GET') {
       return await tracePartnerGet(path.slice('partner/'.length), env)
+    }
+    // Two-party handoff (Phase 2): offer (sender) → read → accept (receiver).
+    if (path === 'handoff/offer' && request.method === 'POST') return await traceHandoffOffer(request, env)
+    if (path.startsWith('handoff/')) {
+      const rest = path.slice('handoff/'.length)
+      const slash = rest.indexOf('/')
+      const code = slash === -1 ? rest : rest.slice(0, slash)
+      const action = slash === -1 ? '' : rest.slice(slash + 1)
+      if (action === 'accept' && request.method === 'POST') return await traceHandoffAccept(code, request, env)
+      if (action === '' && request.method === 'GET') return await traceHandoffGet(code, env)
     }
     return json({ error: 'not found' }, 404)
   } catch (e) {
@@ -358,6 +372,124 @@ async function tracePartnerRegister(request: Request, env: TraceEnv): Promise<Re
     String(p.region ?? '').slice(0, 40) || null, JSON.stringify(p), now, now,
   ).run()
   return json({ ok: true, company: p.company })
+}
+
+/* -------------------------------------------------- two-party handoff --- */
+
+const HANDOFF_TTL_MS = 60 * 60 * 1000 // a pending offer lives 1 hour
+const HANDOFF_CODE_RE = /^[A-Z2-9]{4,12}$/
+// Crockford-ish alphabet (no 0/O/1/I/L) — easy to read aloud and type.
+const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
+function makeCode(): string {
+  const buf = new Uint8Array(6)
+  crypto.getRandomValues(buf)
+  let s = ''
+  for (const b of buf) s += CODE_ALPHABET[b % CODE_ALPHABET.length]
+  return s
+}
+
+// Sender publishes a signed RELEASE; we verify it and hold it under a fresh code.
+async function traceHandoffOffer(request: Request, env: TraceEnv): Promise<Response> {
+  let rel: HandoffRelease
+  try {
+    rel = (await request.json()) as HandoffRelease
+  } catch {
+    return json({ error: 'expected json' }, 400)
+  }
+  if (!rel || rel.kind !== 'trace-handoff-release') return json({ error: 'not a release' }, 400)
+  const capsule = String(rel.capsule ?? '').toLowerCase()
+  if (!TRACE_ID_RE.test(capsule)) return json({ error: 'bad capsule id' }, 400)
+  if (!TRACE_KEY_RE.test(String(rel.from ?? ''))) return json({ error: 'bad sender key' }, 400)
+  if (!(await verifyRelease(rel))) return json({ error: 'bad signature' }, 400)
+
+  const nowMs = Date.now()
+  const expiresAt = new Date(nowMs + HANDOFF_TTL_MS).toISOString()
+  const createdAt = new Date(nowMs).toISOString()
+  const raw = JSON.stringify(rel)
+  for (let i = 0; i < 5; i++) {
+    const code = makeCode()
+    try {
+      await env.DB.prepare(
+        `INSERT INTO trace_handoff_pending (code, capsule, from_key, nonce, raw_release, expires_at, created_at)
+         VALUES (?,?,?,?,?,?,?)`,
+      ).bind(code, capsule, rel.from, String(rel.nonce ?? '').slice(0, 80), raw, expiresAt, createdAt).run()
+      return json({ ok: true, code, expiresAt })
+    } catch (e) {
+      // Retry only on a code collision; rethrow anything else (e.g. missing table).
+      if (!/unique|constraint/i.test(e instanceof Error ? e.message : String(e))) throw e
+    }
+  }
+  return json({ error: 'could not allocate a code, try again' }, 503)
+}
+
+// Receiver reads the pending release for a code (to verify + display the sender).
+async function traceHandoffGet(code: string, env: TraceEnv): Promise<Response> {
+  if (!HANDOFF_CODE_RE.test(code)) return json({ error: 'bad code' }, 400)
+  const row = await env.DB.prepare(
+    'SELECT raw_release AS raw, expires_at AS expiresAt FROM trace_handoff_pending WHERE code = ?',
+  ).bind(code).first<{ raw: string; expiresAt: string }>()
+  if (!row) return json({ error: 'not found' }, 404)
+  if (Date.parse(row.expiresAt) < Date.now()) {
+    await env.DB.prepare('DELETE FROM trace_handoff_pending WHERE code = ?').bind(code).run()
+    return json({ error: 'expired' }, 410)
+  }
+  return json({ release: JSON.parse(row.raw) })
+}
+
+// Receiver counter-signs a RECEIPT. We verify the pair, write two custody rows
+// (sender=handoff, receiver=pickup), and consume the code (single-use).
+async function traceHandoffAccept(code: string, request: Request, env: TraceEnv): Promise<Response> {
+  if (!HANDOFF_CODE_RE.test(code)) return json({ error: 'bad code' }, 400)
+  let rec: HandoffReceipt
+  try {
+    rec = (await request.json()) as HandoffReceipt
+  } catch {
+    return json({ error: 'expected json' }, 400)
+  }
+  if (!rec || rec.kind !== 'trace-handoff-receipt') return json({ error: 'not a receipt' }, 400)
+  if (!TRACE_KEY_RE.test(String(rec.to ?? ''))) return json({ error: 'bad receiver key' }, 400)
+
+  const row = await env.DB.prepare(
+    'SELECT raw_release AS raw, expires_at AS expiresAt FROM trace_handoff_pending WHERE code = ?',
+  ).bind(code).first<{ raw: string; expiresAt: string }>()
+  if (!row) return json({ error: 'not found' }, 404)
+  if (Date.parse(row.expiresAt) < Date.now()) {
+    await env.DB.prepare('DELETE FROM trace_handoff_pending WHERE code = ?').bind(code).run()
+    return json({ error: 'expired' }, 410)
+  }
+  const rel = JSON.parse(row.raw) as HandoffRelease
+  const now = new Date().toISOString()
+  const v = await verifyHandoff(rel, rec, now)
+  if (!v.releaseSigOk || !v.receiptSigOk) return json({ error: 'bad signature' }, 400)
+  if (!v.matched) return json({ error: 'receipt does not match the release' }, 400)
+  if ((rel.fromDelegation && !v.fromCompany) || (rec.toDelegation && !v.toCompany)) {
+    return json({ error: 'invalid delegation' }, 400)
+  }
+
+  // Persist both sides into the custody timeline (idempotent on the record hash).
+  const relRaw = JSON.stringify(rel)
+  const recRaw = JSON.stringify(rec)
+  const put = `INSERT INTO trace_custody
+      (id, capsule, actor_key, actor_name, role, event_type, company_key,
+       lat, lng, claimed_at, note, raw, created_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING`
+  const rg = rel.gps
+  const cg = rec.gps
+  await env.DB.prepare(put).bind(
+    await sha256Hex(relRaw), rel.capsule, rel.from, String(rel.fromName ?? '').slice(0, 80),
+    rel.fromDelegation?.role ?? 'other', 'handoff', v.fromCompany,
+    rg ? Number(rg.lat) : null, rg ? Number(rg.lng) : null, String(rel.at ?? '').slice(0, 40),
+    `→ handoff to ${rec.to.slice(0, 8)}…`, relRaw, now,
+  ).run()
+  await env.DB.prepare(put).bind(
+    await sha256Hex(recRaw), rec.capsule, rec.to, String(rec.toName ?? '').slice(0, 80),
+    rec.toDelegation?.role ?? 'other', 'pickup', v.toCompany,
+    cg ? Number(cg.lat) : null, cg ? Number(cg.lng) : null, String(rec.at ?? '').slice(0, 40),
+    `↳ received from ${rel.from.slice(0, 8)}…`, recRaw, now,
+  ).run()
+  await env.DB.prepare('DELETE FROM trace_handoff_pending WHERE code = ?').bind(code).run()
+
+  return json({ ok: true, capsule: rel.capsule, fromCompany: v.fromCompany, toCompany: v.toCompany })
 }
 
 // Public: resolve a company root key → name/logo/verified (for staff/consumers).

@@ -237,6 +237,127 @@ export async function verifyCustody(rec: CustodyRecord, now: string): Promise<Cu
   return { sigOk, delegation: del, staffBound, company, ok: sigOk && delegationOk }
 }
 
+/* --------------------------------------------------------- handoff --- */
+
+/**
+ * A two-party handoff proves a specific item changed hands between two identified
+ * parties at a place and time. It is asymmetric: the sender signs a **release**,
+ * the receiver signs a **receipt** that names the sender. Both cover the same
+ * `{capsule, from, nonce}`, so the pair is cryptographically bound — neither can
+ * be reused for a different counterparty or item. No key pre-exchange is needed:
+ * the sender publishes a release under a short code; the receiver reads it and
+ * counter-signs. (`nonce` is a fresh random string the sender picks.)
+ */
+export interface HandoffRelease {
+  v: 1
+  kind: 'trace-handoff-release'
+  capsule: string
+  from: string
+  at: string
+  gps: Gps | null
+  nonce: string
+  sig: string
+  fromName?: string
+  fromDelegation?: Delegation | null
+}
+
+export interface HandoffReceipt {
+  v: 1
+  kind: 'trace-handoff-receipt'
+  capsule: string
+  from: string
+  to: string
+  at: string
+  gps: Gps | null
+  nonce: string
+  sig: string
+  toName?: string
+  toDelegation?: Delegation | null
+}
+
+export interface ReleaseInput {
+  capsule: string; from: string; at: string; gps?: Gps | null; nonce: string
+  fromName?: string; fromDelegation?: Delegation | null
+}
+
+/** Sender: sign a release for a capsule handoff (the counterparty is not fixed yet). */
+export async function signRelease(input: ReleaseInput, senderKey: CryptoKeyPair): Promise<HandoffRelease> {
+  const core = {
+    v: 1 as const, kind: 'trace-handoff-release' as const,
+    capsule: input.capsule.toLowerCase(), from: input.from,
+    at: input.at, gps: input.gps ?? null, nonce: input.nonce,
+  }
+  return {
+    ...core, sig: await signDigest(core, senderKey),
+    fromName: input.fromName?.slice(0, 80), fromDelegation: input.fromDelegation ?? null,
+  }
+}
+
+export interface ReceiptInput {
+  capsule: string; from: string; to: string; at: string; gps?: Gps | null; nonce: string
+  toName?: string; toDelegation?: Delegation | null
+}
+
+/** Receiver: sign a receipt naming the sender (binds to the same capsule + nonce). */
+export async function signReceipt(input: ReceiptInput, receiverKey: CryptoKeyPair): Promise<HandoffReceipt> {
+  const core = {
+    v: 1 as const, kind: 'trace-handoff-receipt' as const,
+    capsule: input.capsule.toLowerCase(), from: input.from, to: input.to,
+    at: input.at, gps: input.gps ?? null, nonce: input.nonce,
+  }
+  return {
+    ...core, sig: await signDigest(core, receiverKey),
+    toName: input.toName?.slice(0, 80), toDelegation: input.toDelegation ?? null,
+  }
+}
+
+/** Verify just a release's signature (used when a node accepts an offer). */
+export async function verifyRelease(rel: HandoffRelease): Promise<boolean> {
+  const { sig, fromName: _fn, fromDelegation: _fd, ...core } = rel
+  return rel?.kind === 'trace-handoff-release' && (await verifyDigest(core, sig, rel.from))
+}
+
+export interface HandoffVerdict {
+  releaseSigOk: boolean
+  receiptSigOk: boolean
+  /** The receipt names the same capsule + sender + nonce as the release. */
+  matched: boolean
+  fromCompany: string | null
+  toCompany: string | null
+  ok: boolean
+}
+
+/**
+ * Verify a completed handoff: both signatures valid, the receipt bound to the
+ * release (capsule + from + nonce), and any attached delegations valid + bound to
+ * their own party. A missing delegation is fine (that side is self-claimed).
+ */
+export async function verifyHandoff(
+  rel: HandoffRelease, rec: HandoffReceipt, now: string,
+): Promise<HandoffVerdict> {
+  const { sig: rSig, fromName: _fn, fromDelegation, ...rCore } = rel
+  const releaseSigOk = rel?.kind === 'trace-handoff-release' && (await verifyDigest(rCore, rSig, rel.from))
+  const { sig: cSig, toName: _tn, toDelegation, ...cCore } = rec
+  const receiptSigOk = rec?.kind === 'trace-handoff-receipt' && (await verifyDigest(cCore, cSig, rec.to))
+  const matched = rel.capsule === rec.capsule && rel.from === rec.from && rel.nonce === rec.nonce
+
+  let fromCompany: string | null = null
+  let toCompany: string | null = null
+  if (fromDelegation) {
+    const v = await verifyDelegation(fromDelegation, now)
+    if (v.ok && fromDelegation.staff === rel.from) fromCompany = fromDelegation.company
+  }
+  if (toDelegation) {
+    const v = await verifyDelegation(toDelegation, now)
+    if (v.ok && toDelegation.staff === rec.to) toCompany = toDelegation.company
+  }
+  const delOk = (!fromDelegation || !!fromCompany) && (!toDelegation || !!toCompany)
+  return {
+    releaseSigOk, receiptSigOk, matched, fromCompany, toCompany,
+    ok: releaseSigOk && receiptSigOk && matched && delOk,
+  }
+}
+
 /* ---------------------------------------------------- partner registry --- */
 
 /** A company registering its root key → public name / logo (self-asserted). */
