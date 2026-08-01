@@ -15,6 +15,7 @@ import {
   signPartner,
   signRelease,
   signReceipt,
+  signRevocation,
   verifyDelegation,
   type ActorKey,
   type CustodyEvent,
@@ -130,10 +131,57 @@ export async function mintDelegation(input: {
   staff: string; staffName: string; role: CustodyRole; days?: number
 }): Promise<Delegation> {
   const key = await getCompanyKey()
-  return signDelegation(
+  const d = await signDelegation(
     { company: key.pub, staff: input.staff, staffName: input.staffName, role: input.role, days: input.days, now: new Date().toISOString() },
     key.keyPair,
   )
+  recordEnrollment(d) // remember on the admin device for the roster view
+  return d
+}
+
+/* ------------------------------------------------------ roster (local) --- */
+
+const ROSTER_SLOT = 'iany.trace.roster'
+
+/** An enrolled staff member, remembered on the admin device that minted them. */
+export interface RosterEntry {
+  staff: string
+  staffName: string
+  role: CustodyRole
+  issuedAt: string
+  expiresAt: string
+}
+
+export function loadRoster(): RosterEntry[] {
+  try {
+    return JSON.parse(localStorage.getItem(ROSTER_SLOT) ?? '[]') as RosterEntry[]
+  } catch {
+    return []
+  }
+}
+function recordEnrollment(d: Delegation): void {
+  const roster = loadRoster().filter((e) => e.staff !== d.staff)
+  roster.push({ staff: d.staff, staffName: d.staffName, role: d.role, issuedAt: d.issuedAt, expiresAt: d.expiresAt })
+  localStorage.setItem(ROSTER_SLOT, JSON.stringify(roster))
+}
+
+/** Company admin: revoke a staff key (root-signed) so the node stops attributing. */
+export async function revokeStaff(staffKey: string): Promise<void> {
+  const key = await getCompanyKey()
+  const rev = await signRevocation({ company: key.pub, staff: staffKey, at: new Date().toISOString() }, key.keyPair)
+  await postJson('/partner/revoke', rev)
+}
+
+/** The set of staff keys this company has revoked (for the roster's status). */
+export async function fetchRevocations(companyKey: string): Promise<Set<string>> {
+  try {
+    const res = await fetch(`${NODE}/partner/${companyKey}/revocations`)
+    if (!res.ok) return new Set()
+    const d = (await res.json()) as { revoked?: { staff: string }[] }
+    return new Set((d.revoked ?? []).map((r) => r.staff))
+  } catch {
+    return new Set()
+  }
 }
 
 /** Staff: import a delegation minted for THIS device; stored if valid + bound. */

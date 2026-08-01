@@ -368,6 +368,17 @@ CREATE TABLE IF NOT EXISTS trace_handoff_pending (
 );
 CREATE INDEX IF NOT EXISTS idx_trace_handoff_expires ON trace_handoff_pending (expires_at);
 
+-- Revocations (Phase 3): a company root revokes a staff key before its
+-- delegation expires; on ingest the node drops that staff's company attribution.
+CREATE TABLE IF NOT EXISTS trace_revocations (
+  company_key TEXT NOT NULL,
+  staff_key   TEXT NOT NULL,
+  at          TEXT NOT NULL,
+  raw         TEXT NOT NULL,
+  created_at  TEXT NOT NULL,
+  PRIMARY KEY (company_key, staff_key)
+);
+
 -- Grove — the open, decentralized garden-carbon network (/garden). The user's
 -- phone signs each observation on-device (the source of truth); iany.app runs a
 -- reference NODE that re-verifies every signature before storing and serves

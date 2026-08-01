@@ -40,6 +40,8 @@ This is the "open now, verify names later" hybrid.
 | `POST /handoff/offer` | Sender publishes a signed **release**; node verifies it, holds it under a short code (1 h TTL). → `{ code, expiresAt }`. |
 | `GET /handoff/:code` | Receiver reads the pending release (to verify + show the sender). 410 if expired. |
 | `POST /handoff/:code/accept` | Receiver posts a signed **receipt**; node verifies the pair, writes two custody rows (release=`handoff`, receipt=`pickup`), consumes the code. → `{ ok, fromCompany, toCompany }`. |
+| `POST /partner/revoke` | Company revokes a staff key (root-signed). After this, that staff's events drop to self-claimed on ingest. |
+| `GET /partner/:key/revocations` | The staff keys a company has revoked (keys + times). |
 
 Crypto + types: [`core/companion.ts`](./core/companion.ts). Node verify-on-ingest:
 [`worker/handlers.ts`](./worker/handlers.ts). Web client + key storage:
@@ -86,9 +88,26 @@ the same `/custody/:capsule` timeline (sender = `handoff`, receiver = `pickup`),
 each attributed to its company via its delegation. Verify a completed pair
 offline with `verifyHandoff(release, receipt, now)`.
 
-The transport is a typed code (works on every browser). Rendering it as a
-scannable QR, and a polished admin/roster dashboard, are the remaining Phase 3
-niceties.
+The code is shown both as text and as a **QR** (encoding `/custody?h=<code>`), so
+the receiver can scan it with any phone camera — the link opens the console
+straight into *Receive* with the code pre-filled. Typing still works everywhere.
+
+## Roster & revocation (Phase 3)
+
+- **Roster** — the admin device remembers every staff member it enrolled
+  (kept locally, so no server-side staff directory is needed) and shows them
+  under *Company → Staff roster* with expiry + status.
+- **Revocation** — tapping *Revoke* signs a `trace-revocation` with the company
+  root key and posts it. From then on the node **refuses to attribute that
+  staff's events to the company** — their custody events and handoffs drop to
+  *self-claimed* on ingest (they can't be rejected retroactively, but they can
+  no longer act *as the company*). This is the "fired driver" story, enforced
+  server-side without waiting for the delegation's natural expiry. Only the
+  company root can revoke its own staff.
+
+That closes the companion feature: signed custody events, delegated staff
+identity, two-party handoffs, QR transport, and roster + revocation — all
+verifiable offline, no central authority.
 
 ## Setup
 

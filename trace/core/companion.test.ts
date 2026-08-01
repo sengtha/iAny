@@ -13,6 +13,7 @@ import {
   signDelegation, verifyDelegation,
   signCustody, verifyCustody,
   signRelease, signReceipt, verifyHandoff,
+  signRevocation, verifyRevocation,
   type CustodyRecord,
 } from './companion'
 
@@ -168,6 +169,16 @@ console.log('\n8. Two-party handoff (release + receipt)')
   const recSelf = await signReceipt({ capsule: CAPSULE, from: staffA.pub, to: staffB.pub, at: NOW, nonce: 'n2' }, staffB.keyPair)
   const vs = await verifyHandoff(relSelf, recSelf, LATER_OK)
   ok('self-claimed handoff ok, no companies', vs.ok && vs.fromCompany === null && vs.toCompany === null)
+}
+
+console.log('\n9. Revocation (company revokes a staff key)')
+{
+  const rev = await signRevocation({ company: company.pub, staff: staffA.pub, at: NOW }, company.keyPair)
+  ok('valid revocation verifies', await verifyRevocation(rev))
+  ok('tampered staff rejected', !(await verifyRevocation({ ...rev, staff: staffB.pub })))
+  // an attacker can't revoke another company's staff without the root key
+  const forged = await signRevocation({ company: company.pub, staff: staffA.pub, at: NOW }, other.keyPair)
+  ok('revocation signed by wrong key rejected', !(await verifyRevocation(forged)))
 }
 
 console.log(`\n${fails.length === 0 ? '✅ ALL PASS' : '❌ FAILURES'}: ${pass} passed, ${fails.length} failed`)

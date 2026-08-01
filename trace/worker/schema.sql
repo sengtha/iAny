@@ -91,3 +91,15 @@ CREATE TABLE IF NOT EXISTS trace_handoff_pending (
   created_at  TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_trace_handoff_expires ON trace_handoff_pending (expires_at);
+
+-- Revocations (Phase 3): a company root revokes one of its staff keys before the
+-- delegation's natural expiry. On ingest the node refuses to attribute that
+-- staff's events to the company (they drop to self-claimed). Signed by the root.
+CREATE TABLE IF NOT EXISTS trace_revocations (
+  company_key TEXT NOT NULL,         -- company root key doing the revoking
+  staff_key   TEXT NOT NULL,         -- the staff key being revoked
+  at          TEXT NOT NULL,         -- signer-claimed revoke time
+  raw         TEXT NOT NULL,         -- the signed revocation (re-verifiable)
+  created_at  TEXT NOT NULL,
+  PRIMARY KEY (company_key, staff_key)
+);

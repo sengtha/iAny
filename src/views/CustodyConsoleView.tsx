@@ -7,19 +7,24 @@ import {
   fetchCustody,
   fetchHandoffOffer,
   fetchPartner,
+  fetchRevocations,
   getStaffKey,
   importDelegation,
   loadDelegation,
+  loadRoster,
   mintDelegation,
   peekPub,
   registerCompany,
+  revokeStaff,
   startHandoff,
   type CustodyEvent,
   type CustodyItem,
   type CustodyRole,
   type Delegation,
   type HandoffRelease,
+  type RosterEntry,
 } from '../../trace/web/companion'
+import { qrSvg } from '../lib/qr'
 
 /**
  * 🚚 Trace companion console (/custody) — the B2B tool for supply-chain actors
@@ -37,7 +42,9 @@ const EVENTS: CustodyEvent[] = ['pickup', 'in_transit', 'store', 'handoff', 'del
 export function CustodyConsoleView() {
   const { lang } = useI18n()
   const km = lang === 'km'
-  const [tab, setTab] = useState<'event' | 'handoff' | 'identity' | 'company'>('event')
+  // Deep link from a scanned handoff QR: /custody?h=CODE → open Receive.
+  const handoffCode = new URLSearchParams(location.search).get('h')
+  const [tab, setTab] = useState<'event' | 'handoff' | 'identity' | 'company'>(handoffCode ? 'handoff' : 'event')
 
   return (
     <div className="contribute">
@@ -57,7 +64,7 @@ export function CustodyConsoleView() {
       </div>
 
       {tab === 'event' ? <AddEvent km={km} />
-        : tab === 'handoff' ? <Handoff km={km} />
+        : tab === 'handoff' ? <Handoff km={km} deepCode={handoffCode} />
           : tab === 'identity' ? <Identity km={km} />
             : <Company km={km} />}
     </div>
@@ -66,8 +73,8 @@ export function CustodyConsoleView() {
 
 /* ------------------------------------------------------------- handoff --- */
 
-function Handoff({ km }: { km: boolean }) {
-  const [side, setSide] = useState<'send' | 'receive'>('send')
+function Handoff({ km, deepCode }: { km: boolean; deepCode: string | null }) {
+  const [side, setSide] = useState<'send' | 'receive'>(deepCode ? 'receive' : 'send')
   return (
     <>
       <div className="sign-modetabs" role="tablist" style={{ marginTop: 4 }}>
@@ -83,7 +90,7 @@ function Handoff({ km }: { km: boolean }) {
           ? 'ភាគីទាំងពីរចុះហត្ថលេខាលើការប្រគល់តែមួយ — ភ័ស្តុតាងថាទំនិញបានប្តូរដៃ។ អ្នកផ្ញើបង្កើតលេខកូដ អ្នកទទួលបញ្ចូលវា។'
           : 'Both parties sign the same handoff — proof the goods changed hands. The sender creates a code; the receiver enters it.'}
       </p>
-      {side === 'send' ? <HandoffSend km={km} /> : <HandoffReceive km={km} />}
+      {side === 'send' ? <HandoffSend km={km} /> : <HandoffReceive km={km} deepCode={deepCode} />}
     </>
   )
 }
@@ -118,9 +125,11 @@ function HandoffSend({ km }: { km: boolean }) {
   }
 
   if (code) {
+    const link = `${location.origin}/custody?h=${code}`
     return (
       <div className="handoff-codebox">
-        <p>{km ? 'ប្រាប់លេខកូដនេះទៅអ្នកទទួល៖' : 'Give this code to the receiver:'}</p>
+        <p>{km ? 'អ្នកទទួលស្កេន QR ឬបញ្ចូលលេខកូដ៖' : 'Receiver scans the QR, or enters the code:'}</p>
+        <div className="handoff-qr" dangerouslySetInnerHTML={{ __html: qrSvg(link) }} />
         <div className="handoff-code">{code}</div>
         <p className="voice-minor-note">{km ? 'មានសុពលភាព ១ ម៉ោង · ប្រើបានតែម្តង' : 'Valid 1 hour · single use'}</p>
         <button className="voice-ghost" onClick={() => { setCode(''); setCapsule('') }}>
@@ -154,8 +163,8 @@ function HandoffSend({ km }: { km: boolean }) {
   )
 }
 
-function HandoffReceive({ km }: { km: boolean }) {
-  const [code, setCode] = useState('')
+function HandoffReceive({ km, deepCode }: { km: boolean; deepCode: string | null }) {
+  const [code, setCode] = useState((deepCode ?? '').toUpperCase())
   const [offer, setOffer] = useState<HandoffRelease | null>(null)
   const [senderCo, setSenderCo] = useState<{ name: string; verified: boolean } | null>(null)
   const [name, setName] = useState('')
@@ -171,8 +180,8 @@ function HandoffReceive({ km }: { km: boolean }) {
       { enableHighAccuracy: true, timeout: 8000 },
     )
   }
-  async function lookup() {
-    const c = code.trim().toUpperCase()
+  async function lookup(codeArg?: string) {
+    const c = (codeArg ?? code).trim().toUpperCase()
     if (!c) return
     setBusy(true); setError(''); setOffer(null); setSenderCo(null)
     const r = await fetchHandoffOffer(c)
@@ -184,6 +193,12 @@ function HandoffReceive({ km }: { km: boolean }) {
     setOffer(r.release)
     if (r.release.fromDelegation) setSenderCo(await fetchPartner(r.release.fromDelegation.company))
   }
+
+  // A scanned QR lands here with ?h=CODE — look it up automatically once.
+  useEffect(() => {
+    if (deepCode) void lookup(deepCode)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   async function accept() {
     if (!offer) return
     setBusy(true); setError('')
@@ -213,7 +228,7 @@ function HandoffReceive({ km }: { km: boolean }) {
       <div className="voice-controls">
         <input className="handoff-codein" value={code} placeholder={km ? 'លេខកូដ' : 'Handoff code'}
           maxLength={12} onChange={(e) => setCode(e.target.value.toUpperCase())} />
-        <button className="voice-primary" onClick={lookup} disabled={busy || !code.trim()}>
+        <button className="voice-primary" onClick={() => lookup()} disabled={busy || !code.trim()}>
           🔎 {km ? 'រក' : 'Look up'}
         </button>
       </div>
@@ -499,6 +514,23 @@ function Company({ km }: { km: boolean }) {
   const [staffRole, setStaffRole] = useState<CustodyRole>('carrier')
   const [delOut, setDelOut] = useState('')
 
+  // roster (local to this admin device) + which keys are revoked (from the node)
+  const [roster, setRoster] = useState<RosterEntry[]>(loadRoster())
+  const [revoked, setRevoked] = useState<Set<string>>(new Set())
+  useEffect(() => {
+    if (companyPub) void fetchRevocations(companyPub).then(setRevoked)
+  }, [companyPub])
+
+  async function revoke(staff: string) {
+    setError('')
+    try {
+      await revokeStaff(staff)
+      setRevoked((prev) => new Set(prev).add(staff))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }
+
   async function register() {
     setError(''); setRegMsg('')
     if (!name.trim()) { setError(km ? 'សូមបញ្ចូលឈ្មោះក្រុមហ៊ុន' : 'Enter a company name'); return }
@@ -521,6 +553,8 @@ function Company({ km }: { km: boolean }) {
     try {
       const d = await mintDelegation({ staff: staffKey.trim(), staffName: staffName.trim(), role: staffRole })
       setDelOut(JSON.stringify(d))
+      setRoster(loadRoster())
+      setStaffKey(''); setStaffName('')
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     }
@@ -596,6 +630,42 @@ function Company({ km }: { km: boolean }) {
             📋 {km ? 'ចម្លង' : 'Copy delegation'}
           </button>
         </label>
+      ) : null}
+
+      {roster.length > 0 ? (
+        <div className="custody-timeline">
+          <h3 className="custody-timeline-h" style={{ marginTop: 20 }}>
+            👥 {km ? 'បញ្ជីបុគ្គលិក' : 'Staff roster'}
+          </h3>
+          {roster.map((e) => {
+            const isRevoked = revoked.has(e.staff)
+            const expired = Date.parse(e.expiresAt) < Date.now()
+            return (
+              <div className="custody-row" key={e.staff}>
+                <div className="custody-row-top">
+                  <b>{e.staffName || e.staff.slice(0, 8)}</b> · {e.role}
+                  {isRevoked ? (
+                    <span className="custody-tag self">{km ? 'ដកហូត' : 'revoked'}</span>
+                  ) : expired ? (
+                    <span className="custody-tag self">{km ? 'ផុតកំណត់' : 'expired'}</span>
+                  ) : (
+                    <button className="voice-ghost small" onClick={() => void revoke(e.staff)}>
+                      ✕ {km ? 'ដកហូត' : 'Revoke'}
+                    </button>
+                  )}
+                </div>
+                <div className="custody-row-sub">
+                  {e.staff.slice(0, 12)}… · {km ? 'ផុតកំណត់' : 'expires'} {new Date(e.expiresAt).toLocaleDateString()}
+                </div>
+              </div>
+            )
+          })}
+          <p className="voice-minor-note">
+            {km
+              ? 'បញ្ជីនេះរក្សាទុកលើឧបករណ៍នេះ។ ការដកហូតត្រូវបានផ្ញើទៅ node ភ្លាមៗ។'
+              : 'This roster is kept on this device. Revoking is sent to the node immediately.'}
+          </p>
+        </div>
       ) : null}
 
       {error ? <p className="voice-error">{error}</p> : null}

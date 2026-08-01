@@ -401,3 +401,38 @@ export async function verifyPartner(p: PartnerRegistration): Promise<boolean> {
   const { sig, ...unsigned } = p
   return p?.kind === 'trace-partner' && (await verifyDigest(unsigned, sig, p.company))
 }
+
+/* ------------------------------------------------------- revocation --- */
+
+/**
+ * A company root's signed statement that a staff key is no longer authorized —
+ * revocation before the delegation's natural expiry (e.g. a driver leaves). The
+ * node records it and, on ingest, refuses to attribute that staff's events to
+ * the company (they drop to self-claimed). Only the company root can revoke its
+ * own staff.
+ */
+export interface Revocation {
+  v: 1
+  kind: 'trace-revocation'
+  company: string
+  staff: string
+  at: string
+  sig: string
+}
+
+/** Company admin: sign a revocation for one of our staff keys. */
+export async function signRevocation(
+  input: { company: string; staff: string; at: string }, rootKey: CryptoKeyPair,
+): Promise<Revocation> {
+  const unsigned = {
+    v: 1 as const, kind: 'trace-revocation' as const,
+    company: input.company, staff: input.staff, at: input.at,
+  }
+  return { ...unsigned, sig: await signDigest(unsigned, rootKey) }
+}
+
+/** Verify a revocation is signed by the company root key it names. */
+export async function verifyRevocation(r: Revocation): Promise<boolean> {
+  const { sig, ...unsigned } = r
+  return r?.kind === 'trace-revocation' && (await verifyDigest(unsigned, sig, r.company))
+}

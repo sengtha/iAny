@@ -27,10 +27,12 @@ import {
   verifyHandoff,
   verifyPartner,
   verifyRelease,
+  verifyRevocation,
   type CustodyRecord,
   type HandoffReceipt,
   type HandoffRelease,
   type PartnerRegistration,
+  type Revocation,
 } from '../core/companion'
 import { sha256Hex } from '../../grove/core/grove'
 
@@ -83,6 +85,10 @@ export async function serveTrace(url: URL, request: Request, env: TraceEnv): Pro
       return await traceCustodyList(path.slice('custody/'.length), env)
     }
     if (path === 'partner' && request.method === 'POST') return await tracePartnerRegister(request, env)
+    if (path === 'partner/revoke' && request.method === 'POST') return await tracePartnerRevoke(request, env)
+    if (path.startsWith('partner/') && path.endsWith('/revocations') && request.method === 'GET') {
+      return await tracePartnerRevocations(path.slice('partner/'.length, -'/revocations'.length), env)
+    }
     if (path.startsWith('partner/') && request.method === 'GET') {
       return await tracePartnerGet(path.slice('partner/'.length), env)
     }
@@ -291,6 +297,9 @@ async function traceCustodyPost(request: Request, env: TraceEnv): Promise<Respon
     return json({ error: 'invalid delegation', detail: v.delegation }, 400)
   }
 
+  // A valid delegation from a REVOKED staff key drops to self-claimed.
+  const company = v.company && (await isRevoked(v.company, rec.actor, env)) ? null : v.company
+
   const raw = JSON.stringify(rec)
   const id = await sha256Hex(raw)
   const gps = rec.gps && typeof rec.gps === 'object' ? rec.gps : null
@@ -303,10 +312,10 @@ async function traceCustodyPost(request: Request, env: TraceEnv): Promise<Respon
   ).bind(
     id, capsule, rec.actor, String(rec.actorName ?? '').slice(0, 80),
     String(rec.role ?? 'other').slice(0, 20), String(rec.event ?? 'other').slice(0, 20),
-    v.company, gps ? Number(gps.lat) : null, gps ? Number(gps.lng) : null,
+    company, gps ? Number(gps.lat) : null, gps ? Number(gps.lng) : null,
     String(rec.at ?? '').slice(0, 40), String(rec.note ?? '').slice(0, 200), raw, now,
   ).run()
-  return json({ ok: true, id, company: v.company, selfClaimed: !v.company })
+  return json({ ok: true, id, company, selfClaimed: !company })
 }
 
 // Public: the custody timeline for a capsule, each event resolved to its company
@@ -466,6 +475,10 @@ async function traceHandoffAccept(code: string, request: Request, env: TraceEnv)
     return json({ error: 'invalid delegation' }, 400)
   }
 
+  // Revoked staff on either side drop to self-claimed.
+  const fromCompany = v.fromCompany && (await isRevoked(v.fromCompany, rel.from, env)) ? null : v.fromCompany
+  const toCompany = v.toCompany && (await isRevoked(v.toCompany, rec.to, env)) ? null : v.toCompany
+
   // Persist both sides into the custody timeline (idempotent on the record hash).
   const relRaw = JSON.stringify(rel)
   const recRaw = JSON.stringify(rec)
@@ -477,19 +490,59 @@ async function traceHandoffAccept(code: string, request: Request, env: TraceEnv)
   const cg = rec.gps
   await env.DB.prepare(put).bind(
     await sha256Hex(relRaw), rel.capsule, rel.from, String(rel.fromName ?? '').slice(0, 80),
-    rel.fromDelegation?.role ?? 'other', 'handoff', v.fromCompany,
+    rel.fromDelegation?.role ?? 'other', 'handoff', fromCompany,
     rg ? Number(rg.lat) : null, rg ? Number(rg.lng) : null, String(rel.at ?? '').slice(0, 40),
     `→ handoff to ${rec.to.slice(0, 8)}…`, relRaw, now,
   ).run()
   await env.DB.prepare(put).bind(
     await sha256Hex(recRaw), rec.capsule, rec.to, String(rec.toName ?? '').slice(0, 80),
-    rec.toDelegation?.role ?? 'other', 'pickup', v.toCompany,
+    rec.toDelegation?.role ?? 'other', 'pickup', toCompany,
     cg ? Number(cg.lat) : null, cg ? Number(cg.lng) : null, String(rec.at ?? '').slice(0, 40),
     `↳ received from ${rel.from.slice(0, 8)}…`, recRaw, now,
   ).run()
   await env.DB.prepare('DELETE FROM trace_handoff_pending WHERE code = ?').bind(code).run()
 
-  return json({ ok: true, capsule: rel.capsule, fromCompany: v.fromCompany, toCompany: v.toCompany })
+  return json({ ok: true, capsule: rel.capsule, fromCompany, toCompany })
+}
+
+// True if this company has revoked this staff key.
+async function isRevoked(company: string, staff: string, env: TraceEnv): Promise<boolean> {
+  const r = await env.DB.prepare(
+    'SELECT 1 AS x FROM trace_revocations WHERE company_key = ? AND staff_key = ?',
+  ).bind(company, staff).first()
+  return !!r
+}
+
+// Company admin: revoke a staff key (root-signed). Idempotent.
+async function tracePartnerRevoke(request: Request, env: TraceEnv): Promise<Response> {
+  let rev: Revocation
+  try {
+    rev = (await request.json()) as Revocation
+  } catch {
+    return json({ error: 'expected json' }, 400)
+  }
+  if (!rev || rev.kind !== 'trace-revocation') return json({ error: 'not a revocation' }, 400)
+  if (!TRACE_KEY_RE.test(String(rev.company ?? '')) || !TRACE_KEY_RE.test(String(rev.staff ?? ''))) {
+    return json({ error: 'bad key' }, 400)
+  }
+  if (!(await verifyRevocation(rev))) return json({ error: 'bad signature' }, 400)
+  await env.DB.prepare(
+    `INSERT INTO trace_revocations (company_key, staff_key, at, raw, created_at)
+     VALUES (?,?,?,?,?)
+     ON CONFLICT(company_key, staff_key) DO UPDATE SET at = excluded.at, raw = excluded.raw`,
+  ).bind(rev.company, rev.staff, String(rev.at ?? '').slice(0, 40), JSON.stringify(rev), new Date().toISOString()).run()
+  return json({ ok: true })
+}
+
+// Public: the list of staff keys a company has revoked (keys + times only).
+async function tracePartnerRevocations(key: string, env: TraceEnv): Promise<Response> {
+  if (!TRACE_KEY_RE.test(key)) return json({ error: 'bad company key' }, 400)
+  const { results } = await env.DB.prepare(
+    'SELECT staff_key AS staff, at, created_at AS createdAt FROM trace_revocations WHERE company_key = ? LIMIT 1000',
+  ).bind(key).all()
+  return new Response(JSON.stringify({ revoked: results ?? [] }), {
+    headers: { ...JSON_HEADERS, 'cache-control': 'public, max-age=30' },
+  })
 }
 
 // Public: resolve a company root key → name/logo/verified (for staff/consumers).

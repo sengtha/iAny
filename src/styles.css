@@ -2258,6 +2258,19 @@ progress {
   border: 1px solid var(--border);
   border-radius: 10px;
 }
+.handoff-qr {
+  width: 220px;
+  max-width: 70vw;
+  margin: 8px auto;
+  padding: 10px;
+  background: #fff; /* QR needs a light quiet zone to scan reliably */
+  border-radius: 12px;
+}
+.handoff-qr svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
 
 /* iAny Trace (/trace) — proof of origin trust score */
 /* Two big, plain choices — a maker vs. a buyer — instead of a row of tabs. */
