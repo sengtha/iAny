@@ -1,14 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTraceCaps } from './context'
 import type { SttState } from './adapters'
+import { fetchCustody, type CustodyItem } from './companion'
+import { shareJson } from '../../src/lib/share'
+import { qrSvg } from '../../src/lib/qr'
 import {
   addAttestation,
   capsuleId,
+  claimAlias,
+  resolveAlias,
   checkCapsule,
   complianceReport,
   computeTrust,
   EVENT_TYPES,
   fetchAttestations,
+  fetchChain,
   fetchPage,
   photoSignature,
   proofTier,
@@ -44,15 +50,19 @@ export function TraceView({ lang }: { lang: 'en' | 'km' }) {
   const [pageState, setPageState] = useState<'off' | 'loading' | 'ready' | 'missing'>('off')
 
   useEffect(() => {
-    const id = new URLSearchParams(location.search).get('p')
-    if (!id || !/^[0-9a-f]{64}$/.test(id)) return
-    setPageId(id)
+    const p = new URLSearchParams(location.search).get('p')
+    if (!p) return
     setPageState('loading')
-    void fetchPage(id).then((c) => {
+    void (async () => {
+      // `p` is either a capsule id or a short product slug (kampot-pepper-2026-04).
+      const id = /^[0-9a-f]{64}$/.test(p) ? p : await resolveAlias(p)
+      if (!id) { setPageState('missing'); return }
+      setPageId(id)
+      const c = await fetchPage(id)
       setPageCapsule(c)
       setPageState(c ? 'ready' : 'missing')
-    })
-    void fetchAttestations(id).then(setPageAtt)
+      void fetchAttestations(id).then(setPageAtt)
+    })()
   }, [])
 
   if (pageState !== 'off') {
@@ -221,14 +231,11 @@ function Create({ L }: { L: LFn }) {
     setBusy(false)
   }
 
-  function download() {
+  async function download() {
     if (!capsule) return
-    const blob = new Blob([JSON.stringify(capsule)], { type: 'application/json' })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = `trace-${capsule.id.slice(0, 8)}.json`
-    a.click()
-    URL.revokeObjectURL(a.href)
+    // Share the signed proof file to any channel (Bluetooth / Nearby / AirDrop /
+    // messenger); falls back to a download. The receiver verifies it offline.
+    await shareJson(`trace-${capsule.id.slice(0, 8)}.json`, capsule)
   }
 
   if (capsule) {
@@ -243,12 +250,12 @@ function Create({ L }: { L: LFn }) {
             <img key={i} src={p.thumb} alt="" />
           ))}
         </div>
-        <button className="voice-primary big" onClick={download}>
-          ⬇ {L('Save proof file', 'រក្សាទុកឯកសារភស្តុតាង')}
+        <button className="voice-primary big" onClick={() => void download()}>
+          📤 {L('Share proof file', 'ចែករំលែកឯកសារភស្តុតាង')}
         </button>
         <p className="voice-tip">
-          {L('Send this file with the product (share, Bluetooth, upload). The receiver verifies it offline.',
-             'ផ្ញើឯកសារនេះជាមួយផលិតផល (ចែករំលែក ប៊្លូធូស អាប់ឡូត)។ អ្នកទទួលអាចផ្ទៀងផ្ទាត់ក្រៅបណ្ដាញ។')}
+          {L('Send this file with the product (Bluetooth, Nearby/AirDrop, any app). The receiver verifies it offline — no internet needed.',
+             'ផ្ញើឯកសារនេះជាមួយផលិតផល (ប៊្លូធូស Nearby/AirDrop កម្មវិធីណាមួយ)។ អ្នកទទួលផ្ទៀងផ្ទាត់ក្រៅបណ្ដាញ — មិនត្រូវការអ៊ីនធឺណិត។')}
         </p>
         {reg?.firstSeen ? (
           <p className="voice-tip">✓ {L('Registered online', 'ចុះបញ្ជីលើបណ្ដាញ')}: {new Date(reg.firstSeen).toLocaleString()}</p>
@@ -258,12 +265,7 @@ function Create({ L }: { L: LFn }) {
           </button>
         )}
         {pageUrl ? (
-          <div className="trace-share">
-            <div className="trace-share-url">{location.origin}{pageUrl}</div>
-            <button className="voice-ghost" onClick={() => void navigator.clipboard?.writeText(location.origin + pageUrl)}>
-              ⧉ {L('Copy public link', 'ចម្លងតំណសាធារណៈ')}
-            </button>
-          </div>
+          <ShareLink capsuleId={capsule.id} pageUrl={pageUrl} L={L} />
         ) : (
           <button className="voice-ghost" onClick={async () => setPageUrl(await publishCapsule(capsule))}>
             🔗 {L('Publish shareable page (for buyers)', 'ផ្សាយទំព័រចែករំលែក (សម្រាប់អ្នកទិញ)')}
@@ -705,6 +707,8 @@ function ProvenancePage({
           </div>
         )}
 
+        <FullJourney id={id} L={L} />
+
         <button className="voice-primary big" onClick={() => setVerifying(true)}>
           ✓ {L('Verify this product yourself', 'ផ្ទៀងផ្ទាត់ផលិតផលនេះដោយខ្លួនឯង')}
         </button>
@@ -716,6 +720,160 @@ function ProvenancePage({
              'នេះជារឿងប្រភពដែលបានផ្សាយដោយខ្លួនឯង ព្រងឹងដោយសាក្សីខាងលើ។ សូមផ្ទៀងផ្ទាត់ដោយប៊ូតុង។')}
         </p>
       </div>
+    </div>
+  )
+}
+
+/**
+ * The public link for a journey: a QR + URL a buyer can scan. The maker can
+ * claim a short, human-friendly slug (kampot-pepper-2026-04) that stays the SAME
+ * as later steps are added — so a label printed once keeps working, and the link
+ * always opens the full journey.
+ */
+function ShareLink({ capsuleId: id, pageUrl, L }: { capsuleId: string; pageUrl: string; L: LFn }) {
+  const [slug, setSlug] = useState('')
+  const [shortUrl, setShortUrl] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const url = location.origin + (shortUrl ?? pageUrl)
+
+  async function claim() {
+    const s = slug.trim().toLowerCase()
+    if (!s) return
+    setBusy(true); setErr('')
+    const r = await claimAlias(s, id)
+    setBusy(false)
+    if (r.ok) setShortUrl(r.url)
+    else setErr(r.error === 'taken'
+      ? L('That name is already taken — try another.', 'ឈ្មោះនេះមានគេប្រើហើយ — សូមប្តូរ។')
+      : r.error === 'offline'
+        ? L('You are offline.', 'អ្នកនៅក្រៅបណ្ដាញ។')
+        : L('Use 3-40 letters, numbers or dashes.', 'ប្រើ ៣-៤០ តួ អក្សរ លេខ ឬសញ្ញា -។'))
+  }
+
+  return (
+    <div className="trace-share">
+      <div className="handoff-qr" dangerouslySetInnerHTML={{ __html: qrSvg(url) }} />
+      <p className="voice-minor-note">
+        {L('Buyer scans to see the full journey online', 'អ្នកទិញស្កេនដើម្បីមើលដំណើរពេញលើបណ្ដាញ')}
+      </p>
+      <div className="trace-share-url">{url}</div>
+      <button className="voice-ghost" onClick={() => void navigator.clipboard?.writeText(url)}>
+        ⧉ {L('Copy public link', 'ចម្លងតំណសាធារណៈ')}
+      </button>
+
+      {shortUrl ? (
+        <p className="voice-minor-note">
+          ✓ {L('Short link claimed. Print it once — it keeps working as you add steps.',
+                'បានយកតំណខ្លី។ បោះពុម្ពម្តង — វានៅតែដំណើរការពេលបន្ថែមជំហាន។')}
+        </p>
+      ) : (
+        <div className="trace-slug">
+          <label className="voice-field">
+            <span>{L('Short link (optional, stable)', 'តំណខ្លី (ស្រេចចិត្ត ថេរ)')}</span>
+            <div className="trace-slug-row">
+              <span className="trace-slug-pre">/trace?p=</span>
+              <input type="text" value={slug} maxLength={40} placeholder="kampot-pepper-2026-04"
+                onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))} />
+            </div>
+          </label>
+          <button className="voice-ghost" onClick={() => void claim()} disabled={busy || !slug.trim()}>
+            🔖 {busy ? '…' : L('Claim short link', 'យកតំណខ្លី')}
+          </button>
+          {err ? <p className="voice-error">{err}</p> : null}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** One custody/handoff event row (shared by the single view and the journey). */
+function CustodyRow({ it, L }: { it: CustodyItem; L: LFn }) {
+  return (
+    <div className="custody-row">
+      <div className="custody-row-top">
+        <b>{it.event}</b> · {it.role}
+        {it.company ? (
+          <span className={`custody-tag ${it.company.verified ? 'ok' : ''}`}>
+            {it.company.verified ? '✓ ' : ''}{it.company.name}
+          </span>
+        ) : (
+          <span className="custody-tag self">{L('self-claimed', 'ដោយខ្លួនឯង')}</span>
+        )}
+      </div>
+      <div className="custody-row-sub">
+        {it.actorName ? `${it.actorName} · ` : ''}
+        {new Date(it.createdAt).toLocaleString()}
+        {it.lat != null ? ` · ~${it.lat.toFixed(2)}, ${it.lng?.toFixed(2)}` : ''}
+      </div>
+      {it.note ? <div className="custody-row-note">{it.note}</div> : null}
+    </div>
+  )
+}
+
+/**
+ * The **whole journey in one view** — the point of a single shareable link.
+ * Walks the hash-linked chain (any step's id resolves the full story), then
+ * renders every production step in order with its custody/handoff events nested,
+ * plus a tamper-evident ✓/⚠ from re-hashing the chain. Falls back to a plain
+ * custody list when a product has no multi-step journey.
+ */
+function FullJourney({ id, L }: { id: string; L: LFn }) {
+  const [chain, setChain] = useState<TraceCapsule[] | null>(null)
+  const [custody, setCustody] = useState<Record<string, CustodyItem[]>>({})
+  const [check, setCheck] = useState<ChainResult | null>(null)
+
+  useEffect(() => {
+    void (async () => {
+      const caps = await fetchChain(id)
+      // Aggregate custody across every capsule id in the journey.
+      const ids = caps && caps.length ? caps.map((c) => c.id) : [id]
+      const pairs = await Promise.all(ids.map(async (cid) => [cid, await fetchCustody(cid)] as const))
+      setCustody(Object.fromEntries(pairs.filter(([, v]) => v.length)))
+      if (caps && caps.length) { setChain(caps); setCheck(await verifyChain(caps)) }
+    })()
+  }, [id])
+
+  const flatCustody = Object.values(custody).flat()
+
+  // No multi-step journey → just the custody list (or nothing).
+  if (!chain || chain.length <= 1) {
+    if (flatCustody.length === 0) return null
+    return (
+      <div className="custody-timeline">
+        <h3 className="custody-timeline-h">🚚 {L('Chain of custody', 'ខ្សែសង្វាក់ចរាចរណ៍')}</h3>
+        {flatCustody.map((it) => <CustodyRow key={it.id} it={it} L={L} />)}
+      </div>
+    )
+  }
+
+  const ordered = [...chain].sort((a, b) => (a.event?.step ?? 0) - (b.event?.step ?? 0))
+  return (
+    <div className="trace-journey-pub">
+      <h3 className="custody-timeline-h">
+        🧭 {L('Full journey', 'ដំណើរពេញ')}
+        {check ? (
+          <span className={`custody-tag ${check.ok ? 'ok' : 'self'}`}>
+            {check.ok ? `✓ ${L('verified', 'បានផ្ទៀងផ្ទាត់')}` : `⚠ ${L('altered', 'បានកែ')}`}
+          </span>
+        ) : null}
+      </h3>
+      <ol className="journey-steps">
+        {ordered.map((cap, i) => (
+          <li key={cap.id} className={`journey-step ${cap.id === id ? 'here' : ''}`}>
+            <div className="journey-step-head">
+              <b>{i + 1}. {cap.event?.type ?? 'event'}</b>
+              {cap.context.producer ? <span> · {cap.context.producer}</span> : null}
+            </div>
+            <div className="journey-step-sub">
+              {cap.context.product ? `${cap.context.product} · ` : ''}
+              {cap.context.capturedAt ? new Date(cap.context.capturedAt).toLocaleDateString() : ''}
+              {cap.context.gps ? ` · 📍 ${cap.context.gps.lat}, ${cap.context.gps.lng}` : ''}
+            </div>
+            {(custody[cap.id] ?? []).map((it) => <CustodyRow key={it.id} it={it} L={L} />)}
+          </li>
+        ))}
+      </ol>
     </div>
   )
 }

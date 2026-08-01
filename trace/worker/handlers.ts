@@ -22,6 +22,20 @@
  * schema in ./schema.sql once to create the tables.
  */
 
+import {
+  verifyCustody,
+  verifyHandoff,
+  verifyPartner,
+  verifyRelease,
+  verifyRevocation,
+  type CustodyRecord,
+  type HandoffReceipt,
+  type HandoffRelease,
+  type PartnerRegistration,
+  type Revocation,
+} from '../core/companion'
+import { sha256Hex } from '../../grove/core/grove'
+
 /** The minimal binding surface Trace's registry needs. */
 export interface TraceEnv {
   /** D1 database holding trace_capsules + trace_attestations (see schema.sql). */
@@ -35,6 +49,11 @@ const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: JSON_HEADERS })
 
 const TRACE_ID_RE = /^[0-9a-f]{64}$/
+const TRACE_KEY_RE = /^[A-Za-z0-9_-]{80,200}$/ // base64url raw P-256 public key
+
+// Coarsen a coordinate to ~2 decimals (~1 km) for public custody feeds — a
+// warehouse/route location shouldn't be exposed to the metre.
+const fuzz = (v: number | null): number | null => (v == null ? null : Math.round(v * 100) / 100)
 
 export async function serveTrace(url: URL, request: Request, env: TraceEnv): Promise<Response> {
   const path = url.pathname.slice('/api/trace/'.length)
@@ -59,6 +78,35 @@ export async function serveTrace(url: URL, request: Request, env: TraceEnv): Pro
     }
     if (path.startsWith('chain/') && request.method === 'GET') {
       return await traceChain(path.slice('chain/'.length), env)
+    }
+    // Short, stable product links (/trace?p=<slug>).
+    if (path === 'alias' && request.method === 'POST') return await traceAliasClaim(request, env)
+    if (path.startsWith('alias/') && request.method === 'GET') {
+      return await traceAliasGet(path.slice('alias/'.length), env)
+    }
+    // Companion custody layer (supply-chain actors join the proof).
+    if (path === 'custody' && request.method === 'POST') return await traceCustodyPost(request, env)
+    if (path.startsWith('custody/') && request.method === 'GET') {
+      return await traceCustodyList(path.slice('custody/'.length), env)
+    }
+    if (path === 'partner' && request.method === 'POST') return await tracePartnerRegister(request, env)
+    if (path === 'partner/revoke' && request.method === 'POST') return await tracePartnerRevoke(request, env)
+    if (path.startsWith('partner/') && path.endsWith('/revocations') && request.method === 'GET') {
+      return await tracePartnerRevocations(path.slice('partner/'.length, -'/revocations'.length), env)
+    }
+    if (path.startsWith('partner/') && request.method === 'GET') {
+      return await tracePartnerGet(path.slice('partner/'.length), env)
+    }
+    // Two-party handoff (Phase 2): offer (sender) → read → accept (receiver).
+    if (path === 'handoff/offer' && request.method === 'POST') return await traceHandoffOffer(request, env)
+    if (path.startsWith('handoff/')) {
+      const rest = path.slice('handoff/'.length)
+      const slash = rest.indexOf('/')
+      const code = slash === -1 ? rest : rest.slice(0, slash)
+      const action = slash === -1 ? '' : rest.slice(slash + 1)
+      if (action === 'accept' && request.method === 'POST') return await traceHandoffAccept(code, request, env)
+      if (action === 'status' && request.method === 'GET') return await traceHandoffStatus(code, env)
+      if (action === '' && request.method === 'GET') return await traceHandoffGet(code, env)
     }
     return json({ error: 'not found' }, 404)
   } catch (e) {
@@ -225,4 +273,374 @@ async function traceAttestList(id: string, env: TraceEnv): Promise<Response> {
   return new Response(JSON.stringify({ attestations: results ?? [] }), {
     headers: { ...JSON_HEADERS, 'cache-control': 'public, max-age=30' },
   })
+}
+
+/* --------------------------------------------------- companion custody --- */
+
+// A supply-chain actor (delivery/warehouse/exporter) adds a device-SIGNED
+// custody event to a product capsule. Verify-on-ingest: the actor signature must
+// be valid, and any attached delegation must be valid + bound to the actor —
+// otherwise it's rejected (a broken company claim is worse than none). A record
+// with no delegation is a valid "self-claim". Idempotent on the record hash.
+async function traceCustodyPost(request: Request, env: TraceEnv): Promise<Response> {
+  let rec: CustodyRecord
+  try {
+    rec = (await request.json()) as CustodyRecord
+  } catch {
+    return json({ error: 'expected json' }, 400)
+  }
+  if (!rec || rec.kind !== 'trace-custody') return json({ error: 'not a custody record' }, 400)
+  const capsule = String(rec.capsule ?? '').toLowerCase()
+  if (!TRACE_ID_RE.test(capsule)) return json({ error: 'bad capsule id' }, 400)
+  if (!TRACE_KEY_RE.test(String(rec.actor ?? ''))) return json({ error: 'bad actor key' }, 400)
+
+  const now = new Date().toISOString()
+  const v = await verifyCustody(rec, now)
+  if (!v.sigOk) return json({ error: 'bad signature' }, 400)
+  // A delegation was attached but doesn't verify/bind/expired → refuse rather
+  // than silently downgrade to self-claimed (the actor intended attribution).
+  if (rec.delegation && !v.company) {
+    return json({ error: 'invalid delegation', detail: v.delegation }, 400)
+  }
+
+  // A valid delegation from a REVOKED staff key drops to self-claimed.
+  const company = v.company && (await isRevoked(v.company, rec.actor, env)) ? null : v.company
+
+  const raw = JSON.stringify(rec)
+  const id = await sha256Hex(raw)
+  const gps = rec.gps && typeof rec.gps === 'object' ? rec.gps : null
+  await env.DB.prepare(
+    `INSERT INTO trace_custody
+       (id, capsule, actor_key, actor_name, role, event_type, company_key,
+        lat, lng, claimed_at, note, raw, created_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+     ON CONFLICT(id) DO NOTHING`,
+  ).bind(
+    id, capsule, rec.actor, String(rec.actorName ?? '').slice(0, 80),
+    String(rec.role ?? 'other').slice(0, 20), String(rec.event ?? 'other').slice(0, 20),
+    company, gps ? Number(gps.lat) : null, gps ? Number(gps.lng) : null,
+    String(rec.at ?? '').slice(0, 40), String(rec.note ?? '').slice(0, 200), raw, now,
+  ).run()
+  return json({ ok: true, id, company, selfClaimed: !company })
+}
+
+// Public: the custody timeline for a capsule, each event resolved to its company
+// (name/logo/verified) via the partner registry. GPS coarsened to ~1 km.
+async function traceCustodyList(capsule: string, env: TraceEnv): Promise<Response> {
+  capsule = capsule.toLowerCase()
+  if (!TRACE_ID_RE.test(capsule)) return json({ error: 'bad capsule id' }, 400)
+  const { results } = await env.DB.prepare(
+    `SELECT id, actor_key AS actorKey, actor_name AS actorName, role, event_type AS event,
+            company_key AS companyKey, lat, lng, claimed_at AS claimedAt, note,
+            created_at AS createdAt
+       FROM trace_custody WHERE capsule = ? ORDER BY created_at ASC LIMIT 200`,
+  ).bind(capsule).all()
+  const rows = (results ?? []) as Record<string, unknown>[]
+
+  // Resolve the distinct companies once.
+  const keys = [...new Set(rows.map((r) => r.companyKey).filter(Boolean) as string[])]
+  const partners = new Map<string, { name: string; logo: string | null; region: string | null; verified: boolean }>()
+  for (const k of keys) {
+    const p = await env.DB.prepare(
+      'SELECT name, logo, region, verified FROM trace_partners WHERE company_key = ?',
+    ).bind(k).first<{ name: string; logo: string | null; region: string | null; verified: number }>()
+    if (p) partners.set(k, { name: p.name, logo: p.logo, region: p.region, verified: p.verified === 1 })
+  }
+
+  const custody = rows.map((o) => ({
+    ...o,
+    lat: fuzz(o.lat as number | null),
+    lng: fuzz(o.lng as number | null),
+    company: o.companyKey ? partners.get(o.companyKey as string) ?? null : null,
+    selfClaimed: !o.companyKey,
+  }))
+  return new Response(JSON.stringify({ capsule, custody }), {
+    headers: { ...JSON_HEADERS, 'cache-control': 'public, max-age=15' },
+  })
+}
+
+// A company registers its ROOT key → public name/logo. The registration is
+// signed by the root key, so only the key's owner can claim a name for it.
+// `verified` is never set here — an operator flips it after vetting.
+async function tracePartnerRegister(request: Request, env: TraceEnv): Promise<Response> {
+  let p: PartnerRegistration
+  try {
+    p = (await request.json()) as PartnerRegistration
+  } catch {
+    return json({ error: 'expected json' }, 400)
+  }
+  if (!p || p.kind !== 'trace-partner') return json({ error: 'not a partner registration' }, 400)
+  if (!TRACE_KEY_RE.test(String(p.company ?? ''))) return json({ error: 'bad company key' }, 400)
+  const name = String(p.name ?? '').trim()
+  if (!name || name.length > 80) return json({ error: 'name required' }, 400)
+  if (!(await verifyPartner(p))) return json({ error: 'bad signature' }, 400)
+
+  const now = new Date().toISOString()
+  await env.DB.prepare(
+    `INSERT INTO trace_partners (company_key, name, logo, region, verified, raw, created_at, updated_at)
+     VALUES (?,?,?,?,0,?,?,?)
+     ON CONFLICT(company_key) DO UPDATE SET
+       name = excluded.name, logo = excluded.logo, region = excluded.region,
+       raw = excluded.raw, updated_at = excluded.updated_at`,
+  ).bind(
+    p.company, name.slice(0, 80), String(p.logo ?? '').slice(0, 300) || null,
+    String(p.region ?? '').slice(0, 40) || null, JSON.stringify(p), now, now,
+  ).run()
+  return json({ ok: true, company: p.company })
+}
+
+/* ------------------------------------------------ short product links --- */
+
+const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/
+
+/**
+ * Claim a short slug for a journey, or re-point one you already own. The first
+ * claim mints a token (only its hash is stored) and returns it once — the maker
+ * keeps it to re-point the same printed link at later steps. Without the token a
+ * claimed slug can't be changed, so a product name can't be hijacked.
+ */
+async function traceAliasClaim(request: Request, env: TraceEnv): Promise<Response> {
+  let body: { slug?: string; capsule?: string; token?: string }
+  try {
+    body = await request.json()
+  } catch {
+    return json({ error: 'expected json' }, 400)
+  }
+  const slug = String(body.slug ?? '').trim().toLowerCase()
+  const capsule = String(body.capsule ?? '').toLowerCase()
+  if (!SLUG_RE.test(slug)) return json({ error: 'bad slug (3-40 chars, a-z 0-9 -)' }, 400)
+  if (!TRACE_ID_RE.test(capsule)) return json({ error: 'bad capsule id' }, 400)
+
+  const now = new Date().toISOString()
+  const existing = await env.DB.prepare('SELECT token_hash AS h FROM trace_aliases WHERE slug = ?')
+    .bind(slug).first<{ h: string }>()
+
+  if (!existing) {
+    const token = crypto.randomUUID().replace(/-/g, '')
+    await env.DB.prepare(
+      `INSERT INTO trace_aliases (slug, capsule, token_hash, created_at, updated_at) VALUES (?,?,?,?,?)`,
+    ).bind(slug, capsule, await sha256Hex(token), now, now).run()
+    return json({ ok: true, slug, url: `/trace?p=${slug}`, token, claimed: true })
+  }
+  // Already claimed → only the token holder may re-point it.
+  const token = String(body.token ?? '')
+  if (!token || (await sha256Hex(token)) !== existing.h) {
+    return json({ error: 'slug already taken' }, 409)
+  }
+  await env.DB.prepare('UPDATE trace_aliases SET capsule = ?, updated_at = ? WHERE slug = ?')
+    .bind(capsule, now, slug).run()
+  return json({ ok: true, slug, url: `/trace?p=${slug}`, claimed: false })
+}
+
+/** Resolve a slug → the journey step it points at. */
+async function traceAliasGet(slug: string, env: TraceEnv): Promise<Response> {
+  slug = slug.toLowerCase()
+  if (!SLUG_RE.test(slug)) return json({ error: 'bad slug' }, 400)
+  const row = await env.DB.prepare('SELECT capsule FROM trace_aliases WHERE slug = ?')
+    .bind(slug).first<{ capsule: string }>()
+  if (!row) return json({ error: 'not found' }, 404)
+  return new Response(JSON.stringify({ slug, capsule: row.capsule }), {
+    headers: { ...JSON_HEADERS, 'cache-control': 'public, max-age=30' },
+  })
+}
+
+/* -------------------------------------------------- two-party handoff --- */
+
+const HANDOFF_TTL_MS = 60 * 60 * 1000 // a pending offer lives 1 hour
+const HANDOFF_CODE_RE = /^[A-Z2-9]{4,12}$/
+// Crockford-ish alphabet (no 0/O/1/I/L) — easy to read aloud and type.
+const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
+function makeCode(): string {
+  const buf = new Uint8Array(6)
+  crypto.getRandomValues(buf)
+  let s = ''
+  for (const b of buf) s += CODE_ALPHABET[b % CODE_ALPHABET.length]
+  return s
+}
+
+// Sender publishes a signed RELEASE; we verify it and hold it under a fresh code.
+async function traceHandoffOffer(request: Request, env: TraceEnv): Promise<Response> {
+  let rel: HandoffRelease
+  try {
+    rel = (await request.json()) as HandoffRelease
+  } catch {
+    return json({ error: 'expected json' }, 400)
+  }
+  if (!rel || rel.kind !== 'trace-handoff-release') return json({ error: 'not a release' }, 400)
+  const capsule = String(rel.capsule ?? '').toLowerCase()
+  if (!TRACE_ID_RE.test(capsule)) return json({ error: 'bad capsule id' }, 400)
+  if (!TRACE_KEY_RE.test(String(rel.from ?? ''))) return json({ error: 'bad sender key' }, 400)
+  if (!(await verifyRelease(rel))) return json({ error: 'bad signature' }, 400)
+
+  const nowMs = Date.now()
+  const expiresAt = new Date(nowMs + HANDOFF_TTL_MS).toISOString()
+  const createdAt = new Date(nowMs).toISOString()
+  const raw = JSON.stringify(rel)
+  for (let i = 0; i < 5; i++) {
+    const code = makeCode()
+    try {
+      await env.DB.prepare(
+        `INSERT INTO trace_handoff_pending (code, capsule, from_key, nonce, raw_release, expires_at, created_at)
+         VALUES (?,?,?,?,?,?,?)`,
+      ).bind(code, capsule, rel.from, String(rel.nonce ?? '').slice(0, 80), raw, expiresAt, createdAt).run()
+      return json({ ok: true, code, expiresAt })
+    } catch (e) {
+      // Retry only on a code collision; rethrow anything else (e.g. missing table).
+      if (!/unique|constraint/i.test(e instanceof Error ? e.message : String(e))) throw e
+    }
+  }
+  return json({ error: 'could not allocate a code, try again' }, 503)
+}
+
+// Receiver reads the pending release for a code (to verify + display the sender).
+async function traceHandoffGet(code: string, env: TraceEnv): Promise<Response> {
+  if (!HANDOFF_CODE_RE.test(code)) return json({ error: 'bad code' }, 400)
+  const row = await env.DB.prepare(
+    'SELECT raw_release AS raw, status, expires_at AS expiresAt FROM trace_handoff_pending WHERE code = ?',
+  ).bind(code).first<{ raw: string; status: string; expiresAt: string }>()
+  if (!row) return json({ error: 'not found' }, 404)
+  if (row.status === 'received') return json({ error: 'already received' }, 410)
+  if (Date.parse(row.expiresAt) < Date.now()) {
+    await env.DB.prepare('DELETE FROM trace_handoff_pending WHERE code = ?').bind(code).run()
+    return json({ error: 'expired' }, 410)
+  }
+  return json({ release: JSON.parse(row.raw) })
+}
+
+// Sender polls this to close the proof-of-delivery loop: pending until the
+// receiver signs, then 'received' with who confirmed and when.
+async function traceHandoffStatus(code: string, env: TraceEnv): Promise<Response> {
+  if (!HANDOFF_CODE_RE.test(code)) return json({ error: 'bad code' }, 400)
+  const row = await env.DB.prepare(
+    'SELECT status, to_name AS receivedBy, completed_at AS at, expires_at AS expiresAt FROM trace_handoff_pending WHERE code = ?',
+  ).bind(code).first<{ status: string; receivedBy: string | null; at: string | null; expiresAt: string }>()
+  if (!row) return json({ status: 'notfound' })
+  if (row.status !== 'received' && Date.parse(row.expiresAt) < Date.now()) return json({ status: 'expired' })
+  return json({ status: row.status, receivedBy: row.receivedBy, at: row.at })
+}
+
+// Receiver counter-signs a RECEIPT. We verify the pair, write two custody rows
+// (sender=handoff, receiver=pickup), and consume the code (single-use).
+async function traceHandoffAccept(code: string, request: Request, env: TraceEnv): Promise<Response> {
+  if (!HANDOFF_CODE_RE.test(code)) return json({ error: 'bad code' }, 400)
+  let rec: HandoffReceipt
+  try {
+    rec = (await request.json()) as HandoffReceipt
+  } catch {
+    return json({ error: 'expected json' }, 400)
+  }
+  if (!rec || rec.kind !== 'trace-handoff-receipt') return json({ error: 'not a receipt' }, 400)
+  if (!TRACE_KEY_RE.test(String(rec.to ?? ''))) return json({ error: 'bad receiver key' }, 400)
+
+  const row = await env.DB.prepare(
+    'SELECT raw_release AS raw, status, expires_at AS expiresAt FROM trace_handoff_pending WHERE code = ?',
+  ).bind(code).first<{ raw: string; status: string; expiresAt: string }>()
+  if (!row) return json({ error: 'not found' }, 404)
+  if (row.status === 'received') return json({ error: 'already received' }, 409)
+  if (Date.parse(row.expiresAt) < Date.now()) {
+    await env.DB.prepare('DELETE FROM trace_handoff_pending WHERE code = ?').bind(code).run()
+    return json({ error: 'expired' }, 410)
+  }
+  const rel = JSON.parse(row.raw) as HandoffRelease
+  const now = new Date().toISOString()
+  const v = await verifyHandoff(rel, rec, now)
+  if (!v.releaseSigOk || !v.receiptSigOk) return json({ error: 'bad signature' }, 400)
+  if (!v.matched) return json({ error: 'receipt does not match the release' }, 400)
+  if ((rel.fromDelegation && !v.fromCompany) || (rec.toDelegation && !v.toCompany)) {
+    return json({ error: 'invalid delegation' }, 400)
+  }
+
+  // Revoked staff on either side drop to self-claimed.
+  const fromCompany = v.fromCompany && (await isRevoked(v.fromCompany, rel.from, env)) ? null : v.fromCompany
+  const toCompany = v.toCompany && (await isRevoked(v.toCompany, rec.to, env)) ? null : v.toCompany
+
+  // Persist both sides into the custody timeline (idempotent on the record hash).
+  const relRaw = JSON.stringify(rel)
+  const recRaw = JSON.stringify(rec)
+  const put = `INSERT INTO trace_custody
+      (id, capsule, actor_key, actor_name, role, event_type, company_key,
+       lat, lng, claimed_at, note, raw, created_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING`
+  const rg = rel.gps
+  const cg = rec.gps
+  await env.DB.prepare(put).bind(
+    await sha256Hex(relRaw), rel.capsule, rel.from, String(rel.fromName ?? '').slice(0, 80),
+    rel.fromDelegation?.role ?? 'other', 'handoff', fromCompany,
+    rg ? Number(rg.lat) : null, rg ? Number(rg.lng) : null, String(rel.at ?? '').slice(0, 40),
+    `→ handoff to ${rec.to.slice(0, 8)}…`, relRaw, now,
+  ).run()
+  const photoNote = rec.photoHash
+    ? ` · 📷${typeof rec.match === 'number' ? ` ${rec.match}%` : ''}`
+    : ''
+  await env.DB.prepare(put).bind(
+    await sha256Hex(recRaw), rec.capsule, rec.to, String(rec.toName ?? '').slice(0, 80),
+    rec.toDelegation?.role ?? 'other', 'pickup', toCompany,
+    cg ? Number(cg.lat) : null, cg ? Number(cg.lng) : null, String(rec.at ?? '').slice(0, 40),
+    `↳ received from ${rel.from.slice(0, 8)}…${photoNote}`, recRaw, now,
+  ).run()
+  // Keep the row as the sender's proof-of-delivery receipt (24h), not deleted.
+  const keepUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+  await env.DB.prepare(
+    `UPDATE trace_handoff_pending
+        SET status = 'received', to_name = ?, completed_at = ?, expires_at = ?
+      WHERE code = ?`,
+  ).bind(String(rec.toName ?? '').slice(0, 80) || null, now, keepUntil, code).run()
+
+  return json({ ok: true, capsule: rel.capsule, fromCompany, toCompany })
+}
+
+// True if this company has revoked this staff key.
+async function isRevoked(company: string, staff: string, env: TraceEnv): Promise<boolean> {
+  const r = await env.DB.prepare(
+    'SELECT 1 AS x FROM trace_revocations WHERE company_key = ? AND staff_key = ?',
+  ).bind(company, staff).first()
+  return !!r
+}
+
+// Company admin: revoke a staff key (root-signed). Idempotent.
+async function tracePartnerRevoke(request: Request, env: TraceEnv): Promise<Response> {
+  let rev: Revocation
+  try {
+    rev = (await request.json()) as Revocation
+  } catch {
+    return json({ error: 'expected json' }, 400)
+  }
+  if (!rev || rev.kind !== 'trace-revocation') return json({ error: 'not a revocation' }, 400)
+  if (!TRACE_KEY_RE.test(String(rev.company ?? '')) || !TRACE_KEY_RE.test(String(rev.staff ?? ''))) {
+    return json({ error: 'bad key' }, 400)
+  }
+  if (!(await verifyRevocation(rev))) return json({ error: 'bad signature' }, 400)
+  await env.DB.prepare(
+    `INSERT INTO trace_revocations (company_key, staff_key, at, raw, created_at)
+     VALUES (?,?,?,?,?)
+     ON CONFLICT(company_key, staff_key) DO UPDATE SET at = excluded.at, raw = excluded.raw`,
+  ).bind(rev.company, rev.staff, String(rev.at ?? '').slice(0, 40), JSON.stringify(rev), new Date().toISOString()).run()
+  return json({ ok: true })
+}
+
+// Public: the list of staff keys a company has revoked (keys + times only).
+async function tracePartnerRevocations(key: string, env: TraceEnv): Promise<Response> {
+  if (!TRACE_KEY_RE.test(key)) return json({ error: 'bad company key' }, 400)
+  const { results } = await env.DB.prepare(
+    'SELECT staff_key AS staff, at, created_at AS createdAt FROM trace_revocations WHERE company_key = ? LIMIT 1000',
+  ).bind(key).all()
+  return new Response(JSON.stringify({ revoked: results ?? [] }), {
+    headers: { ...JSON_HEADERS, 'cache-control': 'public, max-age=30' },
+  })
+}
+
+// Public: resolve a company root key → name/logo/verified (for staff/consumers).
+async function tracePartnerGet(key: string, env: TraceEnv): Promise<Response> {
+  if (!TRACE_KEY_RE.test(key)) return json({ error: 'bad company key' }, 400)
+  const p = await env.DB.prepare(
+    'SELECT name, logo, region, verified, created_at AS createdAt FROM trace_partners WHERE company_key = ?',
+  ).bind(key).first<{ name: string; logo: string | null; region: string | null; verified: number; createdAt: string }>()
+  if (!p) return json({ registered: false })
+  return new Response(
+    JSON.stringify({
+      registered: true, company: key, name: p.name, logo: p.logo,
+      region: p.region, verified: p.verified === 1, createdAt: p.createdAt,
+    }),
+    { headers: { ...JSON_HEADERS, 'cache-control': 'public, max-age=60' } },
+  )
 }

@@ -2224,6 +2224,161 @@ progress {
   margin: 0 0 10px;
 }
 
+/* /custody — Trace companion console */
+.custody-badge {
+  margin: 10px 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+.custody-badge.self {
+  background: color-mix(in srgb, var(--fg-muted) 12%, var(--surface));
+  color: var(--fg-muted);
+}
+.custody-badge.company {
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  color: var(--fg);
+}
+.custody-key {
+  width: 100%;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.78rem;
+  word-break: break-all;
+  resize: vertical;
+}
+.custody-timeline {
+  margin-top: 18px;
+}
+.custody-timeline-h {
+  font-size: 1rem;
+  margin: 0 0 8px;
+}
+.custody-row {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: var(--surface);
+}
+.custody-row-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+}
+.custody-row-sub {
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+  margin-top: 3px;
+}
+.custody-row-note {
+  font-size: 0.85rem;
+  margin-top: 4px;
+}
+.custody-tag {
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--fg-muted) 15%, var(--surface));
+  color: var(--fg-muted);
+}
+.custody-tag.ok {
+  background: color-mix(in srgb, var(--accent) 20%, var(--surface));
+  color: var(--fg);
+}
+.custody-tag.self {
+  font-weight: 500;
+}
+
+/* /custody — handoff (two-party co-sign) */
+.voice-lead-sm {
+  font-size: 0.9rem;
+  color: var(--fg-muted);
+  margin: 10px 0;
+}
+.handoff-codebox {
+  text-align: center;
+  padding: 18px 12px;
+}
+.handoff-code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 2.4rem;
+  font-weight: 700;
+  letter-spacing: 0.25em;
+  margin: 10px 0;
+  padding: 14px;
+  border: 2px dashed var(--accent);
+  border-radius: 14px;
+  color: var(--fg);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+}
+.handoff-codein {
+  flex: 1;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 1.3rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  text-align: center;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.handoff-qr {
+  width: 220px;
+  max-width: 70vw;
+  margin: 8px auto;
+  padding: 10px;
+  background: #fff; /* QR needs a light quiet zone to scan reliably */
+  border-radius: 12px;
+}
+.handoff-qr svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.qr-scanner {
+  text-align: center;
+  margin: 10px 0;
+}
+.qr-scanner-video {
+  width: 100%;
+  max-width: 360px;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 14px;
+  background: #000;
+  border: 2px solid var(--accent);
+}
+.handoff-received {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #16a34a;
+  margin: 8px 0;
+}
+.handoff-photo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0;
+}
+.handoff-photo img {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 10px;
+}
+.handoff-waiting {
+  animation: handoff-pulse 1.6s ease-in-out infinite;
+}
+@keyframes handoff-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
 /* iAny Trace (/trace) — proof of origin trust score */
 /* Two big, plain choices — a maker vs. a buyer — instead of a row of tabs. */
 .trace-modes {
@@ -2549,6 +2704,68 @@ progress {
   border-radius: 12px;
   padding: 12px 14px;
   margin: 14px 0;
+}
+
+/* Claiming a short, stable product link */
+.trace-slug {
+  margin-top: 10px;
+}
+.trace-slug-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.trace-slug-pre {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+  white-space: nowrap;
+}
+.trace-slug-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Public "full journey" — one link shows every step + custody, parcel-style */
+.trace-journey-pub {
+  margin: 16px 0;
+}
+.journey-steps {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0 0 0 18px;
+  border-left: 2px solid var(--border);
+}
+.journey-step {
+  position: relative;
+  padding: 0 0 14px 12px;
+}
+.journey-step::before {
+  content: "";
+  position: absolute;
+  left: -25px;
+  top: 3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--border);
+}
+.journey-step.here::before {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.journey-step.here {
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  border-radius: 10px;
+}
+.journey-step-head {
+  font-size: 0.98rem;
+}
+.journey-step-sub {
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+  margin: 2px 0 6px;
 }
 .trace-page-witness h3 {
   margin: 0 0 8px;

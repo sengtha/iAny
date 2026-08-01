@@ -55,6 +55,23 @@ function get(): DetectorLike | null {
   return detector
 }
 
+/**
+ * Decode the first barcode in a live source (e.g. a <video> element) without
+ * copying to a blob — used by the /custody QR scanner. Returns null on any
+ * miss so it can be polled every frame cheaply.
+ */
+export async function detectBarcodeSource(source: ImageBitmapSource): Promise<BarcodeResult | null> {
+  const d = get()
+  if (!d) return null
+  try {
+    const codes = await d.detect(source)
+    const hit = codes.find((c) => c.rawValue) ?? codes[0]
+    return hit && hit.rawValue ? { value: hit.rawValue, format: hit.format } : null
+  } catch {
+    return null
+  }
+}
+
 /** Decode the first barcode in a photo, or null (unsupported / none found). */
 export async function detectBarcode(blob: Blob): Promise<BarcodeResult | null> {
   const d = get()

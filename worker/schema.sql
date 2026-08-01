@@ -321,6 +321,81 @@ CREATE TABLE IF NOT EXISTS trace_attestations (
 );
 CREATE INDEX IF NOT EXISTS idx_trace_attest ON trace_attestations (id);
 
+-- Companion custody layer — supply-chain actors (delivery, warehouse, exporter)
+-- join the proof with device-SIGNED events, verified on ingest (ECDSA-P256).
+-- Canonical schema + docs live in trace/worker/schema.sql and trace/core/companion.ts;
+-- duplicated here so iAny's D1 migration creates them.
+CREATE TABLE IF NOT EXISTS trace_custody (
+  id          TEXT PRIMARY KEY,      -- SHA-256 of the signed record (dedupe key)
+  capsule     TEXT NOT NULL,         -- product capsule id this event is about
+  actor_key   TEXT NOT NULL,         -- signer (staff) public key (base64url P-256)
+  actor_name  TEXT,                  -- self-declared signer name
+  role        TEXT NOT NULL,         -- carrier / warehouse / exporter / …
+  event_type  TEXT NOT NULL,         -- pickup / in_transit / store / handoff / …
+  company_key TEXT,                  -- company root key (from a valid delegation)
+  lat         REAL,
+  lng         REAL,
+  claimed_at  TEXT,
+  note        TEXT,
+  raw         TEXT NOT NULL,         -- exact signed JSON (re-verifiable)
+  created_at  TEXT NOT NULL          -- server first-seen (trusted)
+);
+CREATE INDEX IF NOT EXISTS idx_trace_custody_capsule ON trace_custody (capsule);
+CREATE INDEX IF NOT EXISTS idx_trace_custody_company ON trace_custody (company_key);
+
+CREATE TABLE IF NOT EXISTS trace_partners (
+  company_key TEXT PRIMARY KEY,      -- company root public key (base64url P-256)
+  name        TEXT NOT NULL,
+  logo        TEXT,
+  region      TEXT,
+  verified    INTEGER NOT NULL DEFAULT 0,  -- operator flips to 1 after vetting
+  raw         TEXT NOT NULL,
+  created_at  TEXT NOT NULL,
+  updated_at  TEXT NOT NULL
+);
+
+-- Two-party handoff transport (Phase 2): a signed RELEASE held under a short
+-- code until the receiver counter-signs a RECEIPT; then two trace_custody rows
+-- are written and this row is deleted. Short-lived, single-use.
+CREATE TABLE IF NOT EXISTS trace_handoff_pending (
+  code         TEXT PRIMARY KEY,
+  capsule      TEXT NOT NULL,
+  from_key     TEXT NOT NULL,
+  nonce        TEXT NOT NULL,
+  raw_release  TEXT NOT NULL,
+  status       TEXT NOT NULL DEFAULT 'pending', -- pending | received (proof of delivery)
+  to_name      TEXT,
+  completed_at TEXT,
+  expires_at   TEXT NOT NULL,
+  created_at   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_trace_handoff_expires ON trace_handoff_pending (expires_at);
+-- Migration for a DB that already created this table (safe to run once):
+--   ALTER TABLE trace_handoff_pending ADD COLUMN status TEXT NOT NULL DEFAULT 'pending';
+--   ALTER TABLE trace_handoff_pending ADD COLUMN to_name TEXT;
+--   ALTER TABLE trace_handoff_pending ADD COLUMN completed_at TEXT;
+
+-- Short, stable product links: /trace?p=kampot-pepper-2026-04 → a journey step.
+-- First-come-first-served; only the claim-token holder can re-point the alias.
+CREATE TABLE IF NOT EXISTS trace_aliases (
+  slug       TEXT PRIMARY KEY,
+  capsule    TEXT NOT NULL,
+  token_hash TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+-- Revocations (Phase 3): a company root revokes a staff key before its
+-- delegation expires; on ingest the node drops that staff's company attribution.
+CREATE TABLE IF NOT EXISTS trace_revocations (
+  company_key TEXT NOT NULL,
+  staff_key   TEXT NOT NULL,
+  at          TEXT NOT NULL,
+  raw         TEXT NOT NULL,
+  created_at  TEXT NOT NULL,
+  PRIMARY KEY (company_key, staff_key)
+);
+
 -- Grove — the open, decentralized garden-carbon network (/garden). The user's
 -- phone signs each observation on-device (the source of truth); iany.app runs a
 -- reference NODE that re-verifies every signature before storing and serves

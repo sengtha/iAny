@@ -8,11 +8,13 @@ import {
   photoHashOf,
   estimateCarbon,
   exportBundle,
+  importBundle,
   publish,
   publishedIds,
   type GardenObservation,
   type Measure,
 } from '../../grove/web/store'
+import { readJsonFile, shareJson } from '../lib/share'
 import { anchorCall, plotLiveCount, readPlotStatus, type CsbPlotStatus } from '../../grove/core/csb'
 
 /**
@@ -114,6 +116,7 @@ export function GardenView() {
   const [publishing, setPublishing] = useState(false)
   const [publishMsg, setPublishMsg] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
+  const importRef = useRef<HTMLInputElement>(null)
 
   const unpublished = useMemo(() => obs.filter((o) => !published.has(o.id)).length, [obs, published])
 
@@ -280,13 +283,27 @@ export function GardenView() {
     setPublishing(false)
   }
 
-  function download() {
-    const blob = new Blob([exportBundle()], { type: 'application/json' })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = 'grove-garden.json'
-    a.click()
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+  async function shareBundle() {
+    setPublishMsg('')
+    const how = await shareJson('grove-garden.json', exportBundle())
+    if (how === 'downloaded') setPublishMsg(km ? 'បានទាញយកឯកសារ' : 'File downloaded')
+  }
+
+  async function onImport(file: File | null) {
+    if (!file) return
+    setPublishMsg('')
+    try {
+      const r = await importBundle(await readJsonFile(file))
+      setObs(loadObservations())
+      setPublished(publishedIds())
+      setPublishMsg(
+        km
+          ? `នាំចូល៖ បន្ថែម ${r.added} · ស្ទួន ${r.duplicate}${r.invalid ? ` · មិនត្រឹមត្រូវ ${r.invalid}` : ''}`
+          : `Imported: ${r.added} added · ${r.duplicate} dup${r.invalid ? ` · ${r.invalid} invalid` : ''}`,
+      )
+    } catch {
+      setPublishMsg(km ? 'ឯកសារមិនត្រឹមត្រូវ' : 'Not a valid Grove bundle')
+    }
   }
 
   return (
@@ -418,7 +435,14 @@ export function GardenView() {
               <button className="voice-ghost small" onClick={onPublish} disabled={publishing || unpublished === 0}>
                 {publishing ? '…' : `🌐 ${km ? 'ផ្សព្វផ្សាយ' : 'Publish'}${unpublished > 0 ? ` (${unpublished})` : ''}`}
               </button>
-              <button className="voice-ghost small" onClick={download}>⬇ {km ? 'នាំចេញ JSON' : 'Export JSON'}</button>
+              <button className="voice-ghost small" onClick={() => void shareBundle()}>
+                📤 {km ? 'ចែករំលែក' : 'Share'}
+              </button>
+              <button className="voice-ghost small" onClick={() => importRef.current?.click()}>
+                📥 {km ? 'នាំចូល' : 'Import'}
+              </button>
+              <input ref={importRef} type="file" accept="application/json,.json" style={{ display: 'none' }}
+                onChange={(e) => { const f = e.target.files?.[0]; void onImport(f ?? null); e.target.value = '' }} />
             </div>
           </div>
           {publishMsg ? <p className="garden-publish-msg">{publishMsg}</p> : null}
