@@ -98,12 +98,36 @@ SIGN_ADMIN_TOKEN=your-admin-token \
 Produces:
 
 ```
-sign-out/sequences/<id>.json   per-frame hand-landmark sequences (no video)
+sign-out/landmarks/train.jsonl per sample, frames INLINE — loads with no glue code
+sign-out/sequences/<id>.json   the same sequences as individual files
+sign-out/videos/<id>.<ext>     uploaded KSL videos (the "Upload a video" mode)
+sign-out/videos/metadata.csv   file_name,label,region,credit_name,… (HF videofolder)
 sign-out/labels.csv            seq,label
 sign-out/labels.jsonl          {seq, label, prompt_id, frames, hand_frames, region} per line
-sign-out/label-counts.csv      how many samples per sign (spot thin coverage)
+sign-out/label-counts.csv      landmark samples per sign (spot thin coverage)
+sign-out/README.md             Hugging Face dataset card (YAML + licence + usage)
 sign-out/CREDITS.md            opt-in contributor names
 ```
+
+`sign-out/` **is** a publishable Hugging Face dataset repo — same pattern as the
+voice export. Push it with:
+
+```bash
+huggingface-cli upload sengtha/iany-khmer-sign ./sign-out --repo-type dataset
+```
+
+then it loads straight from the Hub:
+
+```python
+from datasets import load_dataset
+ds   = load_dataset("sengtha/iany-khmer-sign", data_files="landmarks/train.jsonl", split="train")
+vids = load_dataset("videofolder", data_dir="videos")   # only if videos were uploaded
+```
+
+The two modalities stay separate on purpose: landmark sequences carry no face or
+background at all, while an uploaded video is real footage its contributor owned
+and explicitly agreed to release. Video export is skipped silently if the
+`sign_videos` table hasn't been migrated yet — the landmarks still export.
 
 ## Training a KSL recognizer (later)
 Each sample is a variable-length sequence of hand landmarks with a label — the
