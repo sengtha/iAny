@@ -65,19 +65,19 @@ export function CustodyConsoleView() {
     <div className="contribute">
       <div className="sign-modetabs" role="tablist">
         <button className={`sign-modetab ${tab === 'event' ? 'active' : ''}`} onClick={() => setTab('event')}>
-          📦 {km ? 'ព្រឹត្តិការណ៍' : 'Add event'}
+          📦 {km ? 'ព្រឹត្តិការណ៍' : 'Event'}
         </button>
         <button className={`sign-modetab ${tab === 'handoff' ? 'active' : ''}`} onClick={() => setTab('handoff')}>
           🤝 {km ? 'ប្រគល់' : 'Handoff'}
         </button>
         <button className={`sign-modetab ${tab === 'identity' ? 'active' : ''}`} onClick={() => setTab('identity')}>
-          🪪 {km ? 'អត្តសញ្ញាណ' : 'Identity'}
+          🪪 {km ? 'ខ្ញុំ' : 'My ID'}
         </button>
         <button className={`sign-modetab ${tab === 'company' ? 'active' : ''}`} onClick={() => setTab('company')}>
           🏢 {km ? 'ក្រុមហ៊ុន' : 'Company'}
         </button>
         <button className={`sign-modetab ${tab === 'verify' ? 'active' : ''}`} onClick={() => setTab('verify')}>
-          🪪 {km ? 'ពិនិត្យអត្តសញ្ញាណ' : 'Verify ID'}
+          🔎 {km ? 'ពិនិត្យ' : 'Verify'}
         </button>
       </div>
 
@@ -145,7 +145,7 @@ function HandoffSend({ km, deepCapsule }: { km: boolean; deepCapsule: string }) 
   }
   async function go() {
     const id = capsule.trim().toLowerCase()
-    if (!/^[0-9a-f]{64}$/.test(id)) { setError(km ? 'លេខសម្គាល់មិនត្រឹមត្រូវ (៦៤ តួ)' : 'Capsule id must be 64 hex'); return }
+    if (!/^[0-9a-f]{64}$/.test(id)) { setError(km ? 'លេខសម្គាល់ផលិតផលមិនត្រឹមត្រូវ' : 'That does not look like a product ID — scan the QR from /trace'); return }
     setBusy(true); setError('')
     try {
       const r = await startHandoff({ capsule: id, actorName: name.trim(), gps })
@@ -195,8 +195,8 @@ function HandoffSend({ km, deepCapsule }: { km: boolean; deepCapsule: string }) 
     <>
       <fieldset className="voice-fields">
         <label className="voice-field">
-          <span>{km ? 'លេខសម្គាល់កាបសែល' : 'Capsule id'}</span>
-          <input type="text" value={capsule} placeholder="64 hex…" onChange={(e) => setCapsule(e.target.value)} />
+          <span>{km ? 'លេខសម្គាល់ផលិតផល' : 'Product ID'}</span>
+          <input type="text" value={capsule} placeholder={km ? 'ស្កេន ឬបិទភ្ជាប់លេខផលិតផល' : 'scan or paste the product ID'} onChange={(e) => setCapsule(e.target.value)} />
           <ScanButton km={km} onScan={setCapsule} label={km ? 'ស្កេនផលិតផល' : 'Scan product'} />
         </label>
         <label className="voice-field">
@@ -444,7 +444,7 @@ function AddEvent({ km, deepCapsule }: { km: boolean; deepCapsule: string }) {
   async function submit() {
     const id = capsule.trim().toLowerCase()
     if (!/^[0-9a-f]{64}$/.test(id)) {
-      setError(km ? 'លេខសម្គាល់កាបសែលមិនត្រឹមត្រូវ (៦៤ តួ)' : 'Capsule id must be 64 hex characters')
+      setError(km ? 'លេខសម្គាល់ផលិតផលមិនត្រឹមត្រូវ' : 'That does not look like a product ID — scan the QR from /trace')
       return
     }
     if (!actorName.trim()) {
@@ -484,8 +484,8 @@ function AddEvent({ km, deepCapsule }: { km: boolean; deepCapsule: string }) {
 
       <fieldset className="voice-fields">
         <label className="voice-field">
-          <span>{km ? 'លេខសម្គាល់កាបសែល (Capsule id)' : 'Capsule id'}</span>
-          <input type="text" value={capsule} placeholder="64 hex…" onChange={(e) => setCapsule(e.target.value)} />
+          <span>{km ? 'លេខសម្គាល់ផលិតផល' : 'Product ID'}</span>
+          <input type="text" value={capsule} placeholder={km ? 'ស្កេន ឬបិទភ្ជាប់លេខផលិតផល' : 'scan or paste the product ID'} onChange={(e) => setCapsule(e.target.value)} />
           <ScanButton km={km} onScan={setCapsule} label={km ? 'ស្កេនផលិតផល' : 'Scan product'} />
         </label>
         <label className="voice-field">

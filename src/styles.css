@@ -2177,18 +2177,21 @@ progress {
 /* /sign — mode toggle (record live vs upload a video) */
 .sign-modetabs {
   display: flex;
+  flex-wrap: wrap; /* 5 tabs must never run off a phone screen */
   gap: 8px;
   margin: 0 0 14px;
 }
 .sign-modetab {
-  flex: 1;
-  padding: 10px 12px;
+  flex: 1 1 88px;
+  min-width: 88px;
+  padding: 10px 8px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--surface);
   color: var(--fg-muted);
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 600;
+  line-height: 1.25;
   cursor: pointer;
 }
 .sign-modetab.active {
