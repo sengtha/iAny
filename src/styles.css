@@ -2364,6 +2364,29 @@ progress {
   gap: 8px;
   justify-content: center;
 }
+.badge-result {
+  margin: 14px 0;
+  padding: 16px;
+  border-radius: 16px;
+  border: 2px solid var(--border);
+  background: var(--surface);
+  text-align: center;
+}
+.badge-result.ok { border-color: #16a34a; background: rgba(22, 163, 74, 0.08); }
+.badge-result.bad { border-color: #dc2626; background: rgba(220, 38, 38, 0.08); }
+.badge-verdict { font-size: 1.6rem; font-weight: 800; }
+.badge-result.ok .badge-verdict { color: #16a34a; }
+.badge-result.bad .badge-verdict { color: #dc2626; }
+.badge-who { font-size: 1.15rem; margin-top: 6px; }
+.badge-co {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 6px;
+  font-size: 0.95rem;
+}
 .qr-row {
   display: flex;
   gap: 8px;

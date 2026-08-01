@@ -336,6 +336,77 @@ export async function acceptHandoff(
   return { fromCompany: (out.fromCompany as string) ?? null, toCompany: (out.toCompany as string) ?? null }
 }
 
+/* ------------------------------------------------------ staff badge --- */
+
+/**
+ * A staff badge is just the delegation the company already signed — shown as a
+ * QR so anyone can check it. This is a free, offline-first employee ID: no
+ * blockchain, no per-credential cost, and no public ledger of who employs whom.
+ *
+ * Verification is three questions, in order of cost:
+ *   1. Is it signed by the company root key, and not expired?  (offline, instant)
+ *   2. Has the company published a revocation for this staff key?  (needs the node)
+ *   3. Is the company itself verified, and how?  (needs the node)
+ * Step 1 alone is meaningful offline; 2–3 need connectivity, which is the honest
+ * trade — revocation can't be known offline by any design, chain or not.
+ */
+export interface BadgeVerdict {
+  ok: boolean
+  reason: 'ok' | 'malformed' | 'bad-signature' | 'expired' | 'revoked'
+  /** True when we could not reach the node — signature is checked, the rest isn't. */
+  offline: boolean
+  staffName: string
+  role: string
+  issuedAt: string
+  expiresAt: string
+  staffKey: string
+  company: { key: string; name: string; verified: boolean; proofs: PartnerProof[] } | null
+}
+
+/** Verify a scanned/pasted staff badge (a signed delegation). */
+export async function verifyBadge(input: string | Delegation): Promise<BadgeVerdict> {
+  const base = {
+    ok: false, offline: false, staffName: '', role: '', issuedAt: '', expiresAt: '', staffKey: '',
+    company: null as BadgeVerdict['company'],
+  }
+  let d: Delegation
+  try {
+    d = (typeof input === 'string' ? JSON.parse(input) : input) as Delegation
+  } catch {
+    return { ...base, reason: 'malformed' }
+  }
+  if (!d || d.kind !== 'trace-delegation') return { ...base, reason: 'malformed' }
+
+  const info = {
+    ...base,
+    staffName: d.staffName ?? '', role: d.role ?? '', issuedAt: d.issuedAt ?? '',
+    expiresAt: d.expiresAt ?? '', staffKey: d.staff ?? '',
+  }
+  const now = new Date().toISOString()
+  const v = await verifyDelegation(d, now)
+  if (!v.sigOk) return { ...info, reason: 'bad-signature' }
+  if (v.expired) return { ...info, reason: 'expired' }
+
+  // Online checks: revocation list, then who the company is.
+  let offline = false
+  let revoked = false
+  let company: BadgeVerdict['company'] = null
+  try {
+    const [revs, partner] = await Promise.all([
+      fetchRevocations(d.company),
+      fetchPartner(d.company),
+    ])
+    revoked = revs.has(d.staff)
+    company = partner
+      ? { key: d.company, name: partner.name, verified: partner.verified, proofs: partner.proofs }
+      : { key: d.company, name: '', verified: false, proofs: [] }
+  } catch {
+    offline = true
+  }
+  if (revoked) return { ...info, reason: 'revoked', offline, company }
+  return { ...info, ok: true, reason: 'ok', offline, company }
+}
+
 /* -------------------------------------------------------- read side --- */
 
 export interface CustodyItem {

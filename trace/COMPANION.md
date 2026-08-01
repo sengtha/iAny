@@ -96,6 +96,32 @@ who checked it. This is the only path that requires the node operator.
 kampotpepper.com`), and `GET /api/trace/partner/<key>` returns the full proof list
 — method, evidence, who verified, when. The badge is auditable, not a promise.
 
+## Staff badge — a free employee ID, no blockchain
+
+The delegation a company already signs *is* a verifiable credential, so the same
+machinery works as a **staff ID** far beyond cargo: a delivery driver at a
+customer's door, a field inspector, an NGO worker, a co-op member.
+
+- **Show** (`/custody` → Identity): *Show my staff badge* renders the signed
+  delegation as a QR, with the expiry.
+- **Check** (`/custody` → Verify ID): anyone scans it — no account, no login —
+  and `verifyBadge()` answers three questions in increasing cost:
+  1. signed by the company root key, and not expired? — **offline, instant**
+  2. has the company published a revocation for this staff key? — needs the node
+  3. is the company itself verified, and by which method? — needs the node
+
+Revocation is deliberately a **published list** (`GET /partner/:key/revocations`),
+not a chain: the company posts a root-signed revocation and every verifier that
+is online sees it immediately. A purely offline verifier can never know about a
+revocation issued after its last sync — *no design fixes that, blockchain
+included* — so the UI says plainly when it checked the signature but could not
+check revocation. Short expiries bound that window.
+
+Why this needs no blockchain: the question is "did this company say this?", which
+a signature answers — not "who spent first?", which needs global consensus.
+Skipping the chain means zero cost per credential, instant issuance, offline
+verification of steps 1, and no public permanent ledger of who employs whom.
+
 ## Two-party handoff (Phase 2)
 
 Proof that a specific item changed hands between two identified parties. It's

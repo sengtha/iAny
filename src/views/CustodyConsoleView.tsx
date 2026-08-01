@@ -18,6 +18,7 @@ import {
   registerCompany,
   revokeStaff,
   startHandoff,
+  verifyBadge,
   verifyDomain,
   vouchFor,
   WELL_KNOWN_PATH,
@@ -26,6 +27,7 @@ import {
   type CustodyRole,
   type Delegation,
   type HandoffRelease,
+  type BadgeVerdict,
   type PartnerProof,
   type RosterEntry,
 } from '../../trace/web/companion'
@@ -57,7 +59,7 @@ export function CustodyConsoleView() {
   const handoffCode = params.get('h')
   const deepCapsule = (params.get('c') ?? '').toLowerCase()
   const capsuleParam = /^[0-9a-f]{64}$/.test(deepCapsule) ? deepCapsule : ''
-  const [tab, setTab] = useState<'event' | 'handoff' | 'identity' | 'company'>(handoffCode ? 'handoff' : 'event')
+  const [tab, setTab] = useState<'event' | 'handoff' | 'identity' | 'company' | 'verify'>(handoffCode ? 'handoff' : 'event')
 
   return (
     <div className="contribute">
@@ -74,12 +76,16 @@ export function CustodyConsoleView() {
         <button className={`sign-modetab ${tab === 'company' ? 'active' : ''}`} onClick={() => setTab('company')}>
           🏢 {km ? 'ក្រុមហ៊ុន' : 'Company'}
         </button>
+        <button className={`sign-modetab ${tab === 'verify' ? 'active' : ''}`} onClick={() => setTab('verify')}>
+          🪪 {km ? 'ពិនិត្យអត្តសញ្ញាណ' : 'Verify ID'}
+        </button>
       </div>
 
       {tab === 'event' ? <AddEvent km={km} deepCapsule={capsuleParam} />
         : tab === 'handoff' ? <Handoff km={km} deepCode={handoffCode} deepCapsule={capsuleParam} />
           : tab === 'identity' ? <Identity km={km} />
-            : <Company km={km} />}
+            : tab === 'verify' ? <VerifyId km={km} />
+              : <Company km={km} />}
     </div>
   )
 }
@@ -550,6 +556,95 @@ export function CustodyTimeline({ km, items }: { km: boolean; items: CustodyItem
   )
 }
 
+/**
+ * Verify someone's staff badge — a free, offline-first employee ID check.
+ * Anyone can use this (a customer at the door, a site gate, a buyer): scan the
+ * badge QR and see who it is, which company, whether that company is verified
+ * and how, and whether the credential is still valid or has been revoked.
+ */
+function VerifyId({ km }: { km: boolean }) {
+  const [paste, setPaste] = useState('')
+  const [v, setV] = useState<BadgeVerdict | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  async function check(text: string) {
+    if (!text.trim()) return
+    setBusy(true)
+    setV(await verifyBadge(text.trim()))
+    setBusy(false)
+  }
+
+  const bad = v && !v.ok
+  return (
+    <>
+      <p className="contribute-lead">
+        {km
+          ? 'ស្កេនប័ណ្ណបុគ្គលិក ដើម្បីដឹងថាតើគាត់ពិតជាបុគ្គលិករបស់ក្រុមហ៊ុននោះឬអត់។'
+          : 'Scan a staff badge to check the person really works for the company they claim.'}
+      </p>
+
+      <div className="qr-row">
+        <ScanButton km={km} onScan={(t) => { setPaste(t); void check(t) }}
+          label={km ? 'ស្កេនប័ណ្ណ' : 'Scan badge'} />
+        <button className="voice-primary" onClick={() => void check(paste)} disabled={busy || !paste.trim()}>
+          🔎 {km ? 'ពិនិត្យ' : 'Check'}
+        </button>
+      </div>
+      <textarea className="custody-key" value={paste} rows={3}
+        placeholder={km ? 'ឬបិទភ្ជាប់ប័ណ្ណនៅទីនេះ' : 'or paste the badge here'}
+        onChange={(e) => setPaste(e.target.value)} />
+
+      {v ? (
+        <div className={`badge-result ${v.ok ? 'ok' : 'bad'}`}>
+          <div className="badge-verdict">
+            {v.ok ? `✓ ${km ? 'ត្រឹមត្រូវ' : 'Valid'}`
+              : v.reason === 'revoked' ? `✕ ${km ? 'ត្រូវបានដកហូត' : 'REVOKED'}`
+                : v.reason === 'expired' ? `✕ ${km ? 'ផុតកំណត់' : 'Expired'}`
+                  : v.reason === 'bad-signature' ? `✕ ${km ? 'ហត្ថលេខាមិនត្រឹមត្រូវ' : 'Invalid signature'}`
+                    : `✕ ${km ? 'ប័ណ្ណមិនត្រឹមត្រូវ' : 'Not a valid badge'}`}
+          </div>
+          {v.staffName || v.role ? (
+            <div className="badge-who">
+              <b>{v.staffName || '—'}</b>{v.role ? ` · ${v.role}` : ''}
+            </div>
+          ) : null}
+          {v.company ? (
+            <div className="badge-co">
+              🏢 {v.company.name || (km ? '(មិនបានចុះឈ្មោះ)' : '(unregistered company)')}
+              {v.company.verified && v.company.proofs[0] ? (
+                <span className="custody-tag ok">
+                  ✓ {v.company.proofs[0].method === 'domain' ? `🌐 ${v.company.proofs[0].evidence}`
+                    : v.company.proofs[0].method === 'peer' ? `🤝 ${v.company.proofs[0].detail || 'vouched'}`
+                      : `🏛️ ${v.company.proofs[0].evidence}`}
+                </span>
+              ) : (
+                <span className="custody-tag self">{km ? 'ក្រុមហ៊ុនមិនទាន់ផ្ទៀងផ្ទាត់' : 'company not verified'}</span>
+              )}
+            </div>
+          ) : null}
+          {v.expiresAt ? (
+            <div className="custody-row-sub">
+              {km ? 'មានសុពលភាពដល់' : 'Valid until'} {new Date(v.expiresAt).toLocaleDateString()}
+            </div>
+          ) : null}
+          {v.offline ? (
+            <p className="voice-minor-note">
+              ⚠ {km
+                ? 'ក្រៅបណ្ដាញ៖ ហត្ថលេខាបានពិនិត្យ ប៉ុន្តែមិនអាចពិនិត្យការដកហូតបានទេ។'
+                : 'Offline: the signature was checked, but revocation could not be. Re-check when online.'}
+            </p>
+          ) : null}
+          {bad && v.reason === 'revoked' ? (
+            <p className="voice-error">
+              {km ? 'ក្រុមហ៊ុនបានដកហូតបុគ្គលិកនេះ។' : 'The company has revoked this person.'}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+    </>
+  )
+}
+
 /* ---------------------------------------------------------- my identity --- */
 
 function Identity({ km }: { km: boolean }) {
@@ -614,6 +709,20 @@ function Identity({ km }: { km: boolean }) {
           ? `🏢 ${km ? 'បានភ្ជាប់' : 'Linked'} · ${del.staffName || ''} (${del.role})`
           : `👤 ${km ? 'មិនទាន់ភ្ជាប់ក្រុមហ៊ុន' : 'Not linked to a company yet'}`}
       </div>
+      {del ? (
+        <>
+          <div className="custody-row-sub">
+            {km ? 'មានសុពលភាពដល់' : 'Valid until'} {new Date(del.expiresAt).toLocaleDateString()}
+          </div>
+          <QrShow value={JSON.stringify(del)} km={km} size={4}
+            label={km ? '🪪 បង្ហាញប័ណ្ណរបស់ខ្ញុំ' : '🪪 Show my staff badge'} />
+          <p className="voice-minor-note">
+            {km
+              ? 'នរណាក៏អាចស្កេនប័ណ្ណនេះ ដើម្បីផ្ទៀងផ្ទាត់ថាអ្នកជាបុគ្គលិកពិតប្រាកដ។'
+              : 'Anyone can scan this badge to check you really work for your company.'}
+          </p>
+        </>
+      ) : null}
       {del ? (
         <button className="voice-ghost" onClick={() => { clearDelegation(); setDel(null) }}>
           ✕ {km ? 'ផ្ដាច់ក្រុមហ៊ុន' : 'Unlink company'}
