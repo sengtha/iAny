@@ -21,9 +21,9 @@ on:
         options: [voice, ocr, sign]
         default: voice
       hf_repo:
-        description: Hugging Face dataset repo (owner/name)
+        description: "Hugging Face dataset repo (owner/name). Leave blank to use the default for the chosen dataset."
         type: string
-        default: sengtha/iany-khmer-voice
+        default: ''
       private:
         description: Create the repo as private (recommended for a first run)
         type: boolean
@@ -41,6 +41,32 @@ jobs:
         with:
           node-version: 20
 
+      # Each dataset has its own home. Publishing one into another's repo would
+      # be near-impossible to undo cleanly, so the repo is derived from the
+      # chosen dataset unless explicitly overridden — and a mismatch is refused.
+      - name: Resolve target repo
+        id: repo
+        env:
+          DATASET: ${{ inputs.dataset }}
+          GIVEN: ${{ inputs.hf_repo }}
+        run: |
+          case "$DATASET" in
+            voice) DEFAULT=sengtha/iany-khmer-voice ;;
+            ocr)   DEFAULT=sengtha/iany-khmer-ocr ;;
+            sign)  DEFAULT=sengtha/iany-khmer-sign ;;
+            *)     echo "::error::unknown dataset '$DATASET'"; exit 1 ;;
+          esac
+          REPO="${GIVEN:-$DEFAULT}"
+          # Refuse an obvious cross-publish (e.g. dataset=sign into …-voice).
+          for other in voice ocr sign; do
+            if [ "$other" != "$DATASET" ] && printf '%s' "$REPO" | grep -qi -- "-$other\$"; then
+              echo "::error::Repo '$REPO' looks like the '$other' dataset but you chose '$DATASET'. Fix the repo name or leave it blank."
+              exit 1
+            fi
+          done
+          echo "repo=$REPO" >> "$GITHUB_OUTPUT"
+          echo "Publishing '$DATASET' → $REPO"
+
       - name: Export dataset from iany.app
         env:
           VOICE_ADMIN_TOKEN: ${{ secrets.RADIO_ADMIN_TOKEN }}
@@ -52,9 +78,11 @@ jobs:
             exit 1
           fi
           node "scripts/export-${{ inputs.dataset }}.mjs" \
-            --base https://iany.app --out ./out --repo "${{ inputs.hf_repo }}"
+            --base https://iany.app --out ./out --repo "${{ steps.repo.outputs.repo }}"
           echo "---- exported files ----"
-          ls -la ./out
+          find ./out -maxdepth 2 -type f | head -40
+          echo "---- size ----"
+          du -sh ./out
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -64,7 +92,7 @@ jobs:
       - name: Upload to Hugging Face
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_REPO: ${{ inputs.hf_repo }}
+          HF_REPO: ${{ steps.repo.outputs.repo }}
           PRIVATE: ${{ inputs.private }}
         run: |
           if [ -z "$HF_TOKEN" ]; then
@@ -93,7 +121,7 @@ jobs:
           echo "### ✅ Published to Hugging Face" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "- Dataset: \`${{ inputs.dataset }}\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Repo: [\`${{ inputs.hf_repo }}\`](https://huggingface.co/datasets/${{ inputs.hf_repo }})" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Repo: [\`${{ steps.repo.outputs.repo }}\`](https://huggingface.co/datasets/${{ steps.repo.outputs.repo }})" >> "$GITHUB_STEP_SUMMARY"
           echo "- Private: ${{ inputs.private }}" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "If private, flip it to public in the dataset's **Settings** when you're ready." >> "$GITHUB_STEP_SUMMARY"
