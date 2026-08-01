@@ -96,6 +96,8 @@ export function TraceView({ lang }: { lang: 'en' | 'km' }) {
 
       {mode === 'create' ? <Create L={L} /> : mode === 'verify' ? <Verify L={L} /> : <Journey L={L} />}
 
+      {mode !== 'journey' ? <PartnerCallout L={L} /> : null}
+
       {/* Journey / compliance is an exporter feature — tucked away, not a top tab. */}
       {mode === 'journey' ? (
         <button className="trace-adv-link" onClick={() => setMode('create')}>
@@ -264,6 +266,8 @@ function Create({ L }: { L: LFn }) {
             🌐 {L('Register online (optional, trusted timestamp)', 'ចុះបញ្ជីលើបណ្ដាញ (ស្រេចចិត្ត ពេលវេលាដែលទុកចិត្ត)')}
           </button>
         )}
+        <PartnerHandoffLink capsuleId={capsule.id} L={L} />
+
         {pageUrl ? (
           <ShareLink capsuleId={capsule.id} pageUrl={pageUrl} L={L} />
         ) : (
@@ -720,6 +724,57 @@ function ProvenancePage({
              'នេះជារឿងប្រភពដែលបានផ្សាយដោយខ្លួនឯង ព្រងឹងដោយសាក្សីខាងលើ។ សូមផ្ទៀងផ្ទាត់ដោយប៊ូតុង។')}
         </p>
       </div>
+    </div>
+  )
+}
+
+/**
+ * Explains the third role. Trace is the entry point: a **maker** creates the
+ * proof here and a **buyer** checks it here — but the product also passes through
+ * delivery companies, warehouses and exporters, and they add their own signed
+ * links to the same chain in the companion console (/custody). One product, one
+ * journey; this is the door to the partner half of it.
+ */
+/**
+ * The concrete Trace → Custody link: hand the driver/warehouse a QR that opens
+ * the partner console with **this capsule already filled in**, so they never have
+ * to type a 64-hex id. Collapsed by default — it's for the moment of handover.
+ */
+function PartnerHandoffLink({ capsuleId: id, L }: { capsuleId: string; L: LFn }) {
+  const [open, setOpen] = useState(false)
+  const url = `${location.origin}/custody?c=${id}`
+  if (!open) {
+    return (
+      <button className="voice-ghost" onClick={() => setOpen(true)}>
+        🚚 {L('Hand to a delivery partner', 'ប្រគល់ទៅដៃគូដឹកជញ្ជូន')}
+      </button>
+    )
+  }
+  return (
+    <div className="trace-share">
+      <div className="handoff-qr" dangerouslySetInnerHTML={{ __html: qrSvg(url) }} />
+      <p className="voice-minor-note">
+        {L('The driver or warehouse scans this — the partner console opens with this product already filled in, ready for them to sign the handoff.',
+           'អ្នកបើកបរ ឬឃ្លាំងស្កេនវា — កុងសូលដៃគូបើកឡើងដោយមានផលិតផលនេះរួចរាល់ ដើម្បីចុះហត្ថលេខាលើការប្រគល់។')}
+      </p>
+      <button className="voice-ghost" onClick={() => void navigator.clipboard?.writeText(url)}>
+        ⧉ {L('Copy partner link', 'ចម្លងតំណដៃគូ')}
+      </button>
+    </div>
+  )
+}
+
+function PartnerCallout({ L }: { L: LFn }) {
+  return (
+    <div className="trace-partner-callout">
+      <h3>🚚 {L('Moving the product? Add your link to the chain', 'ដឹកជញ្ជូនផលិតផល? បន្ថែមតំណរបស់អ្នក')}</h3>
+      <p>
+        {L('A maker creates the proof and a buyer checks it — here. In between, the delivery company, warehouse or exporter each sign the handoffs they take part in. Those signed steps join the same product journey and show up on its page.',
+           'អ្នកផលិតបង្កើតភស្តុតាង ហើយអ្នកទិញពិនិត្យ — នៅទីនេះ។ ចន្លោះនោះ ក្រុមហ៊ុនដឹកជញ្ជូន ឃ្លាំង ឬអ្នកនាំចេញ ចុះហត្ថលេខាលើការប្រគល់នីមួយៗ។ ជំហានទាំងនោះចូលរួមក្នុងដំណើរតែមួយ ហើយបង្ហាញនៅលើទំព័ររបស់វា។')}
+      </p>
+      <a className="voice-ghost" href="/custody">
+        {L('Open the partner console', 'បើកកុងសូលដៃគូ')} →
+      </a>
     </div>
   )
 }
