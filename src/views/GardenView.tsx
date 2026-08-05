@@ -56,6 +56,11 @@ const SPECIES_LIST: SpeciesInfo[] = [
   { id: 'rubber', en: 'Rubber tree', km: 'កៅស៊ូ', scientific: 'Hevea brasiliensis' },
   { id: 'lychee', en: 'Lychee', km: 'គូឡែន', scientific: 'Litchi chinensis' },
   { id: 'cashew', en: 'Cashew', km: 'ស្វាយចន្ទី', scientific: 'Anacardium occidentale' },
+  { id: 'white-champak', en: 'White Champak', km: 'ចំប៉ា', scientific: 'Michelia alba' },
+  { id: 'white-frangipani', en: 'White Frangipani', km: 'ចំប៉ីស', scientific: 'Plumeria alba' },
+  { id: 'red-frangipani', en: 'Red Frangipani', km: 'ចំប៉ីក្រហម', scientific: 'Plumeria rubra' },
+  { id: 'siamese-rosewood', en: 'Siamese rosewood', km: 'ក្រញូង', scientific: 'Dalbergia cochinchinensis' },
+  { id: 'pine', en: 'Pine (Sumatran pine)', km: 'ស្រល់', scientific: 'Pinus merkusii' },
 ]
 /** Where the optional CSB read endpoint is remembered. Empty = chain off. */
 const CSB_KEY = 'grove.csb.base.v1'
