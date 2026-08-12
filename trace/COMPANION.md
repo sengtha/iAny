@@ -194,8 +194,10 @@ returns the "trace registry not initialised" hint.
 
 ## EU readiness (EUDR today, DPP next)
 
-**EUDR — EU Deforestation Regulation 2023/1115.** In scope for Cambodian pepper,
-cashew, rubber and coffee. Large/medium operators must comply from **30 Dec 2026**,
+**EUDR — EU Deforestation Regulation 2023/1115.** Annex I covers seven
+commodities: cattle, cocoa, coffee, oil palm, rubber, soya and wood. For Cambodia
+that means **rubber and coffee** — **pepper and cashew are NOT in scope**, a
+common misreading worth stating plainly. Large/medium operators must comply from **30 Dec 2026**,
 SMEs from **30 Jun 2027**. It asks for the **production plot's geolocation**:
 
 - a **point** for plots under 4 ha, a **polygon** of the perimeter at 4 ha and above,

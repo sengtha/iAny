@@ -77,8 +77,9 @@ export interface TraceCapsule {
  * EUDR (Reg. 2023/1115) requires geolocation of every plot a commodity came
  * from: a single point for plots **under 4 ha**, and a **polygon** of the
  * perimeter for 4 ha and above, with coordinates to at least six decimals.
- * Cambodian pepper/cashew/rubber/coffee are in scope — large and medium
- * operators from 30 Dec 2026, SMEs from 30 Jun 2027.
+ * Annex I covers seven commodities (cattle, cocoa, coffee, oil palm, rubber,
+ * soya, wood) — for Cambodia that is rubber and coffee; pepper and cashew are
+ * NOT in scope. Large and medium operators from 30 Dec 2026, SMEs 30 Jun 2027.
  */
 export interface PlotGeometry {
   /** Perimeter, walked corner by corner. 1 point = a point plot; 3+ = polygon. */
