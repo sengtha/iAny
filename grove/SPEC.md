@@ -80,13 +80,18 @@ floating-point drift across languages.
 
 ## 4. Carbon estimate
 
-`co2Kg` is derived, not asserted. Reference method (Chave et al. 2014, pantropical):
+`co2Kg` is derived, not asserted. Reference method:
 
 ```
-AGB (kg) = 0.0673 · (ρ · D² · H)^0.976
-carbon   = AGB · 0.47            (IPCC carbon fraction)
-CO₂e     = carbon · 3.667        (44/12)
+AGB (kg) = 0.0673 · (ρ · D² · H)^0.976   Chave et al. (2014) Eq. 4, pantropical
+carbon   = AGB · 0.47                     carbon fraction — SOURCE UNRESOLVED
+CO₂e     = carbon · 3.6667                stoichiometry (44/12)
 ```
+
+The three lines do not have the same standing, and the wood density and the
+height fallback are ours rather than anyone's published model. **`docs/REFERENCES.md`
+records what each component rests on**, including why the carbon fraction is
+marked unresolved rather than attributed to the IPCC as it once was.
 
 where `ρ` = wood density (g/cm³, species table + 0.6 default), `D` = DBH (cm),
 `H` = height (m). Height may be estimated from DBH when unmeasured. The method is

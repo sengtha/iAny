@@ -1774,6 +1774,16 @@ progress {
   font-size: 1rem;
 }
 .garden-est b { font-size: 1.25rem; }
+/* Attribution for the figure in the box above. The wording varies with what was
+   actually measured — only the DBH+height case runs a published model. See
+   docs/REFERENCES.md. */
+.garden-est-note {
+  margin: -4px 0 10px;
+  font-size: 0.76rem;
+  line-height: 1.5;
+  opacity: 0.72;
+}
+.garden-est-note a { color: inherit; text-decoration: underline; }
 .garden-list { margin-top: 16px; }
 .garden-list-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
 .garden-list-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
