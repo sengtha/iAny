@@ -133,8 +133,13 @@ both of which matter the moment money is attached to a grove surviving.
 [ANCHORING.md](./ANCHORING.md) describes an **optional** path: commit a record's
 content hash to [CSB](https://github.com/sengtha/CSB), where a block timestamp
 replaces the phone's clock and confirmations count only from **licensed** field
-verifiers. Only the hash and `keccak256(plot)` are sent — never the plot name,
-GPS, photo, or device key.
+verifiers. Only hashes are sent: the GPS, the photo and the device key never
+reach the chain at all, and the plot name is never sent as text — but it is sent
+as `keccak256(plot)`, and a short everyday name can be worked back out of that
+hash by anyone who tries. **Do not tell your users the chain cannot learn a
+grove's name.** It is a bound on what is transmitted, not a privacy guarantee,
+and iAny's own publish worker serves the name in clear for any published record.
+See CSB `3245244`.
 
 CamboVerse reads that status alongside the signed records and shows it as a
 provenance tier on each plot (`✓ verified by a licensed field verifier` /
