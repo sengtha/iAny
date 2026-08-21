@@ -9,9 +9,15 @@ the **read contract** between them. It is intentionally small: CamboVerse needs 
 special privilege, no API key, and no trust in iany.app — it reads the same public,
 signed records anyone can, and it can **verify every one for itself**.
 
-> Honest scope: `co2Kg` is an **estimate** from published allometry (Chave et al.
-> 2014), never a certified carbon credit. The virtual world should render it as
-> "estimated CO₂ captured", not a tradable asset. See [SPEC.md](./SPEC.md) §7.
+> Honest scope: `co2Kg` is an **estimate**, never a certified carbon credit. The
+> virtual world should render it as "estimated CO₂ captured", not a tradable
+> asset. Do not label it "Chave allometry" as this note once did: the figure is
+> four components multiplied, and only the biomass model is published (Chave et
+> al. 2014, **Eq. 4**). The carbon fraction's attribution is **unresolved**, the
+> wood-density table is ours, and when height was not measured the biomass step
+> is ours too. See [SPEC.md](./SPEC.md) §7 and
+> [`docs/REFERENCES.md`](../docs/REFERENCES.md), which records each component and
+> what it rests on.
 
 > **Build against real data now.** [`fixtures/`](./fixtures) has genuinely
 > device-signed sample records that verify with the reference verifier — an

@@ -409,9 +409,31 @@ export function GardenView() {
             </label>
           </div>
 
+          {/*
+            The number has four components and only the biomass model is a
+            published one: Chave et al. (2014) Eq. 4 for AGB, an UNRESOLVED
+            carbon fraction, 44/12 stoichiometry, and our own wood-density table.
+            When height was not measured the biomass model is ours too, so the
+            label has to say which of the two ran. Deliberately no "IPCC" here
+            while that attribution is unverified — docs/REFERENCES.md §3.
+          */}
           <div className="garden-est">
             ≈ <b>{est.total}</b> kg CO₂ {count > 1 ? <small>({est.per} × {count})</small> : null}
           </div>
+          <p className="garden-est-note">
+            {measure.method === 'dbh_height'
+              ? km
+                ? 'ការប៉ាន់ស្មាន — Chave et al. (2014) សមីការទី 4។ មិនមែនជាក្រេឌីតសម្រាប់ជួញដូរឡើយ។'
+                : 'Estimate — Chave et al. (2014) Eq. 4. Never a tradable credit.'
+              : km
+                ? 'ការប៉ាន់ស្មានប្រហាក់ប្រហែល — មិនបានវាស់កម្ពស់ ប្រើរូបមន្តផ្ទៃក្នុង។ មិនមែនជាក្រេឌីតសម្រាប់ជួញដូរឡើយ។'
+                : 'Rough estimate — height not measured, in-house approximation. Never a tradable credit.'}
+            {' '}
+            <a href="https://github.com/sengtha/iAny/blob/main/docs/REFERENCES.md"
+               target="_blank" rel="noreferrer">
+              {km ? 'របៀបគណនា' : 'How this is calculated'}
+            </a>
+          </p>
 
           <label className="voice-field">
             <span>{km ? 'សួន (plot)' : 'Plot'}</span>
