@@ -468,10 +468,21 @@ export function GardenView() {
           <b>⛓ {km ? 'ចងភ្ជាប់លើ CSB' : 'Anchor on CSB'}</b>
           <small>{km ? 'ស្រេចចិត្ត' : 'optional'}</small>
         </div>
+        {/*
+          The plot name is hashed on this device and never sent as text, but the
+          hash IS public on chain, and plot names are short and speakable because
+          a verifier types one standing in a field. A wordlist crossed with a
+          two-digit index recovers most of them in seconds, and liveCount and
+          species sit beside the hash in the same anchor. So this panel no longer
+          says the name is safe; it says what is true and tells her what to do
+          about it today. The real fix is a salted commitment in grove/core/csb.ts
+          (plotId = keccak256(plot ‖ salt)), which changes the derivation in three
+          repositories and is deliberately not part of this copy change.
+        */}
         <p className="garden-chain-lead">
           {km
-            ? 'ហត្ថលេខាបញ្ជាក់ថា “នរណានិយាយ” មិនមែន “ពិតឬអត់”។ ការចងភ្ជាប់បន្ថែមកាលបរិច្ឆេទដែលអ្នកដទៃយល់ព្រម និងកន្លែងឲ្យអ្នកផ្ទៀងផ្ទាត់មានអាជ្ញាបណ្ណដាក់ឈ្មោះ។ មានតែ hash ទេដែលចេញទៅ។'
-            : 'A signature proves who said something, never that it is true. Anchoring adds a date somebody else agrees with, and a place a licensed field verifier can put their name. Only the hash leaves this phone — never the plot name, the photo, or your location.'}
+            ? 'ហត្ថលេខាបញ្ជាក់ថា “នរណានិយាយ” មិនមែន “ពិតឬអត់”។ ការចងភ្ជាប់បន្ថែមកាលបរិច្ឆេទដែលអ្នកដទៃយល់ព្រម និងកន្លែងឲ្យអ្នកផ្ទៀងផ្ទាត់មានអាជ្ញាបណ្ណដាក់ឈ្មោះ។ មានតែ hash ទេដែលចេញពីទូរស័ព្ទនេះ — រូបថត ទីតាំង និងសោឧបករណ៍ មិនចេញឡើយ។ ឈ្មោះសួនក៏ផ្ញើជា hash ដែរ ប៉ុន្តែឈ្មោះខ្លីធម្មតា អាចមានគេទាយចេញពី hash នោះបាន។ ដូច្នេះសូមជ្រើសឈ្មោះសួនណាដែលអ្នកមិនខ្វល់ បើមានមនុស្សចម្លែកដឹង។'
+            : 'A signature proves who said something, never that it is true. Anchoring adds a date somebody else agrees with, and a place a licensed field verifier can put their name. Only hashes leave this phone — never the photo, never your location, never your device key. The plot name is sent as a hash too, but a short everyday name can be worked back out of that hash by someone who tries, so pick a plot name you would not mind a stranger guessing.'}
         </p>
 
         <label className="voice-field">
