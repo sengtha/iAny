@@ -423,7 +423,7 @@ export function GardenView() {
           <p className="garden-est-note">
             {measure.method === 'dbh_height'
               ? km
-                ? 'ការប៉ាន់ស្មាន — Chave et al. (2014) សមីការទី ៤។ មិនមែនជាក្រេឌីតសម្រាប់ជួញដូរឡើយ។'
+                ? 'ការប៉ាន់ស្មាន — Chave et al. (2014) សមីការទី 4។ មិនមែនជាក្រេឌីតសម្រាប់ជួញដូរឡើយ។'
                 : 'Estimate — Chave et al. (2014) Eq. 4. Never a tradable credit.'
               : km
                 ? 'ការប៉ាន់ស្មានប្រហាក់ប្រហែល — មិនបានវាស់កម្ពស់ ប្រើរូបមន្តផ្ទៃក្នុង។ មិនមែនជាក្រេឌីតសម្រាប់ជួញដូរឡើយ។'

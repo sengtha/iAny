@@ -19,8 +19,12 @@ palms** in `village-plot-07`; a neighbour device **confirms** the latest mango.
 | `observation.json` | `GET /api/grove/observation/:id` | One record **with raw signed bytes** + its attestation + `trust` (0–100). |
 | `plot.json` | `GET /api/grove/plot/home-garden-01` | The mango's growth chain, oldest→newest, each scored. |
 
-> `co2Kg` is an **estimate** (Chave 2014 allometry), never a certified credit —
-> render it as "≈ estimated CO₂". See [../SPEC.md](../SPEC.md) §7.
+> `co2Kg` is an **estimate**, never a certified credit — render it as
+> "≈ estimated CO₂". It is four components multiplied together and only the
+> biomass model is published (Chave et al. 2014, Eq. 4); the carbon fraction's
+> attribution is unresolved, and the wood density and the height fallback are
+> ours. Do not label the figure after the allometry alone. See
+> [../SPEC.md](../SPEC.md) §7 and [`docs/REFERENCES.md`](../../docs/REFERENCES.md).
 
 ## Verify one (any language ports the same 3 steps — SPEC §§4–5)
 
