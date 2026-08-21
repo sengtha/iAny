@@ -15,11 +15,16 @@
  *   that a tree was standing in July. A block timestamp is agreed by a validator
  *   set that has never met the grower.
  *
- * ONLY THE HASH IS SENT. `observationId` is the record's own SHA-256 content
- * hash and `plotId` is keccak256 of the plot string, so the chain learns neither
- * the garden's name, its coordinates, the photo, nor the device key. A farmer's
- * fruit trees are worth stealing, and a permissioned national chain is still
- * readable by everyone on it.
+ * ONLY HASHES ARE SENT, WHICH IS NOT THE SAME AS PRIVACY. `observationId` is the
+ * record's own SHA-256 content hash and `plotId` is keccak256 of the plot string,
+ * so the coordinates, the photo and the device key genuinely never reach the
+ * chain — those three are unconditional. The garden's NAME is different: the
+ * chain never receives it as text, but a plot name is short and speakable by
+ * necessity, so it is recoverable FROM an anchored `plotId` by anyone who tries.
+ * See the note on `plotKey` below, which states the limit and the fix, and CSB
+ * `3245244`. A farmer's fruit trees are worth stealing, and a permissioned
+ * national chain is still readable by everyone on it — which is the reason to be
+ * exact here rather than reassuring.
  *
  * TWO DIFFERENT KEYS, deliberately. Grove's device identity is an ECDSA P-256
  * key that never leaves the phone and signs the record. A CSB transaction is
