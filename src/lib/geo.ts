@@ -18,8 +18,8 @@ export function getLocation(): Promise<GeoPoint | null> {
     navigator.geolocation.getCurrentPosition(
       (p) =>
         resolve({
-          lat: +p.coords.latitude.toFixed(5),
-          lng: +p.coords.longitude.toFixed(5),
+          lat: +p.coords.latitude.toFixed(7),
+          lng: +p.coords.longitude.toFixed(7),
           acc: Math.round(p.coords.accuracy),
         }),
       () => resolve(null),

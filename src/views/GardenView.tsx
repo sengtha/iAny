@@ -71,6 +71,11 @@ const GENERIC_DENSITY_SPECIES = new Set([
 /** Where the optional CSB read endpoint is remembered. Empty = chain off. */
 const CSB_KEY = 'grove.csb.base.v1'
 
+function parseDecimal(val: string): number {
+  const v = parseFloat(val.replace(',', '.'))
+  return isNaN(v) || v <= 0 ? 0 : v
+}
+
 /** Full combobox label: common name + scientific name, e.g. "Mango (Mangifera indica)".
  *  Falls back to the raw value for a typed species not in the list. */
 function speciesLabel(idOrText: string, km: boolean): string {
@@ -126,6 +131,8 @@ export function GardenView() {
   const [published, setPublished] = useState<Set<string>>(() => publishedIds())
   const [publishing, setPublishing] = useState(false)
   const [publishMsg, setPublishMsg] = useState('')
+  const [processingPhoto, setProcessingPhoto] = useState(false)
+  const locationRequestId = useRef(0)
   const fileRef = useRef<HTMLInputElement>(null)
   const importRef = useRef<HTMLInputElement>(null)
 
@@ -184,7 +191,7 @@ export function GardenView() {
   useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl) }, [previewUrl])
 
   const measure: Measure = useMemo(() => {
-    const d = parseFloat(dbh), h = parseFloat(height)
+    const d = parseDecimal(dbh), h = parseDecimal(height)
     if (d > 0 && h > 0) return { method: 'dbh_height', dbh_cm: d, height_m: h }
     if (d > 0) return { method: 'dbh', dbh_cm: d }
     if (h > 0) return { method: 'height', height_m: h }
@@ -241,16 +248,36 @@ export function GardenView() {
 
   async function onPick(file: File) {
     setError('')
-    const scaled = await downscale(file, 1280)
-    if (previewUrl) URL.revokeObjectURL(previewUrl)
-    setImage(scaled)
-    setPreviewUrl(URL.createObjectURL(scaled))
+    setProcessingPhoto(true)
+    let processedFile = file
+    try {
+      const name = file.name.toLowerCase()
+      if (name.endsWith('.heic') || name.endsWith('.heif') || file.type === 'image/heic' || file.type === 'image/heif') {
+        const heic2any = (await import('heic2any')).default
+        const converted = await heic2any({ blob: file, toType: 'image/jpeg' })
+        processedFile = new File([Array.isArray(converted) ? converted[0] : converted], 'photo.jpg', { type: 'image/jpeg' })
+      }
+      const scaled = await downscale(processedFile, 1280)
+      if (previewUrl) URL.revokeObjectURL(previewUrl)
+      setImage(scaled)
+      setPreviewUrl(URL.createObjectURL(scaled))
+    } catch (e) {
+      console.error(e)
+      setError(km ? 'មិនអាចដំណើរការរូបភាពបានទេ' : 'Could not process photo')
+    } finally {
+      if (fileRef.current) fileRef.current.value = ''
+      setProcessingPhoto(false)
+    }
   }
 
   async function addLocation() {
-    setLocating(true)
+    locationRequestId.current += 1
+    const reqId = locationRequestId.current
+    setGps(null)
     setLocationMessage('')
+    setLocating(true)
     const point = await getLocation()
+    if (reqId !== locationRequestId.current) return
     setGps(point)
     setLocationMessage(
       point
@@ -276,6 +303,7 @@ export function GardenView() {
       // reset the item, keep the plot
       if (previewUrl) URL.revokeObjectURL(previewUrl)
       setImage(null); setPreviewUrl(''); setDbh(''); setHeight(''); setCount(1)
+      setGps(null); setLocationMessage(''); locationRequestId.current += 1
       if (fileRef.current) fileRef.current.value = ''
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -343,7 +371,9 @@ export function GardenView() {
       {!image ? (
         <div className="ocr-drop" onClick={() => fileRef.current?.click()}>
           <div className="ocr-drop-icon">🌳</div>
-          <div className="ocr-drop-title">{km ? 'ថតរូបរុក្ខជាតិ / ដើមឈើ' : 'Photograph a plant / tree'}</div>
+          <div className="ocr-drop-title">
+            {processingPhoto ? (km ? 'កំពុងដំណើរការ…' : 'Processing photo...') : (km ? 'ថតរូបរុក្ខជាតិ / ដើមឈើ' : 'Photograph a plant / tree')}
+          </div>
           <div className="ocr-drop-sub">{km ? 'ដើមមួយក្នុងមួយកំណត់ត្រា' : 'one plant per record'}</div>
         </div>
       ) : (
@@ -424,13 +454,13 @@ export function GardenView() {
             <label className="voice-field garden-input-card">
               <span>{km ? 'អង្កត់ផ្ចិតដើម' : 'Trunk width'}</span>
               <small>{km ? 'សង់ទីម៉ែត្រ · វាស់នៅកម្ពស់ ១.៣ ម' : 'centimetres · measure at 1.3 m high'}</small>
-              <input type="number" inputMode="decimal" min="0" value={dbh} placeholder="e.g. 20"
+              <input type="text" inputMode="decimal" min="0" value={dbh} placeholder="e.g. 20.5"
                 onChange={(e) => setDbh(e.target.value)} />
             </label>
             <label className="voice-field garden-input-card">
               <span>{km ? 'កម្ពស់ដើមឈើ' : 'Tree height'}</span>
               <small>{km ? 'ម៉ែត្រ · ប៉ាន់ស្មានបាន' : 'metres · an estimate is fine'}</small>
-              <input type="number" inputMode="decimal" min="0" value={height} placeholder="e.g. 8"
+              <input type="text" inputMode="decimal" min="0" value={height} placeholder="e.g. 8.5"
                 onChange={(e) => setHeight(e.target.value)} />
             </label>
             <label className="voice-field garden-input-card garden-count-field">
@@ -479,16 +509,16 @@ export function GardenView() {
               <p>{km ? 'ស្រេចចិត្ត · នៅលើឧបករណ៍នេះ រហូតដល់អ្នកផ្សព្វផ្សាយកំណត់ត្រា' : 'Optional · stays on this device until you publish the record'}</p>
             </div>
             <button className={gps ? 'garden-location-button recorded' : 'garden-location-button'} onClick={addLocation} disabled={locating}>
-              <span aria-hidden="true">{locating ? '◌' : gps ? '✓' : '📍'}</span>
-              <span>{locating ? (km ? 'កំពុងរកទីតាំង…' : 'Finding location…') : gps ? (km ? 'ទីតាំងបានកត់ត្រា' : 'Location recorded') : (km ? 'កត់ត្រាទីតាំងនេះ' : 'Record this location')}</span>
+              <span aria-hidden="true">{locating ? '◌' : '📍'}</span>
+              <span>{locating ? (km ? 'កំពុងរកទីតាំង…' : 'Finding location…') : gps ? (km ? 'ផ្ទុកទីតាំងម្ដងទៀត' : 'Refresh location') : (km ? 'កត់ត្រាទីតាំងនេះ' : 'Record this location')}</span>
             </button>
             {locationMessage ? <p className={gps ? 'garden-location-status success' : 'garden-location-status'}>{locationMessage}</p> : null}
           </section>
 
           {error ? <p className="voice-error">{error}</p> : null}
           <div className="voice-controls">
-            <button className="voice-ghost" onClick={() => { setImage(null); setPreviewUrl(''); if (fileRef.current) fileRef.current.value = '' }}>↺</button>
-            <button className="voice-primary big" onClick={save} disabled={saving}>
+            <button className="voice-ghost" onClick={() => { setImage(null); setPreviewUrl(''); setGps(null); setLocationMessage(''); locationRequestId.current += 1; setLocating(false); if (fileRef.current) fileRef.current.value = '' }}>↺</button>
+            <button className="voice-primary big" onClick={save} disabled={saving || locating || processingPhoto}>
               {saving ? '…' : `✓ ${km ? 'ចុះហត្ថលេខា & រក្សាទុក' : 'Sign & save'}`}
             </button>
           </div>
