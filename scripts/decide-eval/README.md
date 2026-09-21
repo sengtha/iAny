@@ -35,6 +35,28 @@ python run_laya.py --model english      # force a checkpoint
 CPU is fine (~200–500 ms per scenario). First run downloads ~1.3 GB of
 weights from Hugging Face.
 
+## The Jev column (GA since 2026-09-21 — no waitlist, $5 free credit)
+
+`run_jev.py` sends the SAME payloads and applies the SAME gate (imported from
+run_laya.py, so the columns are judged identically). All 12 scenarios cost
+well under one US cent.
+
+```bash
+# through the deployed worker (production path; --fresh salts the cache key
+# so the model answers, not the KV cache):
+python run_jev.py
+
+# or straight at TypeSafe's API once you have a key from console.typesafe.ai
+# (check their docs for the endpoint path):
+python run_jev.py --api typesafe --url https://<endpoint> --auth "Bearer sk-..."
+```
+
+Runs fine from the same Kaggle/Colab notebook as the Laya pass — both
+scripts, one payload set, three comparable columns.
+
+Before publishing Jev numbers anywhere, read TypeSafe's terms of service:
+some model providers restrict publishing benchmarks without consent.
+
 ## Reading the result
 
 - **gate would USE n/12** — how often the app would have shown "checked
