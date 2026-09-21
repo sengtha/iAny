@@ -92,3 +92,58 @@ the on-device ONNX path at this quality. Caveats recorded for fairness: the
 confidence scalar is not Jev-comparable (so gate verdicts here reflect
 semantics as much as quality), and this task is likely outside Laya's
 training distribution — `--model typed-decisions` remains untried.
+
+## Results: 2026-09-21, Jev via deployed worker (same-origin runner)
+
+Full output in `results/2026-09-21-jev-worker.json`. 12/12 answered, all
+fresh model calls, median ~1.0 s end to end through the edge.
+
+### Three-way table
+
+| scenario | device | Jev | Laya (router) |
+|---|---|---|---|
+| M1 hot lunch | green salad | green salad ✓ | sour soup ✗ |
+| M2 cool breakfast | fried fish | **porridge** ≠ | num banh chok ✗ |
+| M3 rainy dinner | fried fish | **sour soup** ≠ | fried rice ✗ |
+| M4 fried-fatigue | green salad | green salad ✓ | fried rice ✗ |
+| M5 untagged | mystery-2wk | mystery-2wk ✓ (gate: self-doubt) | mystery 1 ✗ |
+| M6 coin toss (truth: B) | B ✓ | **B at 0.93** ✓ | A ✗ |
+| O1 wedding | sampot hol | **sampot hol at 0.78** ✓ | office shirt ✗ |
+| O2 hot workday | rain jacket (!) | **sun-cover riding shirt** ≠ | office shirt ✗ |
+| O3 rainy casual | rain jacket | rain jacket ✓ | office shirt ✗ |
+| E1 tired rainy | stretching | stretching ✓ | stretching ✓ |
+| S1 tired evening | vocabulary | vocabulary ✓ | vocabulary ✓ |
+| S2 fresh morning | new grammar | new grammar ✓ | vocabulary ✗ |
+
+|  | Jev | Laya |
+|---|---|---|
+| agrees with device | 9/12 | 2/12 |
+| gate would use | 11/12 | 1/12 |
+| known-truth probes | 4/4 | 0/4 |
+| effort-score spread | 0.02 → 1.12 (responsive) | 0.94 → 0.97 (flat) |
+| variety after fried week | 0.83 (yes) | 0.40 (no) |
+
+### The finding that matters
+
+**All three Jev↔device disagreements read as Jev being right:**
+
+- M2: the device picked fried fish for a cool breakfast (the +0.25 rating
+  beat the +0.18 porridge-morning weight); Jev picked borbor — the actual
+  Cambodian breakfast.
+- M3: device again rating-led to fried fish; Jev picked sour soup for a
+  rainy dinner.
+- O2: the device picked a RAIN JACKET on a hot dry day — rotation pressure
+  promoting an absurd item in a small wardrobe. Jev picked the sun-cover
+  riding shirt.
+
+And M5 shows the gate working as designed: with untagged items Jev agreed
+with the device but was honestly unsure (conf 0.23 vs floor 0.24) and the
+answer was correctly not relied on.
+
+So the verdict is not "arithmetic beats models" — it is the hybrid thesis
+validated end to end: the device is reliable on hard constraints (recency,
+availability, ground truth) and cheap; Jev adds genuine judgement where the
+hand weights are subtly wrong; the gate keeps the one shaky answer out. The
+two device weaknesses Jev exposed (ratings overpowering meal-slot fit;
+rotation promoting weather-absurd items) are recorded as tuning candidates —
+to be fixed on their merits, not by copying Jev.
