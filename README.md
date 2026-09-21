@@ -62,6 +62,19 @@ are the foundation for pack sharing and a future marketplace. Source text is
 always included (RAG needs it, and it makes packs survivable across future
 embedding-model upgrades).
 
+## Decide (experiment)
+
+`/decide` answers four daily questions — what to eat, wear, train, and study —
+from a personal habit log kept in the on-device database. A deterministic
+scorer ranks options offline; when it is unsure, the app can consult a remote
+typed decision model (TypeSafe **Jev** via Cloudflare Workers AI) behind a
+privacy wire format in which nothing user-authored ever leaves the device
+(closed tag vocabulary, bucketed context, per-request ordinal aliases). Engine
+in `src/decide/`, worker proxy in `worker/decide.ts`, and a reproducible
+evaluation harness — production-generated payloads, gate, and raw three-way
+results (device / Jev / Laya) — in
+**[scripts/decide-eval](scripts/decide-eval/README.md)**.
+
 ## Models
 
 All of iAny's models download once from Hugging Face and are cached on-device,
