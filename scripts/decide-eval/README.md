@@ -146,6 +146,28 @@ fresh model calls, median ~1.0 s end to end through the edge.
 | effort-score spread | 0.02 → 1.12 (responsive) | 0.94 → 0.97 (flat) |
 | variety after fried week | 0.83 (yes) | 0.40 (no) |
 
+### Repeat consistency (3× run, 2026-09-21)
+
+Full output in `results/2026-09-21-jev-worker-3runs.json` — 36 fresh model
+calls via the `/eval-jev.html` "Run 3×" button, so with the pinned first
+run every scenario has four independent samples.
+
+- **Picks stable on 11/12 rows** across all four samples; p_top moves by at
+  most 0.08 anywhere. Effort head responsive AND repeatable (E1/S1 at 0.02
+  every run; O1 at 1.13–1.15). Agreement with device is 9/12 in every run —
+  the same three disagreements every time.
+- **M2 is the one mover:** the cool-breakfast pick alternates between rice
+  porridge and sour soup (near-tied at 0.27–0.31). What never moves is the
+  rejection of the device's rating-boosted fried fish: 0.02–0.03 in every
+  run. The disagreement with the device is stable; the specific winner
+  among Jev's warm-dish cluster is not.
+- **M5's gate verdict flips.** Confidence came back 0.24, 0.25, 0.23, 0.23
+  against a floor of exactly 0.24 → accepted twice, withheld twice. The
+  honesty probe sits ON the boundary, inside Jev's ±0.01 run-to-run noise.
+  Lesson for gate designers: a single boundary verdict is not a stable
+  property. (Harmless here: the accepted answer was the same pick as the
+  device's.)
+
 ### The finding that matters
 
 **All three Jev↔device disagreements read as Jev being right:**
