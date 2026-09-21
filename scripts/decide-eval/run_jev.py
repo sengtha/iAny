@@ -25,6 +25,7 @@ import json
 import pathlib
 import secrets
 import time
+import urllib.error
 import urllib.request
 
 from run_laya import gate  # identical gate for every column, by construction
@@ -68,14 +69,41 @@ def main() -> None:
 
         req = urllib.request.Request(
             args.url, data=json.dumps(body).encode(),
-            headers={"content-type": "application/json",
-                     **({"authorization": args.auth} if args.auth else {})},
+            headers={
+                "content-type": "application/json",
+                # A plain Python User-Agent from a datacenter IP is exactly
+                # what Cloudflare's bot protection blocks with a 403 that
+                # never reaches the worker. Look like the browser the app is.
+                "user-agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                               "AppleWebKit/537.36 (KHTML, like Gecko) "
+                               "Chrome/128.0 Safari/537.36 decide-eval/1.0"),
+                "accept": "application/json",
+                **({"authorization": args.auth} if args.auth else {}),
+            },
             method="POST")
         t0 = time.perf_counter()
         try:
             with urllib.request.urlopen(req, timeout=60) as r:
                 raw = json.loads(r.read())
                 source = r.headers.get("x-decide-source", "?")
+        except urllib.error.HTTPError as e:
+            # Say WHO refused: the worker answers in JSON; Cloudflare's edge
+            # block page is HTML that mentions cloudflare. That difference is
+            # the whole diagnosis.
+            snippet = ""
+            try:
+                snippet = e.read(400).decode("utf-8", "replace")
+            except Exception:  # noqa: BLE001
+                pass
+            who = ("cloudflare-edge (bot protection — run from a residential "
+                   "IP or allow /api/decide in the WAF)"
+                   if "cloudflare" in snippet.lower() or snippet.lstrip().startswith("<")
+                   else "worker")
+            print(f"── {sc['id']}: FAILED — HTTP {e.code} from {who}")
+            if snippet and who == "worker":
+                print(f"   body: {snippet[:200]}")
+            results.append({"id": sc["id"], "error": f"http-{e.code}", "blocked_by": who})
+            continue
         except Exception as e:  # noqa: BLE001 — report the scenario, keep going
             print(f"── {sc['id']}: FAILED — {e}")
             results.append({"id": sc["id"], "error": str(e)})
