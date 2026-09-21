@@ -64,7 +64,7 @@ embedding-model upgrades).
 
 ## Decide (experiment)
 
-`/decide` answers four daily questions — what to eat, wear, train, and study —
+**[iany.app/decide](https://iany.app/decide)** answers four daily questions — what to eat, wear, train, and study —
 from a personal habit log kept in the on-device database. A deterministic
 scorer ranks options offline; when it is unsure, the app can consult a remote
 typed decision model (TypeSafe **Jev** via Cloudflare Workers AI) behind a
