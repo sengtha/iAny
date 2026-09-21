@@ -1,0 +1,905 @@
+{
+  "generated": "2026-09-21",
+  "scenarios": [
+    {
+      "id": "M1-hot-lunch",
+      "title": "Meal · hot midday, full 10-item list",
+      "expectation": "light/sour/salad up, curry and heavy down; fried rice punished (eaten yesterday)",
+      "options": 10,
+      "request": {
+        "state": "A person in Cambodia is deciding what to eat for the lunch of a work day. Right now it is dry, the weather is hot, above 32C. They have 60 past entries. Prefer variety over repetition, and a choice that suits the situation.",
+        "questions": {
+          "pick": {
+            "type": "choice",
+            "instructions": "Which option should the person eat right now?",
+            "criteria": {
+              "opt_2": "fried, fish; chosen 3-6 days ago; the person likes it",
+              "opt_10": "soup, sour, fish; chosen 1-2 weeks ago",
+              "opt_5": "meat, spicy, heavy; chosen 1-2 weeks ago",
+              "opt_3": "fried, rice; chosen yesterday",
+              "opt_6": "noodle, fish, light; chosen 3-6 days ago",
+              "opt_4": "grill, meat; chosen 3-6 days ago",
+              "opt_1": "curry, meat, heavy; chosen 1-2 weeks ago",
+              "opt_9": "salad, veg, light; chosen 1-2 weeks ago",
+              "opt_8": "porridge, light; chosen 2 days ago",
+              "opt_7": "noodle, street; chosen 3-6 days ago"
+            }
+          },
+          "effort": {
+            "type": "score",
+            "instructions": "How demanding should the choice be, given the situation and time of day?",
+            "criteria": [
+              "Easy",
+              "Moderate",
+              "Demanding"
+            ]
+          },
+          "needs_variety": {
+            "type": "noul",
+            "instructions": "Does this person need a change from their recent pattern?",
+            "criteria": {
+              "true": "Recent choices are repetitive",
+              "false": "Recent choices are already varied"
+            }
+          }
+        }
+      },
+      "device": [
+        {
+          "alias": "opt_9",
+          "score": 0.89
+        },
+        {
+          "alias": "opt_2",
+          "score": 0.71
+        },
+        {
+          "alias": "opt_6",
+          "score": 0.71
+        },
+        {
+          "alias": "opt_7",
+          "score": 0.6
+        },
+        {
+          "alias": "opt_10",
+          "score": 0.54
+        },
+        {
+          "alias": "opt_8",
+          "score": 0.53
+        },
+        {
+          "alias": "opt_4",
+          "score": 0.43
+        },
+        {
+          "alias": "opt_5",
+          "score": 0.37
+        },
+        {
+          "alias": "opt_1",
+          "score": 0.32
+        },
+        {
+          "alias": "opt_3",
+          "score": 0.27
+        }
+      ],
+      "legend": {
+        "opt_1": "samlor kari (curry)",
+        "opt_2": "trei chien (fried fish)",
+        "opt_3": "bai cha (fried rice)",
+        "opt_4": "moan ang (grilled chicken)",
+        "opt_5": "prahok ktis",
+        "opt_6": "num banh chok",
+        "opt_7": "street stall noodles",
+        "opt_8": "borbor (rice porridge)",
+        "opt_9": "green salad",
+        "opt_10": "samlor machu (sour soup)"
+      }
+    },
+    {
+      "id": "M2-cool-breakfast",
+      "title": "Meal · cool morning (breakfast)",
+      "expectation": "porridge or noodle soup should top; heavy/grill buried",
+      "options": 10,
+      "request": {
+        "state": "A person in Cambodia is deciding what to eat for the breakfast of a work day. Right now it is dry, the weather is cool, below 26C. They have 60 past entries. Prefer variety over repetition, and a choice that suits the situation.",
+        "questions": {
+          "pick": {
+            "type": "choice",
+            "instructions": "Which option should the person eat right now?",
+            "criteria": {
+              "opt_2": "fried, fish; chosen 3-6 days ago; the person likes it",
+              "opt_10": "soup, sour, fish; chosen 1-2 weeks ago",
+              "opt_5": "meat, spicy, heavy; chosen 1-2 weeks ago",
+              "opt_3": "fried, rice; chosen yesterday",
+              "opt_6": "noodle, fish, light; chosen 3-6 days ago",
+              "opt_4": "grill, meat; chosen 3-6 days ago",
+              "opt_1": "curry, meat, heavy; chosen 1-2 weeks ago",
+              "opt_9": "salad, veg, light; chosen 1-2 weeks ago",
+              "opt_8": "porridge, light; chosen 2 days ago",
+              "opt_7": "noodle, street; chosen 3-6 days ago"
+            }
+          },
+          "effort": {
+            "type": "score",
+            "instructions": "How demanding should the choice be, given the situation and time of day?",
+            "criteria": [
+              "Easy",
+              "Moderate",
+              "Demanding"
+            ]
+          },
+          "needs_variety": {
+            "type": "noul",
+            "instructions": "Does this person need a change from their recent pattern?",
+            "criteria": {
+              "true": "Recent choices are repetitive",
+              "false": "Recent choices are already varied"
+            }
+          }
+        }
+      },
+      "device": [
+        {
+          "alias": "opt_2",
+          "score": 0.79
+        },
+        {
+          "alias": "opt_10",
+          "score": 0.72
+        },
+        {
+          "alias": "opt_7",
+          "score": 0.72
+        },
+        {
+          "alias": "opt_8",
+          "score": 0.62
+        },
+        {
+          "alias": "opt_6",
+          "score": 0.56
+        },
+        {
+          "alias": "opt_1",
+          "score": 0.48
+        },
+        {
+          "alias": "opt_5",
+          "score": 0.44
+        },
+        {
+          "alias": "opt_4",
+          "score": 0.4
+        },
+        {
+          "alias": "opt_3",
+          "score": 0.36
+        },
+        {
+          "alias": "opt_9",
+          "score": 0.36
+        }
+      ],
+      "legend": {
+        "opt_1": "samlor kari (curry)",
+        "opt_2": "trei chien (fried fish)",
+        "opt_3": "bai cha (fried rice)",
+        "opt_4": "moan ang (grilled chicken)",
+        "opt_5": "prahok ktis",
+        "opt_6": "num banh chok",
+        "opt_7": "street stall noodles",
+        "opt_8": "borbor (rice porridge)",
+        "opt_9": "green salad",
+        "opt_10": "samlor machu (sour soup)"
+      }
+    },
+    {
+      "id": "M3-rainy-dinner",
+      "title": "Meal · rainy evening (dinner)",
+      "expectation": "soup up, street stall down",
+      "options": 10,
+      "request": {
+        "state": "A person in Cambodia is deciding what to eat for the dinner of a work day. Right now it is raining, the weather is warm, 26-32C. They have 60 past entries. Prefer variety over repetition, and a choice that suits the situation.",
+        "questions": {
+          "pick": {
+            "type": "choice",
+            "instructions": "Which option should the person eat right now?",
+            "criteria": {
+              "opt_2": "fried, fish; chosen 3-6 days ago; the person likes it",
+              "opt_10": "soup, sour, fish; chosen 1-2 weeks ago",
+              "opt_5": "meat, spicy, heavy; chosen 1-2 weeks ago",
+              "opt_3": "fried, rice; chosen yesterday",
+              "opt_6": "noodle, fish, light; chosen 3-6 days ago",
+              "opt_4": "grill, meat; chosen 3-6 days ago",
+              "opt_1": "curry, meat, heavy; chosen 1-2 weeks ago",
+              "opt_9": "salad, veg, light; chosen 1-2 weeks ago",
+              "opt_8": "porridge, light; chosen 2 days ago",
+              "opt_7": "noodle, street; chosen 3-6 days ago"
+            }
+          },
+          "effort": {
+            "type": "score",
+            "instructions": "How demanding should the choice be, given the situation and time of day?",
+            "criteria": [
+              "Easy",
+              "Moderate",
+              "Demanding"
+            ]
+          },
+          "needs_variety": {
+            "type": "noul",
+            "instructions": "Does this person need a change from their recent pattern?",
+            "criteria": {
+              "true": "Recent choices are repetitive",
+              "false": "Recent choices are already varied"
+            }
+          }
+        }
+      },
+      "device": [
+        {
+          "alias": "opt_2",
+          "score": 0.75
+        },
+        {
+          "alias": "opt_10",
+          "score": 0.6
+        },
+        {
+          "alias": "opt_1",
+          "score": 0.52
+        },
+        {
+          "alias": "opt_4",
+          "score": 0.5
+        },
+        {
+          "alias": "opt_8",
+          "score": 0.46
+        },
+        {
+          "alias": "opt_5",
+          "score": 0.46
+        },
+        {
+          "alias": "opt_6",
+          "score": 0.44
+        },
+        {
+          "alias": "opt_9",
+          "score": 0.44
+        },
+        {
+          "alias": "opt_7",
+          "score": 0.43
+        },
+        {
+          "alias": "opt_3",
+          "score": 0.27
+        }
+      ],
+      "legend": {
+        "opt_1": "samlor kari (curry)",
+        "opt_2": "trei chien (fried fish)",
+        "opt_3": "bai cha (fried rice)",
+        "opt_4": "moan ang (grilled chicken)",
+        "opt_5": "prahok ktis",
+        "opt_6": "num banh chok",
+        "opt_7": "street stall noodles",
+        "opt_8": "borbor (rice porridge)",
+        "opt_9": "green salad",
+        "opt_10": "samlor machu (sour soup)"
+      }
+    },
+    {
+      "id": "M4-fried-fatigue",
+      "title": "Meal · hot midday after a fried-heavy week",
+      "expectation": "fried fish (otherwise a favourite) should lose to non-fried options",
+      "options": 10,
+      "request": {
+        "state": "A person in Cambodia is deciding what to eat for the lunch of a work day. Right now it is dry, the weather is hot, above 32C. They have 60 past entries. Recent choices were mostly: fried, rice. Prefer variety over repetition, and a choice that suits the situation.",
+        "questions": {
+          "pick": {
+            "type": "choice",
+            "instructions": "Which option should the person eat right now?",
+            "criteria": {
+              "opt_2": "fried, fish; chosen 3-6 days ago; the person likes it",
+              "opt_10": "soup, sour, fish; chosen 1-2 weeks ago",
+              "opt_5": "meat, spicy, heavy; chosen 1-2 weeks ago",
+              "opt_3": "fried, rice; chosen yesterday",
+              "opt_6": "noodle, fish, light; chosen 3-6 days ago",
+              "opt_4": "grill, meat; chosen 3-6 days ago",
+              "opt_1": "curry, meat, heavy; chosen 1-2 weeks ago",
+              "opt_9": "salad, veg, light; chosen 1-2 weeks ago",
+              "opt_8": "porridge, light; chosen 2 days ago",
+              "opt_7": "noodle, street; chosen 3-6 days ago"
+            }
+          },
+          "effort": {
+            "type": "score",
+            "instructions": "How demanding should the choice be, given the situation and time of day?",
+            "criteria": [
+              "Easy",
+              "Moderate",
+              "Demanding"
+            ]
+          },
+          "needs_variety": {
+            "type": "noul",
+            "instructions": "Does this person need a change from their recent pattern?",
+            "criteria": {
+              "true": "Recent choices are repetitive",
+              "false": "Recent choices are already varied"
+            }
+          }
+        }
+      },
+      "device": [
+        {
+          "alias": "opt_9",
+          "score": 0.89
+        },
+        {
+          "alias": "opt_6",
+          "score": 0.71
+        },
+        {
+          "alias": "opt_7",
+          "score": 0.6
+        },
+        {
+          "alias": "opt_2",
+          "score": 0.55
+        },
+        {
+          "alias": "opt_10",
+          "score": 0.54
+        },
+        {
+          "alias": "opt_8",
+          "score": 0.53
+        },
+        {
+          "alias": "opt_4",
+          "score": 0.43
+        },
+        {
+          "alias": "opt_5",
+          "score": 0.37
+        },
+        {
+          "alias": "opt_1",
+          "score": 0.32
+        },
+        {
+          "alias": "opt_3",
+          "score": 0.07
+        }
+      ],
+      "legend": {
+        "opt_1": "samlor kari (curry)",
+        "opt_2": "trei chien (fried fish)",
+        "opt_3": "bai cha (fried rice)",
+        "opt_4": "moan ang (grilled chicken)",
+        "opt_5": "prahok ktis",
+        "opt_6": "num banh chok",
+        "opt_7": "street stall noodles",
+        "opt_8": "borbor (rice porridge)",
+        "opt_9": "green salad",
+        "opt_10": "samlor machu (sour soup)"
+      }
+    },
+    {
+      "id": "M5-untagged",
+      "title": "Meal · five untagged items (worst case: only recency separates them)",
+      "expectation": "low information; a good model should be near-uniform, not confidently wrong",
+      "options": 5,
+      "request": {
+        "state": "A person in Cambodia is deciding what to eat for the lunch of a work day. Right now it is dry, the weather is warm, 26-32C. Their history is short, so habit signals are weak. Prefer variety over repetition, and a choice that suits the situation.",
+        "questions": {
+          "pick": {
+            "type": "choice",
+            "instructions": "Which option should the person eat right now?",
+            "criteria": {
+              "opt_3": "no tags; never chosen before",
+              "opt_1": "no tags; chosen earlier today",
+              "opt_4": "no tags; never chosen before",
+              "opt_2": "no tags; not chosen for over 2 weeks",
+              "opt_5": "no tags; never chosen before"
+            }
+          },
+          "effort": {
+            "type": "score",
+            "instructions": "How demanding should the choice be, given the situation and time of day?",
+            "criteria": [
+              "Easy",
+              "Moderate",
+              "Demanding"
+            ]
+          },
+          "needs_variety": {
+            "type": "noul",
+            "instructions": "Does this person need a change from their recent pattern?",
+            "criteria": {
+              "true": "Recent choices are repetitive",
+              "false": "Recent choices are already varied"
+            }
+          }
+        }
+      },
+      "device": [
+        {
+          "alias": "opt_2",
+          "score": 0.7
+        },
+        {
+          "alias": "opt_3",
+          "score": 0.56
+        },
+        {
+          "alias": "opt_4",
+          "score": 0.56
+        },
+        {
+          "alias": "opt_5",
+          "score": 0.56
+        },
+        {
+          "alias": "opt_1",
+          "score": 0.05
+        }
+      ],
+      "legend": {
+        "opt_1": "mystery 2 (today)",
+        "opt_2": "mystery 4 (2wk ago)",
+        "opt_3": "mystery 1",
+        "opt_4": "mystery 3",
+        "opt_5": "mystery 5"
+      }
+    },
+    {
+      "id": "M6-coin-toss",
+      "title": "Meal · two similar dishes, one eaten yesterday",
+      "expectation": "the one NOT eaten yesterday should win clearly",
+      "options": 2,
+      "request": {
+        "state": "A person in Cambodia is deciding what to eat for the lunch of a work day. Right now it is dry, the weather is warm, 26-32C. They have 60 past entries. Prefer variety over repetition, and a choice that suits the situation.",
+        "questions": {
+          "pick": {
+            "type": "choice",
+            "instructions": "Which option should the person eat right now?",
+            "criteria": {
+              "opt_1": "fried, rice; chosen yesterday",
+              "opt_2": "fried, rice; chosen 3-6 days ago"
+            }
+          },
+          "effort": {
+            "type": "score",
+            "instructions": "How demanding should the choice be, given the situation and time of day?",
+            "criteria": [
+              "Easy",
+              "Moderate",
+              "Demanding"
+            ]
+          },
+          "needs_variety": {
+            "type": "noul",
+            "instructions": "Does this person need a change from their recent pattern?",
+            "criteria": {
+              "true": "Recent choices are repetitive",
+              "false": "Recent choices are already varied"
+            }
+          }
+        }
+      },
+      "device": [
+        {
+          "alias": "opt_2",
+          "score": 0.6
+        },
+        {
+          "alias": "opt_1",
+          "score": 0.32
+        }
+      ],
+      "legend": {
+        "opt_1": "fried rice A (yesterday)",
+        "opt_2": "fried rice B (6 days ago)"
+      }
+    },
+    {
+      "id": "O1-wedding",
+      "title": "Outfit · wedding day",
+      "expectation": "sampot hol must win despite being worn only twice ever",
+      "options": 6,
+      "request": {
+        "state": "A person in Cambodia is deciding what to wear for the midday of a work day. Right now they are attending a wedding, it is dry, the weather is warm, 26-32C. They have 60 past entries. Prefer variety over repetition, and a choice that suits the situation.",
+        "questions": {
+          "pick": {
+            "type": "choice",
+            "instructions": "Which option should the person wear right now?",
+            "criteria": {
+              "opt_4": "short-sleeve, casual, light; chosen yesterday",
+              "opt_1": "long-sleeve, formal; chosen 2 days ago",
+              "opt_6": "traditional; not chosen for over 2 weeks",
+              "opt_3": "rain-proof; not chosen for over 2 weeks",
+              "opt_2": "long-sleeve, sun-protective, casual; chosen 3-6 days ago",
+              "opt_5": "shorts, casual, light; chosen 2 days ago"
+            }
+          },
+          "effort": {
+            "type": "score",
+            "instructions": "How demanding should the choice be, given the situation and time of day?",
+            "criteria": [
+              "Easy",
+              "Moderate",
+              "Demanding"
+            ]
+          },
+          "needs_variety": {
+            "type": "noul",
+            "instructions": "Does this person need a change from their recent pattern?",
+            "criteria": {
+              "true": "Recent choices are repetitive",
+              "false": "Recent choices are already varied"
+            }
+          }
+        }
+      },
+      "device": [
+        {
+          "alias": "opt_6",
+          "score": 0.933
+        },
+        {
+          "alias": "opt_1",
+          "score": 0.6
+        },
+        {
+          "alias": "opt_3",
+          "score": 0.49
+        },
+        {
+          "alias": "opt_2",
+          "score": 0.34
+        },
+        {
+          "alias": "opt_4",
+          "score": 0.07
+        },
+        {
+          "alias": "opt_5",
+          "score": 0
+        }
+      ],
+      "legend": {
+        "opt_1": "office shirt",
+        "opt_2": "long-sleeve riding shirt",
+        "opt_3": "rain jacket",
+        "opt_4": "plain t-shirt",
+        "opt_5": "shorts",
+        "opt_6": "sampot hol (traditional)"
+      }
+    },
+    {
+      "id": "O2-hot-workday",
+      "title": "Outfit · hot work day",
+      "expectation": "office shirt or sun-cover shirt; shorts must not win a work day",
+      "options": 6,
+      "request": {
+        "state": "A person in Cambodia is deciding what to wear for the midday of a work day. Right now they are dressing for work, it is dry, the weather is hot, above 32C. They have 60 past entries. Prefer variety over repetition, and a choice that suits the situation.",
+        "questions": {
+          "pick": {
+            "type": "choice",
+            "instructions": "Which option should the person wear right now?",
+            "criteria": {
+              "opt_4": "short-sleeve, casual, light; chosen yesterday",
+              "opt_1": "long-sleeve, formal; chosen 2 days ago",
+              "opt_6": "traditional; not chosen for over 2 weeks",
+              "opt_3": "rain-proof; not chosen for over 2 weeks",
+              "opt_2": "long-sleeve, sun-protective, casual; chosen 3-6 days ago",
+              "opt_5": "shorts, casual, light; chosen 2 days ago"
+            }
+          },
+          "effort": {
+            "type": "score",
+            "instructions": "How demanding should the choice be, given the situation and time of day?",
+            "criteria": [
+              "Easy",
+              "Moderate",
+              "Demanding"
+            ]
+          },
+          "needs_variety": {
+            "type": "noul",
+            "instructions": "Does this person need a change from their recent pattern?",
+            "criteria": {
+              "true": "Recent choices are repetitive",
+              "false": "Recent choices are already varied"
+            }
+          }
+        }
+      },
+      "device": [
+        {
+          "alias": "opt_3",
+          "score": 0.54
+        },
+        {
+          "alias": "opt_6",
+          "score": 0.533
+        },
+        {
+          "alias": "opt_5",
+          "score": 0.47
+        },
+        {
+          "alias": "opt_2",
+          "score": 0.46
+        },
+        {
+          "alias": "opt_4",
+          "score": 0.46
+        },
+        {
+          "alias": "opt_1",
+          "score": 0.45
+        }
+      ],
+      "legend": {
+        "opt_1": "office shirt",
+        "opt_2": "long-sleeve riding shirt",
+        "opt_3": "rain jacket",
+        "opt_4": "plain t-shirt",
+        "opt_5": "shorts",
+        "opt_6": "sampot hol (traditional)"
+      }
+    },
+    {
+      "id": "O3-rainy-casual",
+      "title": "Outfit · rainy casual day",
+      "expectation": "rain jacket surges",
+      "options": 6,
+      "request": {
+        "state": "A person in Cambodia is deciding what to wear for the midday of a work day. Right now it is an ordinary casual day, it is raining, the weather is warm, 26-32C. They have 60 past entries. Prefer variety over repetition, and a choice that suits the situation.",
+        "questions": {
+          "pick": {
+            "type": "choice",
+            "instructions": "Which option should the person wear right now?",
+            "criteria": {
+              "opt_4": "short-sleeve, casual, light; chosen yesterday",
+              "opt_1": "long-sleeve, formal; chosen 2 days ago",
+              "opt_6": "traditional; not chosen for over 2 weeks",
+              "opt_3": "rain-proof; not chosen for over 2 weeks",
+              "opt_2": "long-sleeve, sun-protective, casual; chosen 3-6 days ago",
+              "opt_5": "shorts, casual, light; chosen 2 days ago"
+            }
+          },
+          "effort": {
+            "type": "score",
+            "instructions": "How demanding should the choice be, given the situation and time of day?",
+            "criteria": [
+              "Easy",
+              "Moderate",
+              "Demanding"
+            ]
+          },
+          "needs_variety": {
+            "type": "noul",
+            "instructions": "Does this person need a change from their recent pattern?",
+            "criteria": {
+              "true": "Recent choices are repetitive",
+              "false": "Recent choices are already varied"
+            }
+          }
+        }
+      },
+      "device": [
+        {
+          "alias": "opt_3",
+          "score": 0.82
+        },
+        {
+          "alias": "opt_6",
+          "score": 0.583
+        },
+        {
+          "alias": "opt_2",
+          "score": 0.58
+        },
+        {
+          "alias": "opt_5",
+          "score": 0.54
+        },
+        {
+          "alias": "opt_4",
+          "score": 0.33
+        },
+        {
+          "alias": "opt_1",
+          "score": 0.25
+        }
+      ],
+      "legend": {
+        "opt_1": "office shirt",
+        "opt_2": "long-sleeve riding shirt",
+        "opt_3": "rain jacket",
+        "opt_4": "plain t-shirt",
+        "opt_5": "shorts",
+        "opt_6": "sampot hol (traditional)"
+      }
+    },
+    {
+      "id": "E1-tired-rainy",
+      "title": "Exercise · tired, raining",
+      "expectation": "gentle indoor stretching over intense outdoor run",
+      "options": 3,
+      "request": {
+        "state": "A person in Cambodia is deciding what to do for exercise for the evening of a work day. Right now they are tired and low on energy, it is raining, the weather is warm, 26-32C. They have 60 past entries. Prefer variety over repetition, and a choice that suits the situation.",
+        "questions": {
+          "pick": {
+            "type": "choice",
+            "instructions": "Which option should the person do for exercise right now?",
+            "criteria": {
+              "opt_1": "run, outdoor, intense, legs; chosen 2 days ago",
+              "opt_3": "stretch, indoor, gentle; chosen 3-6 days ago",
+              "opt_2": "strength, indoor, arms; chosen yesterday"
+            }
+          },
+          "effort": {
+            "type": "score",
+            "instructions": "How demanding should the choice be, given the situation and time of day?",
+            "criteria": [
+              "Easy",
+              "Moderate",
+              "Demanding"
+            ]
+          },
+          "needs_variety": {
+            "type": "noul",
+            "instructions": "Does this person need a change from their recent pattern?",
+            "criteria": {
+              "true": "Recent choices are repetitive",
+              "false": "Recent choices are already varied"
+            }
+          }
+        }
+      },
+      "device": [
+        {
+          "alias": "opt_3",
+          "score": 1
+        },
+        {
+          "alias": "opt_2",
+          "score": 0.42
+        },
+        {
+          "alias": "opt_1",
+          "score": 0
+        }
+      ],
+      "legend": {
+        "opt_1": "park run",
+        "opt_2": "weights (arms, yesterday)",
+        "opt_3": "stretching"
+      }
+    },
+    {
+      "id": "S1-tired-evening",
+      "title": "Study · tired evening",
+      "expectation": "easy vocabulary review over hard new grammar",
+      "options": 3,
+      "request": {
+        "state": "A person in Cambodia is deciding what to study for the evening of a work day. Right now they are tired and low on energy. They have 60 past entries. Prefer variety over repetition, and a choice that suits the situation.",
+        "questions": {
+          "pick": {
+            "type": "choice",
+            "instructions": "Which option should the person study right now?",
+            "criteria": {
+              "opt_2": "vocabulary, review, easy; chosen 2 days ago",
+              "opt_1": "grammar, new, hard; chosen 3-6 days ago",
+              "opt_3": "writing, practice, long; chosen 3-6 days ago"
+            }
+          },
+          "effort": {
+            "type": "score",
+            "instructions": "How demanding should the choice be, given the situation and time of day?",
+            "criteria": [
+              "Easy",
+              "Moderate",
+              "Demanding"
+            ]
+          },
+          "needs_variety": {
+            "type": "noul",
+            "instructions": "Does this person need a change from their recent pattern?",
+            "criteria": {
+              "true": "Recent choices are repetitive",
+              "false": "Recent choices are already varied"
+            }
+          }
+        }
+      },
+      "device": [
+        {
+          "alias": "opt_2",
+          "score": 1
+        },
+        {
+          "alias": "opt_3",
+          "score": 0.19
+        },
+        {
+          "alias": "opt_1",
+          "score": 0
+        }
+      ],
+      "legend": {
+        "opt_1": "new grammar unit",
+        "opt_2": "English vocabulary",
+        "opt_3": "essay practice"
+      }
+    },
+    {
+      "id": "S2-fresh-morning",
+      "title": "Study · fresh morning on a work day",
+      "expectation": "hard new material wins the morning; long sessions lose the work day",
+      "options": 3,
+      "request": {
+        "state": "A person in Cambodia is deciding what to study for the morning of a work day. Right now they feel energetic. They have 60 past entries. Prefer variety over repetition, and a choice that suits the situation.",
+        "questions": {
+          "pick": {
+            "type": "choice",
+            "instructions": "Which option should the person study right now?",
+            "criteria": {
+              "opt_2": "vocabulary, review, easy, short; chosen yesterday",
+              "opt_1": "grammar, new, hard, short; chosen 3-6 days ago",
+              "opt_3": "writing, practice, long; chosen 3-6 days ago"
+            }
+          },
+          "effort": {
+            "type": "score",
+            "instructions": "How demanding should the choice be, given the situation and time of day?",
+            "criteria": [
+              "Easy",
+              "Moderate",
+              "Demanding"
+            ]
+          },
+          "needs_variety": {
+            "type": "noul",
+            "instructions": "Does this person need a change from their recent pattern?",
+            "criteria": {
+              "true": "Recent choices are repetitive",
+              "false": "Recent choices are already varied"
+            }
+          }
+        }
+      },
+      "device": [
+        {
+          "alias": "opt_1",
+          "score": 1
+        },
+        {
+          "alias": "opt_3",
+          "score": 0.5
+        },
+        {
+          "alias": "opt_2",
+          "score": 0.36
+        }
+      ],
+      "legend": {
+        "opt_1": "new grammar unit",
+        "opt_2": "English vocabulary",
+        "opt_3": "essay practice"
+      }
+    }
+  ]
+}

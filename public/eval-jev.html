@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>Decide × Jev eval runner</title>
+<style>
+  /* Same-origin eval runner: runs where the app runs, so Cloudflare's bot
+     protection (which 403s Kaggle/Colab datacenter IPs) never enters the
+     picture. Phone-first, self-contained, no dependencies. */
+  :root { color-scheme: light dark; }
+  body { font: 15px/1.5 system-ui, sans-serif; margin: 0 auto; max-width: 720px; padding: 16px; }
+  h1 { font-size: 1.2rem; margin: 0 0 4px; }
+  p.sub { margin: 0 0 14px; opacity: .7; font-size: .85rem; }
+  button { font-size: 1rem; padding: 10px 18px; border-radius: 10px; border: 1px solid #888; cursor: pointer; }
+  button.primary { background: #5b4df0; border-color: transparent; color: #fff; font-weight: 700; }
+  table { border-collapse: collapse; width: 100%; margin-top: 14px; font-size: .8rem; }
+  th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid #8884; vertical-align: top; }
+  td.ok { color: #15803d; } td.bad { color: #b91c1c; }
+  #summary { margin-top: 12px; font-weight: 600; white-space: pre-line; }
+  textarea { width: 100%; height: 120px; margin-top: 10px; font: 11px/1.4 monospace; }
+  .row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+<h1>Decide × Jev eval runner</h1>
+<p class="sub">Sends the 12 production payloads to <code>/api/decide</code> (same origin), fresh
+cache keys, and applies the app's own gate. ~12 model calls, well under one cent.</p>
+<button class="primary" id="run">Run all 12 scenarios</button>
+<div id="summary"></div>
+<table id="tbl" hidden><thead><tr>
+  <th>scenario</th><th>Jev picked</th><th>device picked</th><th>p / conf / lift</th><th>gate</th><th>ms</th>
+</tr></thead><tbody></tbody></table>
+<div class="row" hidden id="actions">
+  <button id="copy">Copy results JSON</button>
+  <button id="dl">Download jev_results.json</button>
+</div>
+<textarea id="out" hidden readonly></textarea>
+
+<script>
+// Keep in sync with src/decide/jev.ts remoteGate().
+const MIN_LIFT = 1.4, MIN_SELF_TRUST = 1.2;
+const gate = (conf, top, n) =>
+  n < 2 ? 'solo'
+  : conf < MIN_SELF_TRUST / n ? 'self-doubt'
+  : top * n < MIN_LIFT ? 'flat'
+  : 'ok';
+
+// Same envelope walk as normalizeJevResponse.
+function findAnswers(node, depth = 0) {
+  if (depth > 4 || !node || typeof node !== 'object') return null;
+  if (node.answers && typeof node.answers === 'object') return node;
+  for (const k of ['result', 'response', 'output', 'data'])
+    if (node[k]) return findAnswers(node[k], depth + 1);
+  return null;
+}
+
+const api = new URLSearchParams(location.search).get('api') || '/api/decide';
+
+document.getElementById('run').onclick = async () => {
+  const btn = document.getElementById('run');
+  btn.disabled = true; btn.textContent = 'Running…';
+  const tbody = document.querySelector('#tbl tbody');
+  tbody.innerHTML = ''; document.getElementById('tbl').hidden = false;
+  const salt = Math.random().toString(36).slice(2, 10);
+  const results = []; let used = 0, agreed = 0, done = 0;
+
+  const { scenarios } = await (await fetch('/decide-eval-payloads.json')).json();
+  for (const sc of scenarios) {
+    const tr = tbody.insertRow();
+    tr.insertCell().textContent = sc.id;
+    const t0 = performance.now();
+    try {
+      const r = await fetch(api, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ key: `eval:${salt}:${sc.id}`, request: sc.request }),
+      });
+      const ms = Math.round(performance.now() - t0);
+      if (!r.ok) throw new Error(`HTTP ${r.status}: ${(await r.text()).slice(0, 120)}`);
+      const res = findAnswers(await r.json());
+      if (!res) throw new Error('no answers in response');
+      const pick = res.answers.pick || {};
+      let probs = pick.probabilities || {};
+      if (!Object.keys(probs).length && pick.choice) probs = { [pick.choice]: pick.confidence ?? 0.5 };
+      const ranked = Object.entries(probs).sort((a, b) => b[1] - a[1]);
+      if (!ranked.length) throw new Error('pick carried no probabilities');
+      const [topAlias, topP] = ranked[0];
+      const conf = +(pick.confidence ?? 0), n = sc.options;
+      const verdict = gate(conf, topP, n);
+      const devTop = sc.device[0].alias;
+      const agree = topAlias === devTop;
+      used += verdict === 'ok'; agreed += agree; done++;
+      results.push({ id: sc.id, jev_top: topAlias, device_top: devTop, agree,
+        top_p: +topP.toFixed(4), confidence: conf, lift: +(topP * n).toFixed(2),
+        gate: verdict, ms, source: r.headers.get('x-decide-source') || '?',
+        effort: res.answers.effort?.score ?? null,
+        needs_variety: res.answers.needs_variety?.noul ?? null, probabilities: probs });
+      const c1 = tr.insertCell(); c1.textContent = sc.legend[topAlias] || topAlias;
+      const c2 = tr.insertCell(); c2.textContent = sc.legend[devTop] || devTop;
+      c1.className = c2.className = agree ? 'ok' : 'bad';
+      tr.insertCell().textContent = `${topP.toFixed(2)} / ${conf.toFixed(2)} / ${(topP * n).toFixed(2)}`;
+      tr.insertCell().textContent = verdict;
+      tr.insertCell().textContent = ms;
+    } catch (e) {
+      results.push({ id: sc.id, error: String(e) });
+      const c = tr.insertCell(); c.colSpan = 5; c.className = 'bad'; c.textContent = String(e);
+    }
+  }
+
+  document.getElementById('summary').textContent =
+    `answered ${done}/${scenarios.length}` +
+    (done ? ` · gate would USE ${used}/${done} · agrees with device ${agreed}/${done}` : '');
+  const payload = JSON.stringify({ api: 'worker-samesite', results }, null, 2);
+  const out = document.getElementById('out');
+  out.value = payload; out.hidden = false;
+  document.getElementById('actions').hidden = false;
+  document.getElementById('copy').onclick = () =>
+    navigator.clipboard.writeText(payload).then(() => alert('Copied'));
+  document.getElementById('dl').onclick = () => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([payload], { type: 'application/json' }));
+    a.download = 'jev_results.json'; a.click();
+  };
+  btn.disabled = false; btn.textContent = 'Run again';
+};
+</script>
+</body>
+</html>
