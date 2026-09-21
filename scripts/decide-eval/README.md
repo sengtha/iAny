@@ -91,7 +91,30 @@ latency 4 s/call on x86 CPU (the 33 ms figure is T4 GPU), which also closes
 the on-device ONNX path at this quality. Caveats recorded for fairness: the
 confidence scalar is not Jev-comparable (so gate verdicts here reflect
 semantics as much as quality), and this task is likely outside Laya's
-training distribution — `--model typed-decisions` remains untried.
+training distribution — see the typed-decisions follow-up below.
+
+## Results: 2026-09-21, Kaggle reproduction + typed-decisions checkpoint
+
+Public, re-runnable notebook: https://www.kaggle.com/code/sengthachay/laya-testing
+Full outputs in `results/2026-09-21-kaggle-router-rerun.json` and
+`results/2026-09-21-kaggle-typed-decisions.json`.
+
+**Reproduction:** the router run was repeated in a fresh Kaggle session and
+came back **bit-identical** to the original — every pick the same, max
+probability difference 0.0000 across all 12×n entries. Laya inference is
+deterministic, so the 2026-09-21 router numbers are independently
+reproduced, not a lucky draw.
+
+**`--model typed-decisions`** (the checkpoint the first pass left untried):
+agreement with device 3/12, gate accepts 0/12, and the distributions are
+compressed toward uniform everywhere (top-p 0.20–0.52; effort still flat at
+0.88–1.01; needs-variety hovers 0.38–0.62 and does NOT fire after the fried
+week, 0.38). It picks the correct coin-toss dish — but at p=0.52 against a
+0.50 chance floor, with entropy-confidence 0.002. It fabricates less than
+the English checkpoint (M5 untagged is honestly near-uniform) but signals
+almost nothing: consistent with its fine-tuning on four unrelated workflows
+(customer service, invoices, security incidents, agent traces). Verdict
+unchanged: **keep Jev**.
 
 ## Results: 2026-09-21, Jev via deployed worker (same-origin runner)
 
