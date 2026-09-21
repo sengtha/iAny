@@ -13,3 +13,7 @@ public/mediapipe
 .dev.vars
 *.pem
 *.key
+
+# Python bytecode (eval scripts)
+__pycache__/
+*.pyc
