@@ -70,6 +70,16 @@ const GENERIC_DENSITY_SPECIES = new Set([
 ])
 /** Where the optional CSB read endpoint is remembered. Empty = chain off. */
 const CSB_KEY = 'grove.csb.base.v1'
+/** Above this radius (metres) a fix is more likely network/Wi-Fi-based than real
+ *  GPS — e.g. iOS "Precise Location" off, or Android's coarse-location grant. */
+const LOW_ACCURACY_M = 100
+
+/** Shared with the proactive permission check below — keeps both denial messages identical. */
+function locationDeniedMessage(km: boolean): string {
+  return km
+    ? 'ទីតាំងត្រូវបានបិទសម្រាប់គេហទំព័រនេះ — បើក Location នៅក្នុងការកំណត់កម្មវិធីរុករក (ឬការកំណត់ទូរស័ព្ទ) រួចផ្ទុកទំព័រនេះឡើងវិញ'
+    : 'Location access is blocked for this site — enable it in your browser\'s (or phone\'s) site permissions, then reload this page'
+}
 
 function parseDecimal(val: string): number {
   const v = parseFloat(val.replace(',', '.'))
@@ -190,6 +200,23 @@ export function GardenView() {
 
   useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl) }, [previewUrl])
 
+  // Proactively surface an already-blocked permission before the user even taps
+  // "Record this location" — a prior denial means tapping it would just fail
+  // silently again (the browser won't re-prompt). Permissions API support for
+  // 'geolocation' varies by browser, so this degrades to the button's own
+  // on-tap check when unsupported.
+  useEffect(() => {
+    if (typeof navigator === 'undefined' || !navigator.permissions?.query) return
+    let stale = false
+    navigator.permissions
+      .query({ name: 'geolocation' as PermissionName })
+      .then((status) => {
+        if (!stale && status.state === 'denied') setLocationMessage(locationDeniedMessage(km))
+      })
+      .catch(() => { /* unsupported for 'geolocation' on this browser — fine */ })
+    return () => { stale = true }
+  }, [])
+
   const measure: Measure = useMemo(() => {
     const d = parseDecimal(dbh), h = parseDecimal(height)
     if (d > 0 && h > 0) return { method: 'dbh_height', dbh_cm: d, height_m: h }
@@ -276,13 +303,21 @@ export function GardenView() {
     setGps(null)
     setLocationMessage('')
     setLocating(true)
-    const point = await getLocation()
+    const { point, error } = await getLocation()
     if (reqId !== locationRequestId.current) return
     setGps(point)
     setLocationMessage(
       point
-        ? (km ? `✓ ទីតាំងបានកត់ត្រា · ភាពត្រឹមត្រូវប្រហែល ${point.acc} ម` : `✓ Location recorded · accurate to about ${point.acc} m`)
-        : (km ? 'មិនអាចទទួលទីតាំងបានទេ — អនុញ្ញាត Location ហើយព្យាយាមម្ដងទៀត' : 'Could not get location — allow Location, then try again'),
+        ? point.acc > LOW_ACCURACY_M
+          ? (km
+              ? `⚠ ទីតាំងបានកត់ត្រា ប៉ុន្តែភាពត្រឹមត្រូវទន់ខ្សោយ (±${point.acc} ម) — នេះប្រហែលជាទីតាំងតាមបណ្ដាញ មិនមែន GPS ពិតប្រាកដទេ។ ពិនិត្យការកំណត់ "Precise Location" សម្រាប់កម្មវិធីរុករកនេះ ហើយសាកល្បងនៅទីវាលមានមេឃចំហ។`
+              : `⚠ Location recorded but accuracy is poor (±${point.acc} m) — this is likely a network-based fix, not real GPS. Check your phone's "Precise Location" setting for this browser, and try again with a clear view of the sky.`)
+          : (km ? `✓ ទីតាំងបានកត់ត្រា · ភាពត្រឹមត្រូវប្រហែល ${point.acc} ម` : `✓ Location recorded · accurate to about ${point.acc} m`)
+        : error === 'denied'
+          ? locationDeniedMessage(km)
+          : error === 'timeout'
+            ? (km ? 'ការស្វែងរកទីតាំងអស់ពេល — សាកល្បងម្ដងទៀតនៅកន្លែងបើកចំហ' : 'Location request timed out — try again with a clearer view of the sky')
+            : (km ? 'មិនអាចទទួលទីតាំងបានទេ — អនុញ្ញាត Location ហើយព្យាយាមម្ដងទៀត' : 'Could not get location — allow Location, then try again'),
     )
     setLocating(false)
   }
@@ -512,7 +547,11 @@ export function GardenView() {
               <span aria-hidden="true">{locating ? '◌' : '📍'}</span>
               <span>{locating ? (km ? 'កំពុងរកទីតាំង…' : 'Finding location…') : gps ? (km ? 'ផ្ទុកទីតាំងម្ដងទៀត' : 'Refresh location') : (km ? 'កត់ត្រាទីតាំងនេះ' : 'Record this location')}</span>
             </button>
-            {locationMessage ? <p className={gps ? 'garden-location-status success' : 'garden-location-status'}>{locationMessage}</p> : null}
+            {locationMessage ? (
+              <p className={gps && gps.acc <= LOW_ACCURACY_M ? 'garden-location-status success' : 'garden-location-status'}>
+                {locationMessage}
+              </p>
+            ) : null}
           </section>
 
           {error ? <p className="voice-error">{error}</p> : null}

@@ -13,7 +13,8 @@ export function GeoField({ gps, onChange }: { gps: GeoPoint | null; onChange: (g
 
   async function locate() {
     setBusy(true)
-    onChange(await getLocation())
+    const { point } = await getLocation()
+    onChange(point)
     setBusy(false)
   }
 

@@ -11,18 +11,42 @@ export interface GeoPoint {
   acc: number
 }
 
-/** Request the current position once. Resolves null if unavailable/denied. */
-export function getLocation(): Promise<GeoPoint | null> {
+/**
+ * Why a fix failed. 'denied' means the browser's permission prompt was
+ * declined (or a prior denial — the browser won't prompt again; only the
+ * user can undo that from the site's own permission settings).
+ */
+export type GeoError = 'denied' | 'unavailable' | 'timeout'
+
+export interface GeoResult {
+  point: GeoPoint | null
+  error: GeoError | null
+}
+
+/** Request the current position once. This call itself is what triggers the
+ *  browser's "Allow location access?" prompt on first use. */
+export function getLocation(): Promise<GeoResult> {
   return new Promise((resolve) => {
-    if (typeof navigator === 'undefined' || !navigator.geolocation) return resolve(null)
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      resolve({ point: null, error: 'unavailable' })
+      return
+    }
     navigator.geolocation.getCurrentPosition(
       (p) =>
         resolve({
-          lat: +p.coords.latitude.toFixed(7),
-          lng: +p.coords.longitude.toFixed(7),
-          acc: Math.round(p.coords.accuracy),
+          point: {
+            lat: +p.coords.latitude.toFixed(7),
+            lng: +p.coords.longitude.toFixed(7),
+            acc: Math.round(p.coords.accuracy),
+          },
+          error: null,
         }),
-      () => resolve(null),
+      (err) =>
+        resolve({
+          point: null,
+          // code 1 = PERMISSION_DENIED, 3 = TIMEOUT (GeolocationPositionError).
+          error: err.code === 1 ? 'denied' : err.code === 3 ? 'timeout' : 'unavailable',
+        }),
       { enableHighAccuracy: true, timeout: 8000 },
     )
   })
