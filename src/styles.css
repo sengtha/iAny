@@ -1792,6 +1792,15 @@ progress {
 .garden-location-button > span:first-child { font-size: 1.2rem; }
 .garden-location-button.recorded { background: color-mix(in srgb, #22c55e 16%, var(--bg-soft)); border-color: #22c55e; color: var(--garden-success); }
 .garden-location-button:disabled { opacity: 0.68; cursor: wait; }
+.garden-location-button:disabled:not(:is(.recorded)) { cursor: not-allowed; }
+.garden-header-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.voice-topbar:has(.garden-header-actions) .voice-brand { min-width: 0; }
+.garden-location-toggle[aria-pressed="true"] { border-color: #22c55e; color: var(--garden-success); }
+.garden-header-status { margin: 0; padding: 8px 16px; font-size: 0.8rem; color: var(--fg-muted); background: var(--bg-soft); }
+@media (max-width: 420px) {
+  .voice-topbar:has(.garden-header-actions) { flex-wrap: wrap; }
+  .garden-header-actions { width: 100%; justify-content: space-between; }
+}
 .garden-location-status { margin: -3px 0 0 !important; font-size: 0.82rem !important; color: #b45309 !important; }
 .garden-location-status.success { color: var(--garden-success) !important; font-weight: 600; }
 .garden-est {
