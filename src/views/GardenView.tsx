@@ -118,7 +118,7 @@ function matchSpecies(query: string): SpeciesInfo[] {
     .map((x) => x.s)
 }
 
-export function GardenView() {
+export function GardenView({ locationEnabled }: { locationEnabled: boolean }) {
   const { lang } = useI18n()
   const km = lang === 'km'
   const [obs, setObs] = useState<GardenObservation[]>(() => loadObservations())
@@ -145,6 +145,15 @@ export function GardenView() {
   const locationRequestId = useRef(0)
   const fileRef = useRef<HTMLInputElement>(null)
   const importRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!locationEnabled) {
+      locationRequestId.current += 1
+      setGps(null)
+      setLocating(false)
+      setLocationMessage('')
+    }
+  }, [locationEnabled])
 
   const unpublished = useMemo(() => obs.filter((o) => !published.has(o.id)).length, [obs, published])
 
@@ -298,6 +307,7 @@ export function GardenView() {
   }
 
   async function addLocation() {
+    if (!locationEnabled) return
     locationRequestId.current += 1
     const reqId = locationRequestId.current
     setGps(null)
@@ -543,10 +553,11 @@ export function GardenView() {
               <h2>{km ? 'ទីតាំងដើមឈើ' : 'Tree location'}</h2>
               <p>{km ? 'ស្រេចចិត្ត · នៅលើឧបករណ៍នេះ រហូតដល់អ្នកផ្សព្វផ្សាយកំណត់ត្រា' : 'Optional · stays on this device until you publish the record'}</p>
             </div>
-            <button className={gps ? 'garden-location-button recorded' : 'garden-location-button'} onClick={addLocation} disabled={locating}>
+            <button className={gps ? 'garden-location-button recorded' : 'garden-location-button'} onClick={addLocation} disabled={locating || !locationEnabled}>
               <span aria-hidden="true">{locating ? '◌' : '📍'}</span>
               <span>{locating ? (km ? 'កំពុងរកទីតាំង…' : 'Finding location…') : gps ? (km ? 'ផ្ទុកទីតាំងម្ដងទៀត' : 'Refresh location') : (km ? 'កត់ត្រាទីតាំងនេះ' : 'Record this location')}</span>
             </button>
+            {!locationEnabled ? <p className="garden-location-status">{km ? 'សូមបើកទីតាំងនៅផ្នែកខាងលើ ដើម្បីកត់ត្រាទីតាំងដើមឈើ។' : 'Turn on location in the header to record this tree’s position.'}</p> : null}
             {locationMessage ? (
               <p className={gps && gps.acc <= LOW_ACCURACY_M ? 'garden-location-status success' : 'garden-location-status'}>
                 {locationMessage}
