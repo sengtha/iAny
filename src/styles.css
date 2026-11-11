@@ -1801,6 +1801,32 @@ progress {
   .voice-topbar:has(.garden-header-actions) { flex-wrap: wrap; }
   .garden-header-actions { width: 100%; justify-content: space-between; }
 }
+.garden-treerow-start {
+  width: 100%; margin: 14px 0 0; padding: 12px 14px; display: flex; align-items: center; gap: 12px; text-align: left;
+  border: 1px dashed var(--bg-softer); border-radius: 16px; background: transparent; color: var(--fg);
+}
+.garden-treerow-start > span:first-child { font-size: 1.4rem; }
+.garden-treerow-start b { display: block; font-size: 0.95rem; }
+.garden-treerow-start small { display: block; margin-top: 2px; color: var(--fg-muted); font-size: 0.8rem; }
+.garden-treerow {
+  margin: 14px 0; padding: 14px; display: grid; gap: 12px;
+  border: 1px solid var(--accent); border-radius: 16px; background: var(--bg-soft);
+}
+.garden-treerow h2 { margin: 0; font-size: 1rem; }
+.garden-treerow .garden-form-heading { margin-bottom: 0; }
+.garden-treerow .garden-form-heading p { margin: 4px 0 0; color: var(--fg-muted); font-size: 0.82rem; line-height: 1.4; }
+.garden-treerow-ends { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.garden-treerow-end {
+  min-height: 64px; padding: 10px 12px; display: grid; gap: 4px; text-align: left;
+  border: 1px solid var(--accent); border-radius: 14px; background: var(--accent); color: var(--accent-fg);
+}
+.garden-treerow-end-label { font-size: 0.8rem; opacity: 0.9; }
+.garden-treerow-end-value { font-size: 1rem; font-weight: 700; }
+.garden-treerow-end.recorded { background: color-mix(in srgb, #22c55e 16%, var(--bg-soft)); border-color: #22c55e; color: var(--garden-success); }
+.garden-treerow-end.weak { background: color-mix(in srgb, #f59e0b 16%, var(--bg-soft)); border-color: #f59e0b; color: #b45309; }
+.garden-treerow-end:disabled { opacity: 0.68; cursor: not-allowed; }
+.garden-treerow-spacing input, .garden-treerow-number input { width: 100%; }
+.garden-use-now { width: 100%; min-height: 44px; font-weight: 600; }
 .garden-location-status { margin: -3px 0 0 !important; font-size: 0.82rem !important; color: #b45309 !important; }
 .garden-location-status.success { color: var(--garden-success) !important; font-weight: 600; }
 .garden-est {

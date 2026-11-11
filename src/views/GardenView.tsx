@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useI18n } from '../i18n'
 import { getLocation, type GeoPoint } from '../lib/geo'
+import { directionUncertainty, expectedTrees, rowLengthM, rowReady, rowTreePoint, type RowLayout } from '../lib/row'
 import {
   createObservation,
   loadObservations,
@@ -73,6 +74,31 @@ const CSB_KEY = 'grove.csb.base.v1'
 /** Above this radius (metres) a fix is more likely network/Wi-Fi-based than real
  *  GPS — e.g. iOS "Precise Location" off, or Android's coarse-location grant. */
 const LOW_ACCURACY_M = 100
+/** Locating stops on its own once a fix is this tight. */
+const GOOD_ACCURACY_M = 10
+/** Up to this, a fix is accepted without a warning — near buildings phones
+ *  often can't get below ~10 m however long they wait. */
+const ACCEPTABLE_ACCURACY_M = 15
+const LOCATE_MAX_WAIT_MS = 15000
+/** Every path waypoint affects computed tree positions, so use a longer wait and stricter bar. */
+const ROW_END_TARGET_M = 5
+const ROW_END_ACCEPTABLE_M = 10
+const ROW_END_MAX_WAIT_MS = 30000
+/** Above this, the row's direction is shaky enough to say so. */
+const ROW_DIRECTION_OK_DEG = 15
+/** Row-mode setup survives a reload mid-row; it's local working state, never signed. */
+const ROW_KEY = 'grove.row.v1'
+
+function loadRow(): RowLayout | null {
+  try {
+    const row = JSON.parse(localStorage.getItem(ROW_KEY) ?? 'null') as RowLayout | null
+    if (!row) return null
+    if (!row.waypoints) row.waypoints = row.start && row.end ? [row.start, row.end] : row.start ? [row.start] : []
+    return row
+  } catch {
+    return null
+  }
+}
 
 /** Shared with the proactive permission check below — keeps both denial messages identical. */
 function locationDeniedMessage(km: boolean): string {
@@ -146,12 +172,86 @@ export function GardenView({ locationEnabled }: { locationEnabled: boolean }) {
   const fileRef = useRef<HTMLInputElement>(null)
   const importRef = useRef<HTMLInputElement>(null)
 
+  const [row, setRowState] = useState<RowLayout | null>(() => loadRow())
+  const [spacingText, setSpacingText] = useState(() => (row?.spacingM ? String(row.spacingM) : ''))
+  const [treeNumberText, setTreeNumberText] = useState(() => String(row?.nextTree ?? 1))
+  const [rowLocating, setRowLocating] = useState(false)
+  const [rowMessage, setRowMessage] = useState('')
+  const rowRequestId = useRef(0)
+  const [locateBest, setLocateBest] = useState<number | null>(null)
+  const [rowBest, setRowBest] = useState<number | null>(null)
+  const locateAbort = useRef<AbortController | null>(null)
+  const rowAbort = useRef<AbortController | null>(null)
+
+  function setRow(next: RowLayout | null) {
+    setRowState(next)
+    if (next) localStorage.setItem(ROW_KEY, JSON.stringify(next))
+    else localStorage.removeItem(ROW_KEY)
+  }
+
+  function startRow() {
+    setRow({ id: new Date().toISOString().slice(0, 16), start: null, end: null, waypoints: [], spacingM: 0, nextTree: 1 })
+    setSpacingText('')
+    setTreeNumberText('1')
+    setRowMessage('')
+  }
+
+  function endRow() {
+    rowRequestId.current += 1
+    setRowLocating(false)
+    setRowMessage('')
+    setRow(null)
+  }
+
+  async function recordRowPoint() {
+    if (!row || !locationEnabled) return
+    rowRequestId.current += 1
+    const reqId = rowRequestId.current
+    setRowLocating(true)
+    setRowMessage('')
+    setRowBest(null)
+    rowAbort.current = new AbortController()
+    const { point, error } = await getLocation({
+      targetAcc: ROW_END_TARGET_M,
+      maxWaitMs: ROW_END_MAX_WAIT_MS,
+      signal: rowAbort.current.signal,
+      onProgress: (p) => {
+        if (reqId !== rowRequestId.current) return
+        setRowBest(p.acc)
+        setRowMessage(km ? `កំពុងធ្វើឱ្យទីតាំងកាន់តែច្បាស់… ±${p.acc} ម` : `Improving accuracy… ±${p.acc} m`)
+      },
+    })
+    if (reqId !== rowRequestId.current) return
+    setRowLocating(false)
+    setRowBest(null)
+    if (!point) {
+      setRowMessage(error === 'denied'
+        ? locationDeniedMessage(km)
+        : (km ? 'មិនអាចទទួលទីតាំងបានទេ — សាកល្បងម្ដងទៀតនៅកន្លែងបើកចំហ' : 'Could not get a location — try again with a clearer view of the sky'))
+      return
+    }
+    const current = loadRow() ?? row
+    const waypoints = [...(current.waypoints ?? (current.start && current.end ? [current.start, current.end] : current.start ? [current.start] : [])), point]
+    setRow({ ...current, start: waypoints[0] ?? null, end: waypoints[waypoints.length - 1] ?? null, waypoints })
+    setRowMessage(point.acc > ROW_END_ACCEPTABLE_M
+      ? (km ? `⚠ ទីតាំងត្រឹមតែ ±${point.acc} ម — ចុងជួរគួរតែ ±${ROW_END_ACCEPTABLE_M} ម ឬប្រសើរជាងនេះ ព្រោះដើមឈើទាំងអស់ក្នុងជួរទទួលកំហុសនេះ។ ចេញពីក្រោមដំបូល ហើយកត់ត្រាម្ដងទៀត។` : `⚠ Only ±${point.acc} m — row ends should be ±${ROW_END_ACCEPTABLE_M} m or better, since every tree in the row inherits this error. Step out from under the roof and record it again.`)
+      : '')
+  }
+
+  const rowSpacing = parseDecimal(spacingText)
+  const rowWithSpacing = row ? { ...row, spacingM: rowSpacing } : null
+  const readyRow = rowWithSpacing && rowReady(rowWithSpacing) ? rowWithSpacing : null
+  const rowLength = row ? rowLengthM(row) : 0
+  const treeNumber = Math.max(1, parseInt(treeNumberText) || 1)
+
   useEffect(() => {
     if (!locationEnabled) {
       locationRequestId.current += 1
       setGps(null)
       setLocating(false)
       setLocationMessage('')
+      rowRequestId.current += 1
+      setRowLocating(false)
     }
   }, [locationEnabled])
 
@@ -313,8 +413,20 @@ export function GardenView({ locationEnabled }: { locationEnabled: boolean }) {
     setGps(null)
     setLocationMessage('')
     setLocating(true)
-    const { point, error } = await getLocation()
+    setLocateBest(null)
+    locateAbort.current = new AbortController()
+    const { point, error } = await getLocation({
+      targetAcc: GOOD_ACCURACY_M,
+      maxWaitMs: LOCATE_MAX_WAIT_MS,
+      signal: locateAbort.current.signal,
+      onProgress: (p) => {
+        if (reqId !== locationRequestId.current) return
+        setLocateBest(p.acc)
+        setLocationMessage(km ? `កំពុងធ្វើឱ្យទីតាំងកាន់តែច្បាស់… ±${p.acc} ម` : `Improving accuracy… ±${p.acc} m`)
+      },
+    })
     if (reqId !== locationRequestId.current) return
+    setLocateBest(null)
     setGps(point)
     setLocationMessage(
       point
@@ -322,7 +434,11 @@ export function GardenView({ locationEnabled }: { locationEnabled: boolean }) {
           ? (km
               ? `⚠ ទីតាំងបានកត់ត្រា ប៉ុន្តែភាពត្រឹមត្រូវទន់ខ្សោយ (±${point.acc} ម) — នេះប្រហែលជាទីតាំងតាមបណ្ដាញ មិនមែន GPS ពិតប្រាកដទេ។ ពិនិត្យការកំណត់ "Precise Location" សម្រាប់កម្មវិធីរុករកនេះ ហើយសាកល្បងនៅទីវាលមានមេឃចំហ។`
               : `⚠ Location recorded but accuracy is poor (±${point.acc} m) — this is likely a network-based fix, not real GPS. Check your phone's "Precise Location" setting for this browser, and try again with a clear view of the sky.`)
-          : (km ? `✓ ទីតាំងបានកត់ត្រា · ភាពត្រឹមត្រូវប្រហែល ${point.acc} ម` : `✓ Location recorded · accurate to about ${point.acc} m`)
+          : point.acc > ACCEPTABLE_ACCURACY_M
+            ? (km
+                ? `⚠ ទីតាំងបានកត់ត្រា ប៉ុន្តែត្រឹមត្រូវត្រឹមប្រហែល ±${point.acc} ម ប៉ុណ្ណោះ — ដើមឈើដែលនៅជិតគ្នាអាចបង្ហាញខុសកន្លែង។ សូមចេញឆ្ងាយពីអគារ ឬដំបូល ហើយចុច «ផ្ទុកទីតាំងម្ដងទៀត»។`
+                : `⚠ Location recorded, but only to about ±${point.acc} m — nearby trees may land in the wrong spot. Step away from buildings or roofs and tap Refresh location.`)
+            : (km ? `✓ ទីតាំងបានកត់ត្រា · ភាពត្រឹមត្រូវប្រហែល ${point.acc} ម` : `✓ Location recorded · accurate to about ${point.acc} m`)
         : error === 'denied'
           ? locationDeniedMessage(km)
           : error === 'timeout'
@@ -335,15 +451,33 @@ export function GardenView({ locationEnabled }: { locationEnabled: boolean }) {
   async function save() {
     if (!image) { setError(km ? 'សូមថតរូបរុក្ខជាតិជាមុន' : 'Take a photo of the plant first'); return }
     if (measure.method === 'manual') { setError(km ? 'បញ្ចូលទំហំ (អង្កត់ផ្ចិត ឬកម្ពស់)' : 'Enter a size (trunk width or height)'); return }
+    if (row && !readyRow) {
+      setError(km ? 'បញ្ចប់ការរៀបចំផ្លូវជាមុនសិន៖ ចំណុច GPS និងគម្លាត' : 'Finish the path setup first: GPS points and spacing')
+      return
+    }
     setSaving(true)
     setError('')
     try {
       const photoHash = await photoHashOf(image)
+      // In row mode the position is computed, not measured — the note says so,
+      // and it's part of the signed record.
+      const fromRow = readyRow
+        ? {
+            gps: rowTreePoint(readyRow, treeNumber),
+            note: `row ${readyRow.id} · tree ${treeNumber} · ${readyRow.spacingM} m spacing · position computed from ordered row GPS points`,
+          }
+        : null
       await createObservation({
         plot: plot.trim() || 'home-garden-01',
         species, count: Math.max(1, count), measure,
-        gps, observedAt: new Date().toISOString(), photoHash,
+        gps: fromRow ? fromRow.gps : gps,
+        note: fromRow?.note,
+        observedAt: new Date().toISOString(), photoHash,
       })
+      if (readyRow) {
+        setRow({ ...readyRow, nextTree: treeNumber + 1 })
+        setTreeNumberText(String(treeNumber + 1))
+      }
       setObs(loadObservations())
       // reset the item, keep the plot
       if (previewUrl) URL.revokeObjectURL(previewUrl)
@@ -409,6 +543,79 @@ export function GardenView({ locationEnabled }: { locationEnabled: boolean }) {
         <div><b>{obs.length}</b> {km ? 'កំណត់ត្រា' : 'records'}</div>
         <div><b>{totalCo2}</b> kg CO₂ {km ? 'ប៉ាន់ស្មាន' : 'estimated'}</div>
       </div>
+
+      {!row ? (
+        <button type="button" className="garden-treerow-start" onClick={startRow}>
+          <span aria-hidden="true">📏</span>
+          <span>
+            <b>{km ? 'កត់ត្រាដើមឈើមួយជួរ' : 'Record a row of trees'}</b>
+            <small>{km ? 'GPS តាមផ្លូវ · គម្លាតដាក់ដើមឈើនៅចន្លោះ' : 'GPS along the path · spacing places the trees between'}</small>
+          </span>
+        </button>
+      ) : (
+        <section className="garden-treerow" aria-live="polite">
+          <div className="garden-form-heading">
+            <div>
+              <h2>{km ? 'ដើមឈើមួយជួរ' : 'Row of trees'}</h2>
+              <p>{km ? 'កត់ត្រា GPS តាមផ្លូវ៖ ដើម ចំណុចជ្រុង និងចុង។ បញ្ចូលគម្លាត រួចថតដើមនីមួយៗ។' : 'Record GPS along the path: start, corners, and end. Enter the spacing, then photograph each tree.'}</p>
+            </div>
+            <button type="button" className="voice-ghost small" onClick={endRow}>{km ? 'បញ្ចប់ជួរ' : 'End row'}</button>
+          </div>
+
+          <div className="garden-treerow-ends">
+            <button type="button" className={row.waypoints?.length ? 'garden-treerow-end recorded' : 'garden-treerow-end'}
+              onClick={() => void recordRowPoint()} disabled={rowLocating || !locationEnabled}>
+              <span className="garden-treerow-end-label">{rowLocating ? (km ? 'កំពុងរក…' : 'Locating…') : (km ? 'បន្ថែមចំណុច GPS' : 'Add GPS point')}</span>
+              <span className="garden-treerow-end-value">{row.waypoints?.length ? `${row.waypoints.length} ${km ? 'ចំណុច' : 'points'} · ${km ? 'ដើម → ជ្រុង → ចុង' : 'start → corners → end'}` : (km ? 'ចាប់ផ្តើមនៅដើមជួរ' : 'Start at the first tree')}</span>
+            </button>
+          </div>
+
+          <label className="voice-field garden-treerow-spacing">
+            <span>{km ? 'គម្លាតរវាងដើម' : 'Spacing between trees'}</span>
+            <small>{km ? 'ម៉ែត្រ · ពីដើមមួយទៅដើមមួយ' : 'metres · trunk to trunk'}</small>
+            <input type="text" inputMode="decimal" value={spacingText} placeholder="e.g. 3"
+              onChange={(e) => {
+                setSpacingText(e.target.value)
+                setRow({ ...row, spacingM: parseDecimal(e.target.value) })
+              }} />
+          </label>
+
+          {!locationEnabled ? <p className="garden-location-status">{km ? 'សូមបើកទីតាំងនៅផ្នែកខាងលើ ដើម្បីកត់ត្រាចំណុចជួរ។' : 'Turn on location in the header to record the row points.'}</p> : null}
+          {row.waypoints && row.waypoints.length > 1 ? <p className="garden-location-status">{km ? 'បន្ថែមចំណុចនៅជ្រុងនីមួយៗ ហើយបន្ថែមចំណុចចុងក្រោយ។' : 'Add a point at each corner, then add the final point.'}</p> : null}
+          {rowMessage ? <p className="garden-location-status">{rowMessage}</p> : null}
+          {rowLocating && rowBest !== null ? (
+            <button type="button" className="voice-ghost garden-use-now" onClick={() => rowAbort.current?.abort()}>
+              {km ? `ប្រើ ±${rowBest} ម ឥឡូវនេះ` : `Use ±${rowBest} m now`}
+            </button>
+          ) : null}
+          {rowLength > 0 ? (
+            readyRow ? (
+              <>
+                <p className="garden-location-status success">
+                  {km
+                    ? `ផ្លូវវែង ${rowLength.toFixed(1)} ម → ប្រហែល ${expectedTrees(readyRow)} ដើម នៅគម្លាត ${rowSpacing} ម។ ត្រៀមរួចហើយ — ថតដើមនីមួយៗ។`
+                    : `Path is ${rowLength.toFixed(1)} m long → about ${expectedTrees(readyRow)} trees at ${rowSpacing} m. Ready — photograph each tree.`}
+                </p>
+                {(() => {
+                  const dir = directionUncertainty(readyRow)
+                  const ok = dir.deg <= ROW_DIRECTION_OK_DEG
+                  return (
+                    <p className={ok ? 'garden-location-status success' : 'garden-location-status'}>
+                      {ok
+                        ? (km ? `✓ ទិសដៅជួរ ±${Math.round(dir.deg)}° — ដើមចុងអាចខុសទៅចំហៀងប្រហែល ${dir.sideM.toFixed(1)} ម។` : `✓ Row direction ±${Math.round(dir.deg)}° — far-end trees could sit about ${dir.sideM.toFixed(1)} m to the side.`)
+                        : (km ? `⚠ ទិសដៅជួរមិនច្បាស់ (±${Math.round(dir.deg)}°) — ដើមចុងអាចខុសទៅចំហៀងប្រហែល ${dir.sideM.toFixed(1)} ម។ កត់ត្រាចុងណាមួយម្ដងទៀតឱ្យកាន់តែច្បាស់ ឬកត់ត្រាចុងឆ្ងាយជាងនេះតាមបណ្ដោយជួរ។` : `⚠ Row direction is uncertain (±${Math.round(dir.deg)}°) — far-end trees could sit about ${dir.sideM.toFixed(1)} m to the side. Re-record an end with better accuracy, or record the far end further along the row.`)}
+                    </p>
+                  )
+                })()}
+              </>
+            ) : rowSpacing > 0 ? (
+              <p className="garden-location-status">
+                {km ? `ផ្លូវខ្លីពេក (${rowLength.toFixed(1)} ម) សម្រាប់គម្លាត ${rowSpacing} ម។` : `The path is too short (${rowLength.toFixed(1)} m) for ${rowSpacing} m spacing.`}
+              </p>
+            ) : null
+          ) : null}
+        </section>
+      )}
 
       <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
         onChange={(e) => { const f = e.target.files?.[0]; if (f) void onPick(f) }} />
@@ -548,6 +755,24 @@ export function GardenView({ locationEnabled }: { locationEnabled: boolean }) {
             <input type="text" value={plot} maxLength={40} onChange={(e) => setPlot(e.target.value)} />
           </label>
 
+          {row ? (
+          <section className="garden-location" aria-live="polite">
+            <div>
+              <h2>{km ? 'ទីតាំងក្នុងជួរ' : 'Position in the row'}</h2>
+              <p>{km ? 'គណនាពី GPS ចុងជួរ និងគម្លាត · កំណត់ត្រានឹងបញ្ជាក់ថាវាជាទីតាំងគណនា' : 'Computed from the row-end GPS and spacing · the record says it was computed'}</p>
+            </div>
+            <label className="voice-field garden-treerow-number">
+              <span>{km ? 'លេខដើមឈើក្នុងជួរ' : 'Tree number in the row'}</span>
+              <input type="number" inputMode="numeric" min="1" value={treeNumberText}
+                onChange={(e) => setTreeNumberText(e.target.value)} />
+            </label>
+            <p className={readyRow ? 'garden-location-status success' : 'garden-location-status'}>
+              {readyRow
+                ? (km ? `ដើមទី ${treeNumber} · ${((treeNumber - 1) * rowSpacing).toFixed(1)} ម ពីដើមទីមួយ` : `Tree ${treeNumber} · ${((treeNumber - 1) * rowSpacing).toFixed(1)} m from the first tree`)
+                : (km ? 'បញ្ចប់ការរៀបចំជួរនៅខាងលើជាមុនសិន' : 'Finish the row setup above first')}
+            </p>
+          </section>
+          ) : (
           <section className="garden-location" aria-live="polite">
             <div>
               <h2>{km ? 'ទីតាំងដើមឈើ' : 'Tree location'}</h2>
@@ -559,11 +784,17 @@ export function GardenView({ locationEnabled }: { locationEnabled: boolean }) {
             </button>
             {!locationEnabled ? <p className="garden-location-status">{km ? 'សូមបើកទីតាំងនៅផ្នែកខាងលើ ដើម្បីកត់ត្រាទីតាំងដើមឈើ។' : 'Turn on location in the header to record this tree’s position.'}</p> : null}
             {locationMessage ? (
-              <p className={gps && gps.acc <= LOW_ACCURACY_M ? 'garden-location-status success' : 'garden-location-status'}>
+              <p className={gps && gps.acc <= ACCEPTABLE_ACCURACY_M ? 'garden-location-status success' : 'garden-location-status'}>
                 {locationMessage}
               </p>
             ) : null}
+            {locating && locateBest !== null ? (
+              <button type="button" className="voice-ghost garden-use-now" onClick={() => locateAbort.current?.abort()}>
+                {km ? `ប្រើ ±${locateBest} ម ឥឡូវនេះ` : `Use ±${locateBest} m now`}
+              </button>
+            ) : null}
           </section>
+          )}
 
           {error ? <p className="voice-error">{error}</p> : null}
           <div className="voice-controls">
